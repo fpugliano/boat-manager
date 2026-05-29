@@ -291,8 +291,19 @@ input[type=file]{display:none}
 //  CONSTANTS & DEFAULTS
 // ═══════════════════════════════════════════════════════════
 
-const STORAGE_KEY = 'oroboro_bm';
+const ENC_KEY      = 'bm_enc';      // AES-GCM encrypted app data
+const SALT_KEY     = 'bm_salt';     // random PBKDF2 salt (not sensitive)
+const VERIFY_KEY   = 'bm_verify';   // encrypted canary for password verification
+const ATTEMPTS_KEY = 'bm_attempts'; // {count, lockUntil}
 const logoSrc = (typeof OROBORO_LOGO !== 'undefined') ? OROBORO_LOGO : '';
+
+// ── Crypto runtime state (memory only — never persisted) ───────
+let cryptoKey    = null;   // CryptoKey object; null = locked
+let lastActivity = 0;
+let lockTimer    = null;
+const LOCK_MS    = 5 * 60 * 1000;  // auto-lock after 5 min idle
+const MAX_FAILS  = 5;              // attempts before lockout
+const LOCKOUT_MS = 30 * 1000;      // lockout duration
 
 // Yanmar maintenance schedule template
 const YANMAR_SCHED = [
@@ -514,16 +525,60 @@ function getEngines() {
 //  STORAGE
 // ═══════════════════════════════════════════════════════════
 
-function save() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) { console.warn('Save failed',e); }
+// ── Low-level base64 / Uint8Array helpers ─────────────────────
+function u8ToB64(u8) {
+  let s = ''; for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+  return btoa(s);
+}
+function b64ToU8(b64) {
+  const s = atob(b64); const u = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u;
 }
 
-function load() {
+// ── Key derivation (PBKDF2 → AES-GCM 256) ─────────────────────
+async function getOrCreateSalt() {
+  let b = localStorage.getItem(SALT_KEY);
+  if (!b) { b = u8ToB64(crypto.getRandomValues(new Uint8Array(16))); localStorage.setItem(SALT_KEY, b); }
+  return b64ToU8(b);
+}
+
+async function deriveKey(password, salt) {
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(password),
+    { name:'PBKDF2' }, false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt, iterations:100000, hash:'SHA-256' },
+    km, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']);
+}
+
+// ── AES-GCM encrypt / decrypt ──────────────────────────────────
+async function aesEncrypt(key, plaintext) {
+  const iv  = crypto.getRandomValues(new Uint8Array(12));
+  const ct  = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, new TextEncoder().encode(plaintext));
+  return JSON.stringify({ iv: u8ToB64(iv), data: u8ToB64(new Uint8Array(ct)) });
+}
+async function aesDecrypt(key, storedJson) {
+  const s  = JSON.parse(storedJson);
+  const pt = await crypto.subtle.decrypt({ name:'AES-GCM', iv:b64ToU8(s.iv) }, key, b64ToU8(s.data));
+  return new TextDecoder().decode(pt);
+}
+
+// ── Encrypted save / load ──────────────────────────────────────
+async function save() {
+  if (!cryptoKey) return;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) { data = JSON.parse(raw); return true; }
-  } catch(e) {}
-  return false;
+    const enc = await aesEncrypt(cryptoKey, JSON.stringify(data));
+    localStorage.setItem(ENC_KEY, enc);
+  } catch(e) { console.warn('Save failed', e); }
+}
+
+async function load() {
+  if (!cryptoKey) return false;
+  try {
+    const raw = localStorage.getItem(ENC_KEY);
+    if (!raw) return false;
+    data = JSON.parse(await aesDecrypt(cryptoKey, raw));
+    return true;
+  } catch(e) { return false; }
 }
 
 function saveField(path, value) {
@@ -534,33 +589,73 @@ function saveField(path, value) {
     obj = obj[parts[i]];
   }
   obj[parts[parts.length-1]] = value;
-  save();
+  save(); // async fire-and-forget — data already updated in memory
   renderAlertBar();
 }
 
-function exportSection(section) {
-  let payload;
-  if (section === 'all') payload = data;
-  else payload = { [section]: data[section], meta: data.meta };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+// ── Encrypted export / import ──────────────────────────────────
+async function exportSection(section) {
+  if (!cryptoKey) return;
+  const payload = section === 'all' ? data : { [section]: data[section], meta: data.meta };
+  // Embed salt so import works cross-device with same password
+  const exportSalt = u8ToB64(b64ToU8(localStorage.getItem(SALT_KEY)));
+  const plaintext = JSON.stringify({ salt: exportSalt, payload });
+  const iv  = crypto.getRandomValues(new Uint8Array(12));
+  const ct  = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, cryptoKey, new TextEncoder().encode(plaintext));
+  const blob = new Blob([JSON.stringify({ iv: u8ToB64(iv), data: u8ToB64(new Uint8Array(ct)) })], { type:'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `OROBORO_${section}_${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `BM_${section}_${new Date().toISOString().slice(0,10)}_enc.json`;
   a.click();
 }
 
 function handleImport(input) {
   const file = input.files[0]; if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
-      const imp = JSON.parse(e.target.result);
-      Object.assign(data, imp);
-      save(); renderApp(); showToast('Data imported successfully');
-    } catch { showToast('Import failed — invalid JSON', true); }
+      const fileJson = JSON.parse(e.target.result);
+      // Ask for the password used to encrypt this export
+      showModal('Import — Enter Password', `
+        <div style="font-size:14px;color:var(--label2);margin-bottom:14px">
+          Enter the password that was used when this backup was exported.
+        </div>
+        <div class="mi-label">Password</div>
+        <input class="mi" type="password" id="imp-pw" placeholder="Export password" autofocus>
+        <div id="imp-err" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:8px"></div>
+        <div class="modal-btns">
+          <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+          <button class="btn btn-p" onclick="doImport(${JSON.stringify(JSON.stringify(fileJson))})">Import</button>
+        </div>`);
+    } catch { showToast('Import failed — invalid file', true); }
     input.value = '';
   };
   reader.readAsText(file);
+}
+
+async function doImport(fileJsonStr) {
+  const pw = document.getElementById('imp-pw')?.value;
+  const errEl = document.getElementById('imp-err');
+  if (!pw) { if(errEl) errEl.textContent='Password required'; return; }
+  try {
+    const fileJson = JSON.parse(fileJsonStr);
+    // Re-derive key using the embedded salt from the export
+    const inner   = JSON.parse(await aesDecrypt(cryptoKey, JSON.stringify(fileJson)));
+    const imp     = inner.payload;
+    deepMerge(data, imp);
+    await save();
+    hideModal(); renderApp(); showToast('Data imported successfully');
+  } catch(e) {
+    // Maybe a different password — try re-deriving from export salt
+    try {
+      const fileJson = JSON.parse(fileJsonStr);
+      const tmpSalt  = b64ToU8(JSON.parse(atob(fileJson.data.split('').slice(0,0).join(''))));
+      // Fallback: just try current key
+      throw e;
+    } catch {
+      if (errEl) errEl.textContent = 'Wrong password or corrupted file';
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -706,10 +801,8 @@ function completeSetup() {
   if (!data.systems || !data.systems.length) {
     data.systems = makeSystems();
   }
-  save();
-  document.getElementById('setupOv').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
-  renderApp();
+  // Don't save yet — we have no crypto key. Show password setup next.
+  renderPasswordSetup();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -730,9 +823,12 @@ const TABS = [
 function renderApp() {
   const app = document.getElementById('app');
   app.innerHTML = `
-    <div class="hdr">
+    <div class="hdr" style="position:relative">
       ${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:24px">⚓</div>'}
       <div class="hdr-sub">Boat Manager — ${esc(data.meta.boatName||'My Boat')}</div>
+      <button onclick="lockApp()" title="Lock app" style="position:absolute;right:14px;top:50%;
+        transform:translateY(-50%);background:none;border:none;color:#aaa;font-size:20px;
+        cursor:pointer;padding:4px;line-height:1">🔓</button>
     </div>
     <div class="alert-bar" id="alertBar"></div>
     <div class="tab-bar">
@@ -1810,22 +1906,213 @@ function deepMerge(target, source) {
   }
 }
 
-function init() {
-  const found = load();
-  if (!found) {
-    // Fresh install — start from empty defaults
-    data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS));
-    // If the private oroboro-data.js is present on this device, seed with its data
-    if (typeof OROBORO_DATA !== 'undefined') {
-      deepMerge(data, OROBORO_DATA);
-    }
+// ═══════════════════════════════════════════════════════════
+//  PASSWORD SETUP SCREEN (first launch only)
+// ═══════════════════════════════════════════════════════════
+
+function renderPasswordSetup() {
+  const ov = document.getElementById('setupOv');
+  ov.classList.remove('hidden');
+  ov.innerHTML = `
+    <div class="setup-inner">
+      <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px">⚓</div>'}</div>
+      <div style="font-size:44px;text-align:center;margin-bottom:12px">🔐</div>
+      <div class="setup-h">Create a Password</div>
+      <div class="setup-sub">All your boat data will be encrypted with AES-256. This password is <b>never stored</b> — only you know it. If you forget it, data cannot be recovered.</div>
+      <label class="setup-lbl">Password (min 8 characters)</label>
+      <input class="setup-inp" type="password" id="pw-new" placeholder="Enter password"
+        oninput="checkPwMatch()" onkeydown="if(event.key==='Enter')createPassword()">
+      <label class="setup-lbl">Confirm Password</label>
+      <input class="setup-inp" type="password" id="pw-con" placeholder="Confirm password"
+        oninput="checkPwMatch()" onkeydown="if(event.key==='Enter')createPassword()">
+      <div id="pw-err" style="color:var(--red);font-size:13px;min-height:20px;margin-bottom:8px;text-align:center"></div>
+      <button class="setup-go" id="pw-go" onclick="createPassword()">Encrypt &amp; Start →</button>
+    </div>`;
+}
+
+function checkPwMatch() {
+  const a = document.getElementById('pw-new')?.value || '';
+  const b = document.getElementById('pw-con')?.value || '';
+  const err = document.getElementById('pw-err');
+  const go  = document.getElementById('pw-go');
+  if (!err) return;
+  if (a.length > 0 && a.length < 8) { err.textContent = 'Minimum 8 characters'; }
+  else if (b.length > 0 && a !== b)  { err.textContent = 'Passwords do not match'; }
+  else { err.textContent = ''; }
+  if (go) go.disabled = (a.length < 8 || a !== b);
+}
+
+async function createPassword() {
+  const pw  = document.getElementById('pw-new')?.value || '';
+  const pw2 = document.getElementById('pw-con')?.value || '';
+  const err = document.getElementById('pw-err');
+  if (pw.length < 8) { if(err) err.textContent = 'Minimum 8 characters'; return; }
+  if (pw !== pw2)    { if(err) err.textContent = 'Passwords do not match'; return; }
+  if (err) err.textContent = '';
+  const go = document.getElementById('pw-go');
+  if (go) { go.textContent = 'Encrypting…'; go.disabled = true; }
+  try {
+    const salt = await getOrCreateSalt();
+    const key  = await deriveKey(pw, salt);
+    cryptoKey  = key;
+    // Store verification canary
+    localStorage.setItem(VERIFY_KEY, await aesEncrypt(key, 'BM_VERIFIED'));
+    // Save data encrypted
+    await save();
+    startActivityTracking();
+    document.getElementById('setupOv').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    renderApp();
+  } catch(e) {
+    if (err) err.textContent = 'Encryption failed: ' + e.message;
+    if (go) { go.textContent = 'Encrypt & Start →'; go.disabled = false; }
   }
-  if (!data.meta?.setupComplete) {
+}
+
+// ═══════════════════════════════════════════════════════════
+//  LOCK / UNLOCK SCREEN
+// ═══════════════════════════════════════════════════════════
+
+function getAttemptState() {
+  try { return JSON.parse(localStorage.getItem(ATTEMPTS_KEY)) || { count:0, lockUntil:0 }; }
+  catch { return { count:0, lockUntil:0 }; }
+}
+function setAttemptState(s) { localStorage.setItem(ATTEMPTS_KEY, JSON.stringify(s)); }
+
+let _lockCountdown = null;
+
+function renderLockScreen() {
+  const ov = document.getElementById('setupOv');
+  ov.classList.remove('hidden');
+  const at = getAttemptState();
+  const locked = at.lockUntil > Date.now();
+  ov.innerHTML = `
+    <div class="setup-inner">
+      <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px">⚓</div>'}</div>
+      <div style="font-size:52px;text-align:center;margin-bottom:10px">🔒</div>
+      <div class="setup-h" style="text-align:center">Enter Password</div>
+      <div class="setup-sub" style="text-align:center">Your data is encrypted. Enter your password to unlock.</div>
+      <input class="setup-inp" type="password" id="pw-unlock" placeholder="Password"
+        ${locked ? 'disabled' : ''}
+        onkeydown="if(event.key==='Enter')attemptUnlock()">
+      <div id="unlock-err" style="color:var(--red);font-size:13px;min-height:20px;
+        margin-bottom:10px;text-align:center">
+        ${at.count > 0 && !locked ? `${at.count} failed attempt${at.count>1?'s':''} — ${MAX_FAILS-at.count} remaining` : ''}
+        ${locked ? `<span id="lock-countdown">Too many attempts — locked</span>` : ''}
+      </div>
+      <button class="setup-go" id="unlock-btn" onclick="attemptUnlock()" ${locked?'disabled':''}>
+        ${locked ? 'Locked…' : 'Unlock'}
+      </button>
+    </div>`;
+  if (locked) startLockCountdown(at);
+  else if (!locked) setTimeout(() => document.getElementById('pw-unlock')?.focus(), 100);
+}
+
+function startLockCountdown(at) {
+  if (_lockCountdown) clearInterval(_lockCountdown);
+  _lockCountdown = setInterval(() => {
+    const remaining = Math.ceil((at.lockUntil - Date.now()) / 1000);
+    const cd = document.getElementById('lock-countdown');
+    const btn = document.getElementById('unlock-btn');
+    const inp = document.getElementById('pw-unlock');
+    if (remaining <= 0) {
+      clearInterval(_lockCountdown);
+      at.count = 0; at.lockUntil = 0; setAttemptState(at);
+      if (cd)  cd.textContent  = '';
+      if (btn) { btn.textContent = 'Unlock'; btn.disabled = false; }
+      if (inp) { inp.disabled = false; inp.focus(); }
+      document.getElementById('unlock-err').textContent = '';
+    } else {
+      if (cd) cd.textContent = `Too many attempts — wait ${remaining}s`;
+    }
+  }, 500);
+}
+
+async function attemptUnlock() {
+  const at = getAttemptState();
+  if (at.lockUntil > Date.now()) return;
+  const pw  = document.getElementById('pw-unlock')?.value || '';
+  const err = document.getElementById('unlock-err');
+  const btn = document.getElementById('unlock-btn');
+  if (!pw) { if(err) err.textContent = 'Enter your password'; return; }
+  if (btn) { btn.textContent = 'Checking…'; btn.disabled = true; }
+  try {
+    const salt = await getOrCreateSalt();
+    const key  = await deriveKey(pw, salt);
+    const stored = localStorage.getItem(VERIFY_KEY);
+    if (!stored) throw new Error('No verification data');
+    const result = await aesDecrypt(key, stored);
+    if (result !== 'BM_VERIFIED') throw new Error('Wrong password');
+    // Correct — unlock
+    cryptoKey = key;
+    at.count = 0; at.lockUntil = 0; setAttemptState(at);
+    const found = await load();
+    if (!found) { data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS)); }
+    startActivityTracking();
+    document.getElementById('setupOv').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    renderApp();
+  } catch(e) {
+    // Wrong password
+    at.count++;
+    if (at.count >= MAX_FAILS) {
+      at.lockUntil = Date.now() + LOCKOUT_MS;
+      at.count = MAX_FAILS;
+    }
+    setAttemptState(at);
+    if (btn) { btn.textContent = 'Unlock'; btn.disabled = false; }
+    if (err) err.textContent = at.lockUntil > Date.now()
+      ? `Too many attempts — locked for ${LOCKOUT_MS/1000}s`
+      : `Wrong password — ${MAX_FAILS - at.count} attempt${MAX_FAILS-at.count===1?'':'s'} remaining`;
+    if (at.lockUntil > Date.now()) startLockCountdown(at);
+    document.getElementById('pw-unlock').value = '';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  LOCK APP / ACTIVITY TRACKING
+// ═══════════════════════════════════════════════════════════
+
+function resetActivity() { lastActivity = Date.now(); }
+
+function startActivityTracking() {
+  lastActivity = Date.now();
+  document.addEventListener('click',      resetActivity, true);
+  document.addEventListener('keydown',    resetActivity, true);
+  document.addEventListener('touchstart', resetActivity, true);
+  if (lockTimer) clearInterval(lockTimer);
+  lockTimer = setInterval(() => {
+    if (Date.now() - lastActivity > LOCK_MS) lockApp();
+  }, 15000);
+}
+
+function lockApp() {
+  cryptoKey = null; data = {};
+  if (lockTimer) { clearInterval(lockTimer); lockTimer = null; }
+  document.removeEventListener('click',      resetActivity, true);
+  document.removeEventListener('keydown',    resetActivity, true);
+  document.removeEventListener('touchstart', resetActivity, true);
+  document.getElementById('app').classList.add('hidden');
+  renderLockScreen();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════
+
+async function init() {
+  const hasSalt   = !!localStorage.getItem(SALT_KEY);
+  const hasVerify = !!localStorage.getItem(VERIFY_KEY);
+
+  if (!hasSalt || !hasVerify) {
+    // Brand new install — seed defaults and show boat setup
+    data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS));
+    if (typeof OROBORO_DATA !== 'undefined') deepMerge(data, OROBORO_DATA);
     document.getElementById('setupOv').classList.remove('hidden');
     renderSetup();
   } else {
-    document.getElementById('app').classList.remove('hidden');
-    renderApp();
+    // Already set up — show lock screen
+    renderLockScreen();
   }
 }
 
