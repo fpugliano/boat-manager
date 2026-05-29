@@ -283,6 +283,7 @@ input[type=file]{display:none}
 <input type="file" id="importFile" accept=".json" onchange="handleImport(this)">
 
 <script src="logo.js"></script>
+<script src="oroboro-data.js"></script>
 <script>
 'use strict';
 
@@ -388,41 +389,34 @@ function makeSystems() {
   }));
 }
 
-const OROBORO_DEFAULTS = {
-  meta:{ boatName:'OROBORO', ownerName:'Francesco Pugliano', flag:'USA', hullType:'catamaran', setupComplete:false },
+const EMPTY_DEFAULTS = {
+  meta:{ boatName:'', ownerName:'', flag:'', hullType:'catamaran', setupComplete:false },
   documents:{
     vessel:{
-      vesselName:'OROBORO', officialNumber:'1290676', imoNumber:'RACB1150I819',
-      callSign:'WDK 5272', hailingPort:'San Francisco CA', flagRegistry:'USA',
-      hullMaterial:'FRP Fiberglass', boatType:'Sailing Catamaran',
-      grossTonnage:'28', netTonnage:'25', loa:'11.9m', breadth:'6.7m', depth:'',
-      yearCompleted:'2018', placeBuilt:'Cape Town, South Africa',
-      owners:'Francesco Pugliano and Yuka Abe Trustees', managingOwner:'Francesco Pugliano',
-      issueDate:'', expiryDate:'2030-10-31', engine:'Yanmar 30hp Diesel (×2)'
+      vesselName:'', officialNumber:'', imoNumber:'',
+      callSign:'', hailingPort:'', flagRegistry:'',
+      hullMaterial:'', boatType:'',
+      grossTonnage:'', netTonnage:'', loa:'', breadth:'', depth:'',
+      yearCompleted:'', placeBuilt:'',
+      owners:'', managingOwner:'',
+      issueDate:'', expiryDate:'', engine:''
     },
     insurance:{
-      insurer:'Global Yacht Cover / Great Lakes Insurance SE', policyNumber:'',
-      certNumber:'B0878AYA20245054', issueDate:'2024-10-30', expiryDate:'2025-10-29',
-      premium:'', maxPersonalInjury:'EUR 150,000 per passenger / EUR 700,000 per accident / EUR 2,100,000 aggregate',
-      maxMaterial:'EUR 150,000 per accident / EUR 450,000 aggregate',
-      maxPollution:'EUR 150,000 per accident / EUR 450,000 aggregate',
+      insurer:'', policyNumber:'',
+      certNumber:'', issueDate:'', expiryDate:'',
+      premium:'', maxPersonalInjury:'',
+      maxMaterial:'',
+      maxPollution:'',
       renewalHistory:[]
     },
     customs:{
-      holderName:'Francesco Pugliano', address:'San Francisco CA 94115',
-      email:'fpugliano@gmail.com', afm:'SKAN-SDB-242908',
-      customsOffice:'GR001236', clearanceNumber:'25GRDK123600000241',
-      paymentRef:'', validUntil:'2026-11-04', renewalHistory:[]
+      holderName:'', address:'',
+      email:'', afm:'',
+      customsOffice:'', clearanceNumber:'',
+      paymentRef:'', validUntil:'', renewalHistory:[]
     }
   },
-  crew:[
-    {id:'c1', name:'Francesco Pugliano', role:'Skipper', nationality:'USA',
-     dob:'1971-03-10', passportNumber:'561830962', passportExpiry:'',
-     seamanBookNumber:'SKN-5001851', seamanBookExpiry:'', schengenLog:[]},
-    {id:'c2', name:'Yuka Abe', role:'Crew', nationality:'USA',
-     dob:'1969-11-04', passportNumber:'561583416', passportExpiry:'',
-     seamanBookNumber:'SKN-5001853', seamanBookExpiry:'', schengenLog:[]}
-  ],
+  crew:[],
   photos:{vesselDoc:[], insurance:[], transitLog:[], crewList:[]},
   shipyard:{
     current:{name:'', location:'', contact:'', website:'', startDate:'', endDate:'',
@@ -661,7 +655,7 @@ function renderSetup() {
       <label class="setup-lbl">Boat Name</label>
       <input class="setup-inp" id="s-boat" placeholder="e.g. OROBORO" value="${esc(data.meta?.boatName||'')}">
       <label class="setup-lbl">Owner Name</label>
-      <input class="setup-inp" id="s-owner" placeholder="e.g. Francesco Pugliano" value="${esc(data.meta?.ownerName||'')}">
+      <input class="setup-inp" id="s-owner" placeholder="e.g. John Smith" value="${esc(data.meta?.ownerName||'')}">
       <label class="setup-lbl">Flag / Nationality</label>
       <input class="setup-inp" id="s-flag" placeholder="e.g. USA" value="${esc(data.meta?.flag||'')}">
       <label class="setup-lbl" style="margin-bottom:10px">Hull Type</label>
@@ -1729,7 +1723,7 @@ function showAddLogEntry() {
     <div class="mi-label">Fuel Added (litres)</div><input class="mi" id="m-fl" type="number" placeholder="0">
     <div class="mi-label">Wind (Beaufort / direction)</div><input class="mi" id="m-wd" placeholder="e.g. F4 NW">
     <div class="mi-label">Sea State</div><input class="mi" id="m-ss" placeholder="e.g. Slight">
-    <div class="mi-label">Crew on board</div><input class="mi" id="m-cr" placeholder="e.g. Francesco, Yuka">
+    <div class="mi-label">Crew on board</div><input class="mi" id="m-cr" placeholder="e.g. Alice, Bob">
     <div class="mi-label">Notes / Incidents</div>
     <textarea class="mi" id="m-nt" rows="3" placeholder="Optional notes…"></textarea>
     <div class="modal-btns">
@@ -1805,11 +1799,26 @@ document.addEventListener('click', e => {
 //  INIT
 // ═══════════════════════════════════════════════════════════
 
+function deepMerge(target, source) {
+  for (const key of Object.keys(source)) {
+    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+      if (!target[key] || typeof target[key] !== 'object') target[key] = {};
+      deepMerge(target[key], source[key]);
+    } else {
+      target[key] = source[key];
+    }
+  }
+}
+
 function init() {
   const found = load();
   if (!found) {
-    // Fresh install — load OROBORO defaults
-    data = JSON.parse(JSON.stringify(OROBORO_DEFAULTS));
+    // Fresh install — start from empty defaults
+    data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS));
+    // If the private oroboro-data.js is present on this device, seed with its data
+    if (typeof OROBORO_DATA !== 'undefined') {
+      deepMerge(data, OROBORO_DATA);
+    }
   }
   if (!data.meta?.setupComplete) {
     document.getElementById('setupOv').classList.remove('hidden');
