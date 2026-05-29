@@ -248,6 +248,14 @@ select.fi{-webkit-appearance:none}
   margin:10px 0;font-size:13px;color:var(--label2);line-height:1.55;
   border-left:4px solid var(--blue)}
 
+/* ── Backup bar ── */
+.backup-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);
+  border-top:1px solid var(--sep);padding:8px 16px;display:flex;align-items:center;
+  justify-content:space-between;z-index:100;box-shadow:0 -1px 6px rgba(0,0,0,.06)}
+.backup-bar-txt{font-size:12px;color:var(--label3)}
+.backup-bar-txt b{color:var(--label);font-weight:600}
+@media print{ .backup-bar{display:none!important} }
+
 /* ── Print ── */
 @media print{
   .hdr,.tab-bar,.subtab-bar,.alert-bar,.btn,.btn-row,.no-print{display:none!important}
@@ -279,8 +287,9 @@ input[type=file]{display:none}
   </div>
 </div>
 
-<input type="file" id="photoFile" accept="image/*" onchange="handlePhotoUpload(this)">
-<input type="file" id="importFile" accept=".json" onchange="handleImport(this)">
+<input type="file" id="photoFile"  accept="image/*"        onchange="handlePhotoUpload(this)">
+<input type="file" id="importFile" accept=".json"          onchange="handleImport(this)">
+<input type="file" id="backupFile" accept=".json,text/json" onchange="loadBackupFile(this)">
 
 <script src="logo.js"></script>
 <script src="oroboro-icon.js"></script>
@@ -292,10 +301,11 @@ input[type=file]{display:none}
 //  CONSTANTS & DEFAULTS
 // ═══════════════════════════════════════════════════════════
 
-const ENC_KEY      = 'bm_enc';      // AES-GCM encrypted app data
-const SALT_KEY     = 'bm_salt';     // random PBKDF2 salt (not sensitive)
-const VERIFY_KEY   = 'bm_verify';   // encrypted canary for password verification
-const ATTEMPTS_KEY = 'bm_attempts'; // {count, lockUntil}
+const ENC_KEY      = 'bm_enc';        // AES-GCM encrypted app data
+const SALT_KEY     = 'bm_salt';       // random PBKDF2 salt (not sensitive)
+const VERIFY_KEY   = 'bm_verify';     // encrypted canary for password verification
+const ATTEMPTS_KEY = 'bm_attempts';   // {count, lockUntil}
+const BACKUP_TS    = 'bm_last_backup';// timestamp of last manual backup
 const logoSrc = (typeof OROBORO_LOGO !== 'undefined') ? OROBORO_LOGO : '';
 
 // ── Crypto runtime state (memory only — never persisted) ───────
@@ -835,8 +845,10 @@ function renderApp() {
     <div class="tab-bar">
       ${TABS.map(t=>`<button class="tab-btn ${ui.tab===t.id?'active':''}" onclick="showTab('${t.id}')">${t.icon} ${t.label}</button>`).join('')}
     </div>
-    <main id="mainContent"></main>`;
+    <main id="mainContent" style="padding-bottom:120px"></main>
+    <div class="backup-bar" id="backupBar"></div>`;
   renderAlertBar();
+  renderBackupBar();
   renderActiveTab();
 }
 
@@ -1976,20 +1988,37 @@ function renderLockScreen() {
   ov.innerHTML = `
     <div class="setup-inner">
       <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px">⚓</div>'}</div>
-      <div style="font-size:52px;text-align:center;margin-bottom:10px">🔒</div>
+      <div style="font-size:48px;text-align:center;margin-bottom:10px">🔒</div>
       <div class="setup-h" style="text-align:center">Enter Password</div>
       <div class="setup-sub" style="text-align:center">Your data is encrypted. Enter your password to unlock.</div>
       <input class="setup-inp" type="password" id="pw-unlock" placeholder="Password"
         ${locked ? 'disabled' : ''}
         onkeydown="if(event.key==='Enter')attemptUnlock()">
       <div id="unlock-err" style="color:var(--red);font-size:13px;min-height:20px;
-        margin-bottom:10px;text-align:center">
+        margin-bottom:12px;text-align:center">
         ${at.count > 0 && !locked ? `${at.count} failed attempt${at.count>1?'s':''} — ${MAX_FAILS-at.count} remaining` : ''}
         ${locked ? `<span id="lock-countdown">Too many attempts — locked</span>` : ''}
       </div>
       <button class="setup-go" id="unlock-btn" onclick="attemptUnlock()" ${locked?'disabled':''}>
         ${locked ? 'Locked…' : 'Unlock'}
       </button>
+
+      <div style="display:flex;align-items:center;gap:10px;margin:20px 0 10px">
+        <div style="flex:1;height:1px;background:var(--sep)"></div>
+        <div style="font-size:12px;color:var(--label3)">RESTORE FROM BACKUP</div>
+        <div style="flex:1;height:1px;background:var(--sep)"></div>
+      </div>
+      <button onclick="document.getElementById('backupFile').click()"
+        style="width:100%;border:1.5px solid var(--sep);border-radius:12px;
+          padding:13px 16px;font-family:var(--font);font-size:15px;font-weight:600;
+          background:var(--surface);color:var(--blue);cursor:pointer;margin-bottom:6px">
+        📂 Load Backup File
+      </button>
+      <div style="font-size:12px;color:var(--label3);text-align:center;line-height:1.5">
+        Lost your data after reinstalling? Select your<br>
+        <b>oroboro-boat-backup.json</b> from Files / iCloud Drive,<br>
+        then enter your password above.
+      </div>
     </div>`;
   if (locked) startLockCountdown(at);
   else if (!locked) setTimeout(() => document.getElementById('pw-unlock')?.focus(), 100);
@@ -2087,19 +2116,144 @@ function lockApp() {
 //  INIT
 // ═══════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════
+//  LANDING SCREEN — shown when localStorage is empty
+// ═══════════════════════════════════════════════════════════
+
+function renderLandingScreen() {
+  const ov = document.getElementById('setupOv');
+  ov.classList.remove('hidden');
+  ov.innerHTML = `
+    <div class="setup-inner">
+      <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px">⚓</div>'}</div>
+      <div class="setup-h">Boat Manager</div>
+      <div class="setup-sub">Welcome. Have you used this app before?</div>
+
+      <div style="background:rgba(0,122,255,.08);border:1.5px solid var(--blue);border-radius:14px;
+        padding:18px 16px;margin-bottom:20px">
+        <div style="font-size:15px;font-weight:700;color:var(--blue);margin-bottom:6px">
+          📂 Returning user?
+        </div>
+        <div style="font-size:13px;color:var(--label2);line-height:1.55;margin-bottom:12px">
+          Select your <b>oroboro-boat-backup.json</b> from Files or iCloud Drive to restore all your encrypted data. Then enter your password.
+        </div>
+        <button onclick="document.getElementById('backupFile').click()"
+          style="width:100%;background:var(--blue);color:#fff;border:none;border-radius:10px;
+            padding:13px;font-family:var(--font);font-size:16px;font-weight:600;cursor:pointer">
+          Load Backup File
+        </button>
+      </div>
+
+      <div style="text-align:center;font-size:13px;color:var(--label3);margin:4px 0 16px">— or —</div>
+
+      <button onclick="startNewSetup()"
+        style="width:100%;border:1.5px solid var(--sep);border-radius:12px;padding:13px 16px;
+          font-family:var(--font);font-size:15px;font-weight:600;background:var(--surface);
+          color:var(--label2);cursor:pointer">
+        New setup
+      </button>
+      <div style="font-size:12px;color:var(--label3);text-align:center;margin-top:8px;line-height:1.5">
+        Only tap this if this is a <b>brand new installation</b>.<br>
+        All data starts from scratch.
+      </div>
+    </div>`;
+}
+
+function startNewSetup() {
+  // Seed defaults and go into boat setup flow
+  data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS));
+  if (typeof OROBORO_DATA !== 'undefined') deepMerge(data, OROBORO_DATA);
+  renderSetup();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  BACKUP — save & load encrypted backup files
+// ═══════════════════════════════════════════════════════════
+
+async function saveBackup() {
+  if (!cryptoKey) { showToast('Unlock the app first', true); return; }
+  const salt   = localStorage.getItem(SALT_KEY);
+  const verify = localStorage.getItem(VERIFY_KEY);
+  const enc    = localStorage.getItem(ENC_KEY);
+  if (!salt || !verify || !enc) { showToast('Nothing to back up yet', true); return; }
+  const backup = {
+    format:  'oroboro-boat-backup-v1',
+    created: new Date().toISOString(),
+    salt, verify, data: enc
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'oroboro-boat-backup.json';
+  a.click();
+  localStorage.setItem(BACKUP_TS, Date.now().toString());
+  renderBackupBar();
+  showToast('Backup saved to Downloads / Files');
+}
+
+function loadBackupFile(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const backup = JSON.parse(e.target.result);
+      if (backup.format !== 'oroboro-boat-backup-v1') {
+        showToast('Not a valid backup file', true); return;
+      }
+      if (!backup.salt || !backup.verify || !backup.data) {
+        showToast('Backup file is incomplete', true); return;
+      }
+      // Restore encrypted blobs to localStorage
+      localStorage.setItem(SALT_KEY,   backup.salt);
+      localStorage.setItem(VERIFY_KEY, backup.verify);
+      localStorage.setItem(ENC_KEY,    backup.data);
+      // Clear any lock-out state
+      localStorage.removeItem(ATTEMPTS_KEY);
+      // Show lock screen so user enters their password
+      document.getElementById('app').classList.add('hidden');
+      renderLockScreen();
+      showToast('Backup loaded — enter your password to unlock');
+    } catch {
+      showToast('Could not read backup file', true);
+    }
+    input.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function renderBackupBar() {
+  const el = document.getElementById('backupBar'); if (!el) return;
+  const ts  = localStorage.getItem(BACKUP_TS);
+  let label;
+  if (!ts) {
+    label = '<span style="color:var(--orange);font-weight:600">⚠️ Never backed up</span>';
+  } else {
+    const d = new Date(parseInt(ts));
+    const ago = Math.round((Date.now() - d) / 60000);
+    const when = ago < 60 ? `${ago}m ago` :
+                 ago < 1440 ? `${Math.round(ago/60)}h ago` :
+                 d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    label = `Last backup: <b>${when}</b>`;
+  }
+  el.innerHTML = `
+    <div class="backup-bar-txt">${label}</div>
+    <button class="btn btn-s btn-xs" onclick="saveBackup()">☁️ Backup now</button>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════
+
 async function init() {
   const hasSalt   = !!localStorage.getItem(SALT_KEY);
   const hasVerify = !!localStorage.getItem(VERIFY_KEY);
 
-  if (!hasSalt || !hasVerify) {
-    // Brand new install — seed defaults and show boat setup
-    data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS));
-    if (typeof OROBORO_DATA !== 'undefined') deepMerge(data, OROBORO_DATA);
-    document.getElementById('setupOv').classList.remove('hidden');
-    renderSetup();
-  } else {
-    // Already set up — show lock screen
+  if (hasSalt && hasVerify) {
+    // Returning user — show lock screen
     renderLockScreen();
+  } else {
+    // No local data — show landing screen (restore or new setup)
+    renderLandingScreen();
   }
 }
 
