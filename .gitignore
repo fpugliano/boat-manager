@@ -1,0 +1,6 @@
+# Private data file — contains personal boat/crew details.
+# Never push this to GitHub.
+oroboro-data.js
+
+# macOS
+.DS_Store
