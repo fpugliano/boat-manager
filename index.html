@@ -1792,13 +1792,25 @@ function showAddMaintenanceLog(eid) {
 function saveMaintenanceLog(eid) {
   ensureEngine(eid);
   if (!data.maintenance.engines[eid].log) data.maintenance.engines[eid].log = [];
-  data.maintenance.engines[eid].log.push({
+  const entry = {
     id:uid(), date:document.getElementById('m-ld').value,
     hours:document.getElementById('m-lh').value,
     task:document.getElementById('m-lt').value,
     cost:document.getElementById('m-lc').value,
     notes:document.getElementById('m-ln').value
-  });
+  };
+  data.maintenance.engines[eid].log.push(entry);
+  // Auto-update matching schedule items from this log entry
+  const hrs = parseFloat(entry.hours) || 0;
+  if (hrs && entry.task) {
+    if (!data.maintenance.sched) data.maintenance.sched = {};
+    matchSchedTasks(entry.task).forEach(taskId => {
+      if (!data.maintenance.sched[taskId]) data.maintenance.sched[taskId] = {};
+      const cur = data.maintenance.sched[taskId][eid] || {};
+      if (hrs > (cur.lastDoneAt || 0))
+        data.maintenance.sched[taskId][eid] = { lastDoneAt: hrs, date: entry.date, history: cur.history || [] };
+    });
+  }
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderMaintenance();
 }
 function removeMaintenanceLog(eid, i) {
@@ -2149,12 +2161,56 @@ function deepMerge(target, source) {
   }
 }
 
+// Returns YANMAR_SCHED task IDs whose subject matches keywords in a log task string
+function matchSchedTasks(logTask) {
+  const t = logTask.toLowerCase();
+  const hits = new Set();
+  if (t.includes('oil filter') || t.includes('lube filter'))       hits.add('ls6');
+  if (t.includes('fuel filter'))                                    { hits.add('fs4'); hits.add('fs5'); }
+  if (t.includes('sail drive') || t.includes('saildrive'))         hits.add('ls5');
+  if (t.includes('gear oil')   || t.includes('marine gear'))       hits.add('ls4');
+  // generic "oil" / "lube" → crankcase oil, only if no more-specific oil match already found
+  if ((t.includes('oil') || t.includes('lube')) &&
+      !hits.has('ls4') && !hits.has('ls5') && !hits.has('ls6'))    hits.add('ls3');
+  if (t.includes('impeller'))                                       hits.add('cs3');
+  if (t.includes('coolant'))                                        hits.add('cs4');
+  if (t.includes('belt') || t.includes('alternator'))              hits.add('el3');
+  if (t.includes('fuel tank'))                                      hits.add('fs3');
+  if (t.includes('air filter') || t.includes('air intake'))        hits.add('ae1');
+  if (t.includes('exhaust elbow') || t.includes('mixing elbow'))   hits.add('ae2');
+  return [...hits];
+}
+
+// Scans all engine log entries and back-fills sched[taskId][eid].lastDoneAt
+// from the highest-hours matching log entry. Safe to call multiple times.
+function syncSchedFromLog() {
+  if (!data.maintenance?.engines) return;
+  let dirty = false;
+  Object.keys(data.maintenance.engines).forEach(eid => {
+    (data.maintenance.engines[eid].log || []).forEach(entry => {
+      const hrs = parseFloat(entry.hours) || 0;
+      if (!hrs || !entry.task) return;
+      matchSchedTasks(entry.task).forEach(taskId => {
+        if (!data.maintenance.sched) data.maintenance.sched = {};
+        if (!data.maintenance.sched[taskId]) data.maintenance.sched[taskId] = {};
+        const cur = data.maintenance.sched[taskId][eid] || {};
+        if (hrs > (cur.lastDoneAt || 0)) {
+          data.maintenance.sched[taskId][eid] = { lastDoneAt: hrs, date: entry.date || '', history: cur.history || [] };
+          dirty = true;
+        }
+      });
+    });
+  });
+  return dirty;
+}
+
 function migrateData() {
   let dirty = false;
   (data.spareParts || []).forEach(p => {
     const n = normCat(p.category);
     if (n !== p.category) { p.category = n; dirty = true; }
   });
+  if (syncSchedFromLog()) dirty = true;
   if (dirty) save();
 }
 
