@@ -12,26 +12,11 @@ https://boat-manager-storage.fpugliano.workers.dev
 3. Add binding: Variable name = `BOAT_DATA`, KV namespace = `boat-data`
 4. **Save and Deploy**
 
----
-
-## 2. Resend Email Setup (for PIN reset)
-
-1. Create a free account at [resend.com](https://resend.com)
-2. Add and verify your domain (`sailingoroboro.com`) under **Domains**
-3. Go to **API Keys** → **Create API Key** (full access)
-4. Copy the key — you only see it once
-
-Then add it to the Worker:
-
-- Cloudflare Dashboard → **boat-manager-storage** → **Settings** → **Variables**
-- Under **Environment Variables**, add:
-  - Variable name: `RESEND_API_KEY`
-  - Value: your Resend API key
-- **Save and Deploy**
+No other environment variables needed.
 
 ---
 
-## 3. Worker Code
+## 2. Worker Code
 
 Paste this into the Worker editor and click **Deploy**:
 
@@ -41,7 +26,7 @@ export default {
     const url = new URL(request.url);
     const cors = {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, PUT, POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     };
 
@@ -50,14 +35,8 @@ export default {
     const json = (body, status = 200) =>
       new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
-    async function hashEmail(email) {
-      const buf = await crypto.subtle.digest('SHA-256',
-        new TextEncoder().encode(email.toLowerCase().trim()));
-      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-
-    // GET /api/data/:key  — fetch encrypted blob
-    if (request.method === 'GET') {
+    // GET /api/data/:key  — fetch full encrypted blob
+    if (request.method === 'GET' && url.pathname.startsWith('/api/data/')) {
       const m = url.pathname.match(/^\/api\/data\/([a-f0-9]{64})$/);
       if (!m) return json({ error: 'Not found' }, 404);
       const val = await env.BOAT_DATA.get(m[1]);
@@ -65,61 +44,26 @@ export default {
       return new Response(val, { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    // PUT /api/data/:key  — store encrypted blob
-    if (request.method === 'PUT') {
+    // PUT /api/data/:key  — store encrypted blob {salt, verify, data, hint}
+    if (request.method === 'PUT' && url.pathname.startsWith('/api/data/')) {
       const m = url.pathname.match(/^\/api\/data\/([a-f0-9]{64})$/);
       if (!m) return json({ error: 'Not found' }, 404);
       const body = await request.json();
       if (!body.salt || !body.verify || !body.data) return json({ error: 'Bad request' }, 400);
-      await env.BOAT_DATA.put(m[1], JSON.stringify(body));
+      await env.BOAT_DATA.put(m[1], JSON.stringify({
+        salt: body.salt, verify: body.verify, data: body.data, hint: body.hint || ''
+      }));
       return json({ ok: true });
     }
 
-    // POST /api/reset/send  — send 6-digit OTP via Resend
-    if (request.method === 'POST' && url.pathname === '/api/reset/send') {
-      const { email } = await request.json();
-      if (!email) return json({ error: 'Email required' }, 400);
-      const key = await hashEmail(email);
-      const existing = await env.BOAT_DATA.get(key);
-      if (!existing) return json({ error: 'No account found' }, 404);
-      const code = String(Math.floor(100000 + Math.random() * 900000));
-      await env.BOAT_DATA.put(`reset:${key}`, JSON.stringify({ code, attempts: 0 }), { expirationTtl: 600 });
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: 'Boat Manager <noreply@sailingoroboro.com>',
-          to: email,
-          subject: 'Your Boat Manager PIN reset code',
-          html: `<p>Your reset code is:</p>
-                 <p style="font-size:32px;font-weight:bold;letter-spacing:8px">${code}</p>
-                 <p>Expires in 10 minutes. If you didn't request this, ignore this email.</p>`
-        })
-      });
-      if (!res.ok) return json({ error: 'Email delivery failed' }, 500);
-      return json({ ok: true });
-    }
-
-    // POST /api/reset/verify  — verify OTP
-    if (request.method === 'POST' && url.pathname === '/api/reset/verify') {
-      const { email, code } = await request.json();
-      if (!email || !code) return json({ error: 'Email and code required' }, 400);
-      const key = await hashEmail(email);
-      const stored = await env.BOAT_DATA.get(`reset:${key}`);
-      if (!stored) return json({ error: 'Invalid or expired code' }, 400);
-      const { code: storedCode, attempts } = JSON.parse(stored);
-      if (attempts >= 5) {
-        await env.BOAT_DATA.delete(`reset:${key}`);
-        return json({ error: 'Too many attempts — request a new code' }, 400);
-      }
-      if (code !== storedCode) {
-        await env.BOAT_DATA.put(`reset:${key}`,
-          JSON.stringify({ code: storedCode, attempts: attempts + 1 }),
-          { expirationTtl: 600 });
-        return json({ error: 'Invalid code' }, 400);
-      }
-      await env.BOAT_DATA.delete(`reset:${key}`);
-      return json({ ok: true });
+    // GET /api/hint/:key  — fetch only the PIN hint (no auth required)
+    if (request.method === 'GET' && url.pathname.startsWith('/api/hint/')) {
+      const m = url.pathname.match(/^\/api\/hint\/([a-f0-9]{64})$/);
+      if (!m) return json({ error: 'Not found' }, 404);
+      const val = await env.BOAT_DATA.get(m[1]);
+      if (!val) return json({ error: 'Not found' }, 404);
+      const { hint } = JSON.parse(val);
+      return json({ hint: hint || '' });
     }
 
     return json({ error: 'Not found' }, 404);
@@ -129,9 +73,17 @@ export default {
 
 ---
 
-## Summary of environment variables
+## Data format stored in KV
 
-| Variable | Value |
-|---|---|
-| `BOAT_DATA` | KV namespace binding (`boat-data`) |
-| `RESEND_API_KEY` | API key from resend.com |
+Each user's record is keyed by `SHA-256(email)` and stores:
+
+```json
+{
+  "salt":   "base64 random bytes (PBKDF2 input)",
+  "verify": "AES-GCM encrypted canary",
+  "data":   "AES-GCM encrypted app data",
+  "hint":   "plain-text PIN hint (may be empty)"
+}
+```
+
+The `hint` field is unencrypted so the Forgot PIN screen can show it without the PIN.

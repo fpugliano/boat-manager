@@ -320,7 +320,6 @@ const BACKUP_TS    = 'bm_last_backup';// timestamp of last manual backup
 const logoSrc = (typeof OROBORO_LOGO !== 'undefined') ? OROBORO_LOGO : '';
 const STORAGE_WORKER_URL = 'https://boat-manager-storage.fpugliano.workers.dev';
 const EMAIL_KEY = 'bm_email';
-const HINT_KEY  = 'bm_hint';
 
 // ── Crypto runtime state (memory only — never persisted) ───────
 let cryptoKey    = null;   // CryptoKey object; null = locked
@@ -1984,10 +1983,6 @@ function renderPINSetup() {
       ${pinBoxesHTML('s', null)}
       <label class="setup-lbl" style="text-align:center;display:block;margin:14px 0 4px">Confirm PIN</label>
       ${pinBoxesHTML('c', null)}
-      <label class="setup-lbl" style="margin-top:18px">PIN Hint <span style="color:var(--label3);font-weight:400">(optional but recommended)</span></label>
-      <input class="setup-inp" id="pin-hint" type="text" placeholder='e.g. "year of birth" or "boat length"'
-        style="margin-bottom:4px">
-      <div style="font-size:12px;color:var(--label3);margin-bottom:14px">Stored unencrypted — visible on the Forgot PIN screen to jog your memory.</div>
       <div id="pw-err" style="color:var(--red);font-size:13px;min-height:20px;margin:8px 0;text-align:center"></div>
       <button class="setup-go" id="pw-go" onclick="createPIN()">Create Account →</button>
     </div>`;
@@ -2003,8 +1998,6 @@ async function createPIN() {
   if (pin !== pin2) { if(err) err.textContent='PINs do not match'; clearPin('c'); return; }
   if (err) err.textContent='';
   if (go) { go.textContent='Creating account…'; go.disabled=true; }
-  const hint = document.getElementById('pin-hint')?.value.trim() || '';
-  localStorage.setItem(HINT_KEY, hint);
   try {
     const salt = await getOrCreateSalt();
     const key  = await deriveKey(pin, salt);
@@ -2233,7 +2226,6 @@ async function attemptLogin() {
     localStorage.setItem(SALT_KEY,   cloud.salt);
     localStorage.setItem(VERIFY_KEY, cloud.verify);
     localStorage.setItem(ENC_KEY,    cloud.data);
-    localStorage.setItem(HINT_KEY,   cloud.hint || '');
     localStorage.removeItem(ATTEMPTS_KEY);
     cryptoKey = key;
     await load();
@@ -2260,14 +2252,14 @@ function renderForgotPIN() {
   ov.innerHTML = `
     <div class="setup-inner">
       <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px;font-weight:800">⚓</div>'}</div>
-      <div class="setup-h">Forgot PIN?</div>
-      <div class="setup-sub">Enter your email to see your PIN hint.</div>
+      <div class="setup-h">Reset PIN</div>
+      <div class="setup-sub">We'll email you a 6-digit reset code.</div>
       <label class="setup-lbl">Email</label>
-      <input class="setup-inp" id="hint-email" type="email" placeholder="your@email.com"
+      <input class="setup-inp" id="reset-email" type="email" placeholder="your@email.com"
         value="${esc(savedEmail)}"
-        onkeydown="if(event.key==='Enter')loadPINHint()">
-      <div id="hint-err" style="color:var(--red);font-size:13px;min-height:20px;margin-bottom:8px;text-align:center"></div>
-      <button class="setup-go" id="hint-btn" onclick="loadPINHint()">Show My Hint</button>
+        onkeydown="if(event.key==='Enter')sendResetCode()">
+      <div id="reset-err" style="color:var(--red);font-size:13px;min-height:20px;margin-bottom:8px;text-align:center"></div>
+      <button class="setup-go" id="reset-btn" onclick="sendResetCode()">Send Reset Code</button>
       <button onclick="renderLoginScreen()"
         style="width:100%;margin-top:14px;border:none;background:none;font-family:var(--font);
           font-size:15px;color:var(--label3);cursor:pointer;padding:10px">
@@ -2275,69 +2267,81 @@ function renderForgotPIN() {
       </button>
     </div>`;
   setTimeout(() => {
-    if (savedEmail) document.getElementById('hint-btn')?.focus();
-    else document.getElementById('hint-email')?.focus();
+    if (savedEmail) document.getElementById('reset-btn')?.focus();
+    else document.getElementById('reset-email')?.focus();
   }, 80);
 }
 
-async function loadPINHint() {
-  const email = document.getElementById('hint-email')?.value.trim().toLowerCase();
-  const err   = document.getElementById('hint-err');
-  const btn   = document.getElementById('hint-btn');
+async function sendResetCode() {
+  const email = document.getElementById('reset-email')?.value.trim().toLowerCase();
+  const err   = document.getElementById('reset-err');
+  const btn   = document.getElementById('reset-btn');
   if (!email || !email.includes('@')) { if(err) err.textContent='Enter a valid email'; return; }
-  if (btn) { btn.textContent='Loading…'; btn.disabled=true; }
+  if (btn) { btn.textContent='Sending…'; btn.disabled=true; }
   if (err) err.textContent='';
   try {
-    const key = await emailToKey(email);
-    const r   = await fetch(`${STORAGE_WORKER_URL}/api/hint/${key}`);
-    const j   = await r.json();
+    const r = await fetch(`${STORAGE_WORKER_URL}/api/reset/send`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email})
+    });
+    const j = await r.json();
     if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
-    showPINHint(email, j.hint || '');
+    renderEnterResetCode(email);
   } catch(e) {
-    if (err) err.textContent = e.message.includes('404') ? 'No account found for this email.'
-            : 'Could not load hint: ' + e.message;
-    if (btn) { btn.textContent='Show My Hint'; btn.disabled=false; }
+    if (err) err.textContent = e.message.includes('No account') ? 'No account found for this email.'
+            : 'Could not send code — ' + e.message;
+    if (btn) { btn.textContent='Send Reset Code'; btn.disabled=false; }
   }
 }
 
-function showPINHint(email, hint) {
+function renderEnterResetCode(email) {
   const ov = document.getElementById('setupOv');
-  const hintBlock = hint
-    ? `<div style="background:rgba(0,122,255,.08);border:1.5px solid var(--blue);
-        border-radius:12px;padding:18px 16px;margin:18px 0;text-align:center">
-        <div style="font-size:11px;font-weight:700;color:var(--label3);text-transform:uppercase;
-          letter-spacing:.4px;margin-bottom:8px">Your PIN hint</div>
-        <div style="font-size:20px;font-weight:600;color:var(--label)">${esc(hint)}</div>
-      </div>`
-    : `<div style="padding:18px 0;text-align:center;color:var(--label3);font-size:14px">
-        No hint was set for this account.
-      </div>`;
   ov.innerHTML = `
     <div class="setup-inner">
       <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px;font-weight:800">⚓</div>'}</div>
-      <div class="setup-h">Forgot PIN?</div>
-      <div class="setup-sub" style="text-align:center">${esc(email)}</div>
-      ${hintBlock}
-      <button onclick="confirmPINReset('${email}')"
-        style="width:100%;background:var(--red);color:#fff;border:none;border-radius:14px;
-          padding:16px;font-family:var(--font);font-size:16px;font-weight:600;cursor:pointer">
-        Reset PIN — This will erase all data
-      </button>
-      <button onclick="renderLoginScreen()"
+      <div class="setup-h">Enter Reset Code</div>
+      <div class="setup-sub">Check your email at <b>${esc(email)}</b> for a 6-digit code. It expires in 10 minutes.</div>
+      <label class="setup-lbl">Reset Code</label>
+      <input class="setup-inp" id="reset-code" type="tel" maxlength="6" placeholder="000000"
+        style="text-align:center;letter-spacing:10px;font-size:26px"
+        onkeydown="if(event.key==='Enter')verifyResetCode('${esc(email)}')">
+      <div id="reset-err2" style="color:var(--red);font-size:13px;min-height:20px;margin-bottom:8px;text-align:center"></div>
+      <button class="setup-go" id="verify-btn" onclick="verifyResetCode('${esc(email)}')">Verify Code</button>
+      <button onclick="renderForgotPIN()"
         style="width:100%;margin-top:14px;border:none;background:none;font-family:var(--font);
           font-size:15px;color:var(--label3);cursor:pointer;padding:10px">
-        ← Back to login
+        ← Back
       </button>
     </div>`;
+  setTimeout(() => document.getElementById('reset-code')?.focus(), 80);
 }
 
-function confirmPINReset(email) {
-  if (!confirm('Reset PIN?\n\nThis will permanently erase all your boat data on all devices. This cannot be undone.')) return;
-  [SALT_KEY, VERIFY_KEY, ENC_KEY, HINT_KEY].forEach(k => localStorage.removeItem(k));
-  localStorage.setItem(EMAIL_KEY, email);
-  data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS));
-  data.meta.email = email;
-  renderSetNewPIN();
+async function verifyResetCode(email) {
+  const code = document.getElementById('reset-code')?.value.trim();
+  const err  = document.getElementById('reset-err2');
+  const btn  = document.getElementById('verify-btn');
+  if (!code || code.length < 6) { if(err) err.textContent='Enter the 6-digit code'; return; }
+  if (btn) { btn.textContent='Verifying…'; btn.disabled=true; }
+  if (err) err.textContent='';
+  try {
+    const r = await fetch(`${STORAGE_WORKER_URL}/api/reset/verify`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email, code})
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+    // Valid — clear local crypto, show new PIN setup
+    [SALT_KEY, VERIFY_KEY, ENC_KEY].forEach(k => localStorage.removeItem(k));
+    localStorage.setItem(EMAIL_KEY, email);
+    data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS));
+    data.meta.email = email;
+    renderSetNewPIN();
+  } catch(e) {
+    if (err) err.textContent = e.message.includes('nvalid') || e.message.includes('xpir')
+      ? 'Invalid or expired code — try again.'
+      : 'Verification failed: ' + e.message;
+    if (btn) { btn.textContent='Verify Code'; btn.disabled=false; }
+  }
 }
 
 function renderSetNewPIN() {
@@ -2347,13 +2351,11 @@ function renderSetNewPIN() {
       <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px;font-weight:800">⚓</div>'}</div>
       <div style="font-size:40px;text-align:center;margin-bottom:8px">🔐</div>
       <div class="setup-h">Choose New PIN</div>
-      <div class="setup-sub" style="color:var(--orange)">⚠️ Starting fresh — previous data is gone.</div>
+      <div class="setup-sub" style="color:var(--orange)">⚠️ Your previous boat data cannot be recovered. You'll start fresh.</div>
       <label class="setup-lbl" style="text-align:center;display:block;margin-bottom:4px;margin-top:16px">New PIN</label>
       ${pinBoxesHTML('s', null)}
       <label class="setup-lbl" style="text-align:center;display:block;margin:14px 0 4px">Confirm PIN</label>
       ${pinBoxesHTML('c', null)}
-      <label class="setup-lbl" style="margin-top:18px">PIN Hint <span style="color:var(--label3);font-weight:400">(optional)</span></label>
-      <input class="setup-inp" id="pin-hint" type="text" placeholder='e.g. "year of birth"' style="margin-bottom:4px">
       <div id="pw-err" style="color:var(--red);font-size:13px;min-height:20px;margin:8px 0;text-align:center"></div>
       <button class="setup-go" id="pw-go" onclick="createPIN()">Set New PIN →</button>
     </div>`;
@@ -2482,7 +2484,7 @@ async function pushToCloud() {
     const r = await fetch(`${STORAGE_WORKER_URL}/api/data/${key}`, {
       method: 'PUT',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({salt, verify, data: enc, hint: localStorage.getItem(HINT_KEY)||''})
+      body: JSON.stringify({salt, verify, data: enc})
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     setSyncStatus('synced');
