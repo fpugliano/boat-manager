@@ -2111,8 +2111,18 @@ function renderSystemCard(s) {
 }
 
 function showAddSystem() {
+  const existingCats = [...new Set((data.systems||[]).map(s=>s.cat||s.category).filter(Boolean))];
+  const catOptions = existingCats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  const hasExisting = existingCats.length > 0;
   showModal('Add System', `
-    <div class="mi-label">Category</div><input class="mi" id="m-scat" placeholder="e.g. Battery Storage">
+    <div class="mi-label">Category</div>
+    <select class="mi" id="m-scat-sel" onchange="var v=this.value;var ni=document.getElementById('m-scat-new');if(v==='__new__'){ni.style.display='block';ni.focus();}else{ni.style.display='none';}">
+      ${hasExisting ? '<option value="">— Select existing —</option>' : ''}
+      ${catOptions}
+      <option value="__new__">+ New category…</option>
+    </select>
+    <input class="mi" id="m-scat-new" placeholder="New category name" style="display:${hasExisting?'none':'block'};margin-top:6px">
+
     <div class="mi-label">Make</div><input class="mi" id="m-smk" placeholder="e.g. Victron">
     <div class="mi-label">Model</div><input class="mi" id="m-smd" placeholder="e.g. MPPT 75/15">
     <div class="mi-label">Serial Number</div><input class="mi" id="m-sser" placeholder="Optional">
@@ -2125,9 +2135,14 @@ function showAddSystem() {
 }
 function saveSystem() {
   if (!data.systems) data.systems = [];
+  const selVal = document.getElementById('m-scat-sel')?.value;
+  const cat = (selVal === '__new__' || !selVal)
+    ? (document.getElementById('m-scat-new')?.value.trim() || '')
+    : selVal;
+  if (!cat) { showToast('Please enter a category', true); return; }
   data.systems.push({
-    id:uid(), cat:document.getElementById('m-scat').value,
-    category:document.getElementById('m-scat').value,
+    id:uid(), cat,
+    category:cat,
     make:document.getElementById('m-smk').value,
     model:document.getElementById('m-smd').value,
     serialNumber:document.getElementById('m-sser').value,
