@@ -1747,7 +1747,7 @@ function renderMaintenance() {
   // ── Log ──
   const log = getMaintLog();
   const logRows = log.map((e,i) => {
-    const num = log.length - i;
+    const num = i + 1;
     const engBadges = isCat ? (e.engines||[]).map(eid =>
       `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--label3);margin-left:4px">${eLbl[eid]||eid}</span>`
     ).join('') : '';
