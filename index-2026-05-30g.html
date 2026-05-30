@@ -365,17 +365,7 @@ const EMPTY_DEFAULTS = {
     current:{name:'', location:'', contact:'', website:'', startDate:'', endDate:'',
              estimatedCost:'', actualCost:'', status:'Provisional', depositPaid:'', balanceDue:'', notes:''},
     quotes:[], history:[]
-  },
-  spareParts:[
-    {id:'ex_p1', desc:'Heat Exchanger gasket', pn:'128370-13201', category:'Inboard', qty:4, minQuantity:2, unitPrice:0,  location:'', storeUrl:''},
-    {id:'ex_p2', desc:'Engine Oil filter',     pn:'119305-35170-9', category:'Inboard', qty:2, minQuantity:1, unitPrice:8,  location:'', storeUrl:''},
-    {id:'ex_p3', desc:'Impeller',              pn:'128990-42570', category:'Outboard', qty:1, minQuantity:1, unitPrice:26, location:'', storeUrl:''},
-  ],
-  systems:[
-    {id:'ex_s1', cat:'Battery Storage', category:'Battery Storage', make:'Victron', model:'Lithium Battery A', serialNumber:'', location:'engine room port',       installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', notes:'12V', photos:[]},
-    {id:'ex_s2', cat:'Battery Storage', category:'Battery Storage', make:'Victron', model:'Lithium Battery B', serialNumber:'', location:'engine room centre',     installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', notes:'12V', photos:[]},
-    {id:'ex_s3', cat:'Battery Storage', category:'Battery Storage', make:'Victron', model:'Lithium Battery C', serialNumber:'', location:'engine room starboard',  installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', notes:'12V', photos:[]},
-  ]
+  }
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -396,7 +386,6 @@ let _photoCtx = null; // {section, index} for upload
 
 function uid(){ return '_'+Math.random().toString(36).slice(2,9)+Date.now().toString(36); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function normCat(c){ if(!c) return c; if(c==='Port Engine'||c==='Starboard Engine') return 'Inboard'; if(c==='Suzuki Outboard') return 'Outboard'; return c; }
 
 function daysUntil(dateStr) {
   if (!dateStr) return 9999;
@@ -1539,13 +1528,13 @@ function renderParts() {
   const parts = data.spareParts || [];
   const q = ui.partsSearch.toLowerCase();
   const cat = ui.partsFilter;
-  const cats = ['All', ...new Set(parts.map(p => normCat(p.category)).filter(Boolean))];
+  const cats = ['All', ...new Set(parts.map(p=>p.category).filter(Boolean))];
   const filtered = parts.filter(p => {
     const matchQ = !q || p.desc?.toLowerCase().includes(q) || p.pn?.toLowerCase().includes(q);
-    const matchC = cat === 'All' || normCat(p.category) === cat;
+    const matchC = cat==='All' || p.category===cat;
     return matchQ && matchC;
   });
-  const totalValue = parts.reduce((s,p) => s + (p.qty||0)*(p.unitPrice||0), 0).toFixed(2);
+  const totalValue = parts.reduce((s,p)=>(s+(p.qty||0)*(p.unitPrice||0)),0).toFixed(2);
 
   return `
     <div class="parts-top">
@@ -1553,7 +1542,7 @@ function renderParts() {
         oninput="ui.partsSearch=this.value;document.getElementById('mainContent').innerHTML=renderParts()">
     </div>
     <div class="subtab-bar" style="margin-bottom:10px">
-      ${cats.map(c => `<div class="pill ${ui.partsFilter===c?'active':''}"
+      ${cats.map(c=>`<div class="pill ${ui.partsFilter===c?'active':''}"
         onclick="ui.partsFilter='${esc(c)}';document.getElementById('mainContent').innerHTML=renderParts()">${esc(c)}</div>`).join('')}
     </div>
     <div class="btn-row" style="padding:0 0 10px">
@@ -1561,15 +1550,11 @@ function renderParts() {
       <button class="btn btn-s btn-sm" onclick="exportSection('spareParts')">⬇ Export</button>
     </div>
     <div class="card">
-      <div class="card-hd">${filtered.length} items${cat!=='All'?' ('+cat+')':''}</div>
+      <div class="card-hd">${filtered.length} items ${cat!=='All'?'('+cat+')':''}</div>
       <div class="card-body">
         ${filtered.map(p => {
           const low = (p.qty||0) <= (p.minQuantity||0);
           const idx = parts.indexOf(p);
-          const storeDisplay = p.storeUrl
-            ? `<a href="${esc(p.storeUrl)}" target="_blank" rel="noopener" style="color:var(--blue)">${esc(p.location||'Shop')}</a>`
-            : esc(p.location||'');
-          const meta = [p.pn?esc(p.pn):null, esc(normCat(p.category)), storeDisplay||null, `€${p.unitPrice||0}`].filter(Boolean).join(' · ');
           return `<div class="part-row">
             <div class="qty-wrap">
               <button class="qb" onclick="adjQty(${idx},-1)">−</button>
@@ -1578,12 +1563,11 @@ function renderParts() {
             </div>
             <div class="p-info">
               <div class="p-desc">${esc(p.desc)} ${low?`<span class="badge b-red">Low</span>`:''}</div>
-              <div class="p-meta">${meta}</div>
+              <div class="p-meta">${p.pn?esc(p.pn)+' · ':''}${esc(p.category)} · ${esc(p.location||'')} · €${p.unitPrice||0}</div>
             </div>
-            <button class="btn btn-s btn-xs no-print" onclick="showEditPart(${idx})" style="margin-right:4px">✏️</button>
             <button class="btn btn-d btn-xs no-print" onclick="removePart(${idx})">✕</button>
           </div>`;
-        }).join('') || '<div style="padding:16px;color:var(--label3)">No parts — tap + Add Part to get started</div>'}
+        }).join('') || '<div style="padding:16px;color:var(--label3)">No parts match</div>'}
       </div>
       <div class="parts-footer">Total inventory value: €${totalValue}</div>
     </div>`;
@@ -1599,22 +1583,15 @@ function removePart(i) {
   data.spareParts.splice(i,1); save();
   document.getElementById('mainContent').innerHTML = renderParts();
 }
-
-function _partModalFields(p) {
-  return `
-    <div class="mi-label">Description</div><input class="mi" id="m-pd" placeholder="Part description" value="${esc(p.desc||'')}">
-    <div class="mi-label">Part Number</div><input class="mi" id="m-ppn" placeholder="Optional" value="${esc(p.pn||'')}">
-    <div class="mi-label">Category</div><input class="mi" id="m-pc" placeholder="e.g. Inboard" value="${esc(p.category||'')}">
-    <div class="mi-label">Quantity</div><input class="mi" id="m-pq" type="number" value="${p.qty??1}" min="0">
-    <div class="mi-label">Min Quantity</div><input class="mi" id="m-pmq" type="number" value="${p.minQuantity??1}" min="0">
-    <div class="mi-label">Unit Price (€)</div><input class="mi" id="m-pp2" type="number" value="${p.unitPrice??0}" min="0" step="0.01">
-    <div class="mi-label">From Store</div><input class="mi" id="m-pl" placeholder="e.g. Yanmar dealer" value="${esc(p.location||'')}">
-    <div class="mi-label">Store URL</div><input class="mi" id="m-purl" type="url" placeholder="https://…" value="${esc(p.storeUrl||'')}">`;
-}
-
 function showAddPart() {
   showModal('Add Spare Part', `
-    ${_partModalFields({})}
+    <div class="mi-label">Description</div><input class="mi" id="m-pd" placeholder="Part description">
+    <div class="mi-label">Part Number</div><input class="mi" id="m-ppn" placeholder="Optional">
+    <div class="mi-label">Category</div><input class="mi" id="m-pc" placeholder="e.g. Yanmar Engine">
+    <div class="mi-label">Quantity</div><input class="mi" id="m-pq" type="number" value="1" min="0">
+    <div class="mi-label">Min Quantity</div><input class="mi" id="m-pmq" type="number" value="1" min="0">
+    <div class="mi-label">Unit Price (€)</div><input class="mi" id="m-pp2" type="number" value="0" min="0" step="0.01">
+    <div class="mi-label">Location on Boat</div><input class="mi" id="m-pl" placeholder="e.g. engine bay">
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="savePart()">Add</button>
@@ -1623,38 +1600,13 @@ function showAddPart() {
 function savePart() {
   if (!data.spareParts) data.spareParts = [];
   data.spareParts.push({
-    id:uid(),
-    desc:document.getElementById('m-pd').value,
+    id:uid(), desc:document.getElementById('m-pd').value,
     pn:document.getElementById('m-ppn').value,
     category:document.getElementById('m-pc').value,
     qty:parseInt(document.getElementById('m-pq').value)||0,
     minQuantity:parseInt(document.getElementById('m-pmq').value)||0,
     unitPrice:parseFloat(document.getElementById('m-pp2').value)||0,
-    location:document.getElementById('m-pl').value,
-    storeUrl:document.getElementById('m-purl').value,
-  });
-  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderParts();
-}
-function showEditPart(idx) {
-  const p = data.spareParts?.[idx]; if (!p) return;
-  showModal('Edit Part', `
-    ${_partModalFields(p)}
-    <div class="modal-btns">
-      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
-      <button class="btn btn-p" onclick="saveEditedPart(${idx})">Save</button>
-    </div>`);
-}
-function saveEditedPart(idx) {
-  if (!data.spareParts?.[idx]) return;
-  Object.assign(data.spareParts[idx], {
-    desc:document.getElementById('m-pd').value,
-    pn:document.getElementById('m-ppn').value,
-    category:document.getElementById('m-pc').value,
-    qty:parseInt(document.getElementById('m-pq').value)||0,
-    minQuantity:parseInt(document.getElementById('m-pmq').value)||0,
-    unitPrice:parseFloat(document.getElementById('m-pp2').value)||0,
-    location:document.getElementById('m-pl').value,
-    storeUrl:document.getElementById('m-purl').value,
+    location:document.getElementById('m-pl').value, notes:''
   });
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderParts();
 }
