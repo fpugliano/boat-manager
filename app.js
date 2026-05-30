@@ -358,6 +358,7 @@ function handleJsonImport(input) {
           if (m.engineHours !== undefined)
             eng.hours = Math.max(0, parseInt(m.engineHours) || 0);
           if (Array.isArray(m.log)) {
+            console.log('[import maintenance] log entries found:', m.log?.length, 'engines:', Object.keys(data.maintenance.engines));
             if (!eng.log) eng.log = [];
             m.log.forEach(entry => eng.log.push({
               id:    uid(),
@@ -367,6 +368,7 @@ function handleJsonImport(input) {
               cost:  entry.cost  || '',
               notes: entry.location || entry.notes || ''
             }));
+            console.log('[import maintenance] port log now has:', data.maintenance.engines.port?.log?.length, 'entries');
           }
         });
       }
