@@ -2327,6 +2327,7 @@ async function attemptUnlock() {
     at.count = 0; at.lockUntil = 0; setAttemptState(at);
     const found = await load();
     if (!found) { data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS)); }
+    if (!localStorage.getItem(EMAIL_KEY) && data.meta?.email) localStorage.setItem(EMAIL_KEY, data.meta.email);
     const pulled = await pullFromCloud();
     if (!pulled) await pushToCloud(); // cloud has no record yet — seed it with local data
     migrateData();
@@ -2441,6 +2442,7 @@ async function attemptLogin() {
       await aesDecrypt(key, localStorage.getItem(VERIFY_KEY));
       cryptoKey = key;
       await load();
+      if (!localStorage.getItem(EMAIL_KEY) && data.meta?.email) localStorage.setItem(EMAIL_KEY, data.meta.email);
       const pulled = await pullFromCloud();
       if (!pulled) await pushToCloud(); // cloud has no record yet — seed it with local data
       migrateData();
@@ -2706,6 +2708,7 @@ async function pushToCloud() {
   const salt   = localStorage.getItem(SALT_KEY);
   const verify = localStorage.getItem(VERIFY_KEY);
   const enc    = localStorage.getItem(ENC_KEY);
+  console.log('[pushToCloud] email:', email?.slice(0,10)||'NULL', 'salt:', salt?.slice(0,10)||'NULL', 'verify:', verify?.slice(0,10)||'NULL', 'enc:', enc?.slice(0,10)||'NULL');
   if (!email || !salt || !verify || !enc) return;
   setSyncStatus('syncing');
   try {
@@ -2735,6 +2738,7 @@ async function fetchFromCloud(email) {
 
 async function pullFromCloud() {
   const email = localStorage.getItem(EMAIL_KEY);
+  console.log('[pullFromCloud] email:', email?.slice(0,10)||'NULL', 'cryptoKey:', cryptoKey?'SET':'NULL');
   if (!email || !cryptoKey) { console.warn('pullFromCloud: no email or key'); return false; }
   try {
     const cloud = await fetchFromCloud(email);
