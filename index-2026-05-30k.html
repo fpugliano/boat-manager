@@ -24,10 +24,8 @@
 body{font-family:var(--font);background:var(--bg);color:var(--label);min-height:100vh;font-size:17px}
 
 /* ── Header ── */
-.hdr{background:#1a1a1a;border-bottom:1px solid rgba(255,255,255,.08);
-  padding-top:env(safe-area-inset-top);
+.hdr{background:#1a1a1a;border-bottom:1px solid rgba(255,255,255,.08);padding:12px 16px 10px;
   position:sticky;top:0;z-index:300;text-align:center}
-.hdr-content{position:relative;padding:12px 16px 10px}
 .hdr img{height:34px;width:auto;object-fit:contain}
 .hdr-sub{font-size:13px;color:#999;margin-top:2px}
 
@@ -827,15 +825,13 @@ const TABS = [
 function renderApp() {
   const app = document.getElementById('app');
   app.innerHTML = `
-    <div class="hdr">
-      <div class="hdr-content">
-        ${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:24px">⚓</div>'}
-        <div class="hdr-sub">Boat Manager — ${esc(data.meta.boatName||'My Boat')}</div>
-        <span id="sync-dot" class="sync-dot" onclick="pushToCloud()" title="Not synced">●</span>
-        <button onclick="lockApp()" title="Lock app" style="position:absolute;right:14px;top:50%;
-          transform:translateY(-50%);background:none;border:none;color:#aaa;font-size:20px;
-          cursor:pointer;padding:4px;line-height:1">🔓</button>
-      </div>
+    <div class="hdr" style="position:relative">
+      ${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:24px">⚓</div>'}
+      <div class="hdr-sub">Boat Manager — ${esc(data.meta.boatName||'My Boat')}</div>
+      <span id="sync-dot" class="sync-dot" onclick="pushToCloud()" title="Not synced">●</span>
+      <button onclick="lockApp()" title="Lock app" style="position:absolute;right:14px;top:50%;
+        transform:translateY(-50%);background:none;border:none;color:#aaa;font-size:20px;
+        cursor:pointer;padding:4px;line-height:1">🔓</button>
     </div>
     <div class="alert-bar" id="alertBar"></div>
     <div class="tab-bar">
