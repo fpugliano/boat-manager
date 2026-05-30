@@ -3052,14 +3052,11 @@ function prefillTransitLog() {
 
 function migrateData() {
   let dirty = false;
-  (data.spareParts || []).forEach(p => {
-    const n = normCat(p.category);
-    if (n !== p.category) { p.category = n; dirty = true; }
-  });
-  if (migrateToSingleLog()) dirty = true;
-  if (prefillCustomsOwnerData()) dirty = true;
-  if (prefillTransitLog()) dirty = true;
-  if (prefillUpgradesData()) dirty = true;
+  try { (data.spareParts || []).forEach(p => { const n = normCat(p.category); if (n !== p.category) { p.category = n; dirty = true; } }); } catch(e) { console.warn('migrate spareParts', e); }
+  try { if (migrateToSingleLog()) dirty = true; } catch(e) { console.warn('migrateToSingleLog', e); }
+  try { if (prefillCustomsOwnerData()) dirty = true; } catch(e) { console.warn('prefillCustoms', e); }
+  try { if (prefillTransitLog()) dirty = true; } catch(e) { console.warn('prefillTransitLog', e); }
+  try { if (prefillUpgradesData()) dirty = true; } catch(e) { console.warn('prefillUpgrades', e); }
   // Seed belt history if not already present
   if (!data.maintenance) data.maintenance = { engines:{}, sched:{}, log:[] };
   if (!data.maintenance.log) data.maintenance.log = [];
