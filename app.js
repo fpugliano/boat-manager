@@ -529,7 +529,6 @@ function completeSetup() {
 
 const TABS = [
   {id:'documents', icon:'📄', label:'Documents'},
-  {id:'photos',    icon:'📷', label:'Photos'},
   {id:'shipyard',  icon:'⚓', label:'Shipyard'},
   {id:'maint',     icon:'🔧', label:'Maintenance'},
   {id:'upgrades',  icon:'🔧', label:'Upgrades & Repairs'},
@@ -577,7 +576,6 @@ function renderActiveTab() {
     switch(ui.tab) {
       case 'documents': mc.innerHTML = renderDocuments(); break;
       case 'crew':      mc.innerHTML = renderCrew(); break;
-      case 'photos':    mc.innerHTML = renderPhotos(); break;
       case 'shipyard':  mc.innerHTML = renderShipyard(); break;
       case 'maint':     mc.innerHTML = renderMaintenance(); break;
       case 'upgrades':  mc.innerHTML = renderUpgrades(); break;
@@ -598,7 +596,7 @@ function renderActiveTab() {
 // ═══════════════════════════════════════════════════════════
 
 function renderDocuments() {
-  const SUBS = {vessel:'🚢 Vessel Doc', insurance:'🛡️ Insurance', customs:'🛃 eTEPAY', transitlog:'📜 Transit Log'};
+  const SUBS = {vessel:'🚢 Vessel Doc', insurance:'🛡️ Insurance', customs:'🛃 eTEPAY', transitlog:'📜 Transit Log', photos:'📷 Document Photos'};
   return `
     <div class="subtab-bar">
       ${Object.keys(SUBS).map(s=>`
@@ -607,6 +605,7 @@ function renderDocuments() {
     ${ui.docSub==='vessel' ? renderVesselDoc()
     : ui.docSub==='insurance' ? renderInsurance()
     : ui.docSub==='transitlog' ? renderTransitLog()
+    : ui.docSub==='photos' ? renderPhotos()
     : renderCustoms()}`;
 }
 
@@ -626,8 +625,6 @@ function renderVesselDoc() {
   const exp = expiryBadge(v.expiryDate, 90);
   return `
     <div class="btn-row no-print">
-      <button class="btn btn-s btn-sm" onclick="exportSection('documents')">⬇ Export</button>
-      <button class="btn btn-s btn-sm" onclick="document.getElementById('importFile').click()">⬆ Import</button>
       <button class="btn btn-s btn-sm" onclick="window.print()">🖨 Print</button>
     </div>
     <div class="sec-hd">Vessel Identification</div>
@@ -665,10 +662,6 @@ function renderInsurance() {
   const I = data.documents?.insurance || {};
   const exp = expiryBadge(I.expiryDate, 60);
   return `
-    <div class="btn-row no-print">
-      <button class="btn btn-s btn-sm" onclick="exportSection('documents')">⬇ Export</button>
-      <button class="btn btn-s btn-sm" onclick="document.getElementById('importFile').click()">⬆ Import</button>
-    </div>
     <div class="sec-hd">Policy Details</div>
     <div class="card"><div class="card-body">
       ${fr('Insurer','documents.insurance.insurer',I.insurer)}
@@ -706,10 +699,6 @@ function renderCustoms() {
   const C = data.documents?.customs || {};
   const exp = expiryBadge(C.validUntil, 60);
   return `
-    <div class="btn-row no-print">
-      <button class="btn btn-s btn-sm" onclick="exportSection('documents')">⬇ Export</button>
-      <button class="btn btn-s btn-sm" onclick="document.getElementById('importFile').click()">⬆ Import</button>
-    </div>
     <div class="sec-hd">eTEPAY Application</div>
     <div class="card"><div class="card-body">
       ${fr('Application Number','documents.customs.applicationNumber',C.applicationNumber)}
@@ -863,7 +852,6 @@ function renderCrew() {
   return `
     <div class="btn-row">
       <button class="btn btn-p btn-sm" onclick="showAddCrew()">+ Add Person</button>
-      <button class="btn btn-s btn-sm" onclick="exportSection('crew')">⬇ Export</button>
     </div>
     ${crew.map((p,i) => renderCrewCard(p,i)).join('')}
     ${crew.length===0?`<div style="text-align:center;padding:40px 0;color:var(--label3)">No crew added yet</div>`:''}`;
@@ -1082,9 +1070,6 @@ function renderShipyard() {
   const s = data.shipyard?.current || {};
   const STATUS = ['Confirmed','Provisional','Quote Only'];
   return `
-    <div class="btn-row">
-      <button class="btn btn-s btn-sm" onclick="exportSection('shipyard')">⬇ Export</button>
-    </div>
     <div class="sec-hd">Current / Upcoming Season</div>
     <div class="card"><div class="card-body">
       ${fr('Shipyard Name','shipyard.current.name',s.name)}
@@ -1501,7 +1486,6 @@ function renderMaintenance() {
     <div class="sec-hd">Maintenance Log</div>
     <div class="btn-row">
       <button class="btn btn-p btn-sm" onclick="showAddMaintEntry()">+ Add entry</button>
-      <button class="btn btn-s btn-sm" onclick="exportSection('maintenance')">⬇ Export</button>
     </div>
     <div class="card"><div style="overflow-x:auto">
       <table class="tbl"><thead><tr><th>#</th><th>Date</th><th>Hours</th><th>Task</th><th>Cost</th><th>Notes</th><th></th></tr></thead>
@@ -1636,7 +1620,6 @@ function renderParts() {
     </div>
     <div class="btn-row" style="padding:0 0 10px">
       <button class="btn btn-p btn-sm" onclick="showAddPart()">+ Add Part</button>
-      <button class="btn btn-s btn-sm" onclick="exportSection('spareParts')">⬇ Export</button>
     </div>
     <div class="card">
       <div class="card-hd">${filtered.length} items${cat!=='All'?' ('+cat+')':''}</div>
@@ -2021,7 +2004,6 @@ function renderSystems() {
   return `
     <div class="btn-row">
       <button class="btn btn-p btn-sm" onclick="showAddSystem()">+ Add System</button>
-      <button class="btn btn-s btn-sm" onclick="exportSection('systems')">⬇ Export</button>
     </div>
     ${cats.map(cat => `
       <div class="sec-hd">${esc(cat)}</div>
@@ -2401,7 +2383,6 @@ function renderLogbook() {
   return `
     <div class="btn-row">
       <button class="btn btn-p btn-sm" onclick="showAddLogEntry()">+ New Entry</button>
-      <button class="btn btn-s btn-sm" onclick="exportSection('logbook')">⬇ Export</button>
     </div>
     <div class="card" style="margin-bottom:14px">
       <div class="card-hd">Running Totals</div>
