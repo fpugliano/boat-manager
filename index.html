@@ -447,7 +447,7 @@ let data = {};
 let ui = {
   tab:'documents', docSub:'vessel', maintEngine:'port',
   photoSub:'vesselDoc', crewOpen:null, sysOpen:null,
-  partsSearch:'', partsFilter:'All', alertsOpen:true
+  partsSearch:'', partsFilter:'All', alertsOpen:false
 };
 let _photoCtx = null; // {section, index} for upload
 
@@ -2257,6 +2257,7 @@ async function attemptUnlock() {
   const pin = getPin('u');
   const err = document.getElementById('unlock-err');
   const btn = document.getElementById('unlock-btn');
+  if (!crypto?.subtle) { if(err) err.textContent='Secure connection required — please open this app via HTTPS (https://boat.sailingoroboro.com)'; return; }
   if (pin.length !== 4) { if(err) err.textContent='Enter your 4-digit PIN'; return; }
   if (btn) { btn.textContent='Checking…'; btn.disabled=true; }
   try {
@@ -2366,6 +2367,7 @@ async function attemptLogin() {
   const pin   = getPin('l');
   const err   = document.getElementById('login-err');
   const btn   = document.getElementById('login-btn');
+  if (!crypto?.subtle) { if(err) err.textContent='Secure connection required — please open this app via HTTPS (https://boat.sailingoroboro.com)'; return; }
   if (!email || !email.includes('@')) { if(err) err.textContent='Enter a valid email'; return; }
   if (pin.length !== 4) { if(err) err.textContent='Enter your 4-digit PIN'; return; }
   if (btn) { btn.textContent='Signing in…'; btn.disabled=true; }
@@ -2454,6 +2456,7 @@ async function loadPINHint() {
   const email = document.getElementById('hint-email')?.value.trim().toLowerCase();
   const err   = document.getElementById('hint-err');
   const btn   = document.getElementById('hint-btn');
+  if (!crypto?.subtle) { if(err) err.textContent='Secure connection required — please open this app via HTTPS (https://boat.sailingoroboro.com)'; return; }
   if (!email || !email.includes('@')) { if(err) err.textContent='Enter a valid email'; return; }
   if (btn) { btn.textContent='Loading…'; btn.disabled=true; }
   if (err) err.textContent='';
