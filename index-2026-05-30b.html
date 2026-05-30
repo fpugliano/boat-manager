@@ -312,7 +312,7 @@ const ATTEMPTS_KEY = 'bm_attempts';   // {count, lockUntil}
 const BACKUP_TS    = 'bm_last_backup';// timestamp of last manual backup
 const logoSrc = (typeof OROBORO_LOGO !== 'undefined') ? OROBORO_LOGO : '';
 const STORAGE_WORKER_URL = 'https://boat-manager-storage.fpugliano.workers.dev';
-const EMAIL_KEY = 'bm_email';
+const UUID_KEY = 'bm_uuid';
 
 // ── Crypto runtime state (memory only — never persisted) ───────
 let cryptoKey    = null;   // CryptoKey object; null = locked
@@ -419,7 +419,7 @@ function makeSystems() {
 }
 
 const EMPTY_DEFAULTS = {
-  meta:{ boatName:'', ownerName:'', email:'', flag:'', hullType:'catamaran', setupComplete:false },
+  meta:{ boatName:'', ownerName:'', flag:'', hullType:'catamaran', setupComplete:false },
   documents:{
     vessel:{
       vesselName:'', officialNumber:'', imoNumber:'',
@@ -765,13 +765,11 @@ function renderSetup() {
     <div class="setup-inner">
       <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px;font-weight:800">⚓</div>'}</div>
       <div class="setup-h">Boat Manager</div>
-      <div class="setup-sub">Set up your boat. Your encrypted data syncs to the cloud.</div>
+      <div class="setup-sub">Set up your boat. All data stays on your device — nothing is sent anywhere.</div>
       <label class="setup-lbl">Boat Name</label>
       <input class="setup-inp" id="s-boat" placeholder="e.g. OROBORO" value="${esc(data.meta?.boatName||'')}">
       <label class="setup-lbl">Owner Name</label>
       <input class="setup-inp" id="s-owner" placeholder="e.g. John Smith" value="${esc(data.meta?.ownerName||'')}">
-      <label class="setup-lbl">Email</label>
-      <input class="setup-inp" id="s-email" type="email" placeholder="your@email.com" value="${esc(data.meta?.email||'')}">
       <label class="setup-lbl">Flag / Nationality</label>
       <input class="setup-inp" id="s-flag" placeholder="e.g. USA" value="${esc(data.meta?.flag||'')}">
       <label class="setup-lbl" style="margin-bottom:10px">Hull Type</label>
@@ -799,17 +797,13 @@ function selHull(t) {
 }
 
 function completeSetup() {
-  const name  = document.getElementById('s-boat').value.trim();
+  const name = document.getElementById('s-boat').value.trim();
   const owner = document.getElementById('s-owner').value.trim();
-  const email = document.getElementById('s-email').value.trim().toLowerCase();
-  const flag  = document.getElementById('s-flag').value.trim();
-  if (!name)  { showToast('Please enter a boat name', true); return; }
-  if (!email || !email.includes('@')) { showToast('Please enter a valid email', true); return; }
-  data.meta.boatName  = name;
+  const flag = document.getElementById('s-flag').value.trim();
+  if (!name) { showToast('Please enter a boat name', true); return; }
+  data.meta.boatName = name || 'My Boat';
   data.meta.ownerName = owner;
-  data.meta.email     = email;
-  data.meta.flag      = flag;
-  localStorage.setItem(EMAIL_KEY, email);
+  data.meta.flag = flag;
   data.meta.setupComplete = true;
   // Initialize maintenance if not set
   if (!data.maintenance) {
@@ -1975,6 +1969,7 @@ async function createPassword() {
     localStorage.setItem(VERIFY_KEY, await aesEncrypt(key, 'BM_VERIFIED'));
     // Save data encrypted
     await save();
+    getOrCreateUUID();
     pushToCloud();
     startActivityTracking();
     document.getElementById('setupOv').classList.add('hidden');
@@ -2001,15 +1996,14 @@ let _lockCountdown = null;
 function renderLockScreen() {
   const ov = document.getElementById('setupOv');
   ov.classList.remove('hidden');
-  const at    = getAttemptState();
+  const at = getAttemptState();
   const locked = at.lockUntil > Date.now();
-  const email = localStorage.getItem(EMAIL_KEY);
   ov.innerHTML = `
     <div class="setup-inner">
       <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px">⚓</div>'}</div>
       <div style="font-size:48px;text-align:center;margin-bottom:10px">🔒</div>
       <div class="setup-h" style="text-align:center">Enter Password</div>
-      <div class="setup-sub" style="text-align:center">${email ? esc(email) : 'Enter your password to unlock.'}</div>
+      <div class="setup-sub" style="text-align:center">Your data is encrypted. Enter your password to unlock.</div>
       <input class="setup-inp" type="password" id="pw-unlock" placeholder="Password"
         ${locked ? 'disabled' : ''}
         onkeydown="if(event.key==='Enter')attemptUnlock()">
@@ -2140,7 +2134,7 @@ function renderLandingScreen() {
         ☁️ I have an existing boat
       </button>
       <div style="font-size:12px;color:var(--label3);text-align:center;margin-bottom:16px;line-height:1.5">
-        Sign in with your email and password to restore your data.
+        Restore data from the cloud using your recovery UUID.
       </div>
 
       <div style="text-align:center;font-size:13px;color:var(--label3);margin:4px 0 16px">— or —</div>
@@ -2243,9 +2237,14 @@ function renderBackupBar() {
 //  CLOUD SYNC
 // ═══════════════════════════════════════════════════════════
 
-async function emailToKey(email) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(email.toLowerCase().trim()));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+function getOrCreateUUID() {
+  let uuid = localStorage.getItem(UUID_KEY);
+  if (!uuid) {
+    const arr = crypto.getRandomValues(new Uint8Array(16));
+    uuid = Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('');
+    localStorage.setItem(UUID_KEY, uuid);
+  }
+  return uuid;
 }
 
 function setSyncStatus(status) {
@@ -2264,15 +2263,14 @@ function setSyncStatus(status) {
 }
 
 async function pushToCloud() {
-  const email  = localStorage.getItem(EMAIL_KEY);
+  const uuid   = localStorage.getItem(UUID_KEY);
   const salt   = localStorage.getItem(SALT_KEY);
   const verify = localStorage.getItem(VERIFY_KEY);
   const enc    = localStorage.getItem(ENC_KEY);
-  if (!email || !salt || !verify || !enc) return;
+  if (!uuid || !salt || !verify || !enc) return;
   setSyncStatus('syncing');
   try {
-    const key = await emailToKey(email);
-    const r = await fetch(`${STORAGE_WORKER_URL}/api/data/${key}`, {
+    const r = await fetch(`${STORAGE_WORKER_URL}/api/data/${uuid}`, {
       method: 'PUT',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({salt, verify, data: enc})
@@ -2285,9 +2283,8 @@ async function pushToCloud() {
   }
 }
 
-async function fetchFromCloud(email) {
-  const key = await emailToKey(email);
-  const r = await fetch(`${STORAGE_WORKER_URL}/api/data/${key}`);
+async function fetchFromCloud(uuid) {
+  const r = await fetch(`${STORAGE_WORKER_URL}/api/data/${encodeURIComponent(uuid)}`);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const j = await r.json();
   if (!j.salt || !j.verify || !j.data) throw new Error('Incomplete cloud data');
@@ -2299,15 +2296,12 @@ function showExistingBoatFlow() {
   ov.innerHTML = `
     <div class="setup-inner">
       <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px;font-weight:800">⚓</div>'}</div>
-      <div class="setup-h">Sign In</div>
-      <div class="setup-sub">Enter your email and password to restore your boat data.</div>
-      <label class="setup-lbl">Email</label>
-      <input class="setup-inp" id="restore-email" type="email" placeholder="your@email.com" autofocus>
-      <label class="setup-lbl">Password</label>
-      <input class="setup-inp" type="password" id="restore-pw" placeholder="Your password"
-        onkeydown="if(event.key==='Enter')doRestoreFromCloud()">
+      <div class="setup-h">Restore from Cloud</div>
+      <div class="setup-sub">Enter the recovery UUID shown in Settings on your other device.</div>
+      <label class="setup-lbl">Recovery UUID</label>
+      <input class="setup-inp" id="restore-uuid" placeholder="32-character hex UUID" autofocus>
       <div id="restore-err" style="color:var(--red);font-size:13px;min-height:20px;margin-bottom:12px;text-align:center"></div>
-      <button class="setup-go" id="restore-btn" onclick="doRestoreFromCloud()">Sign In →</button>
+      <button class="setup-go" id="restore-btn" onclick="doRestoreFromCloud()">Fetch from Cloud →</button>
       <button onclick="renderLandingScreen()"
         style="width:100%;margin-top:14px;border:none;background:none;font-family:var(--font);
           font-size:15px;color:var(--label3);cursor:pointer;padding:10px">
@@ -2317,51 +2311,34 @@ function showExistingBoatFlow() {
 }
 
 async function doRestoreFromCloud() {
-  const email = document.getElementById('restore-email')?.value.trim().toLowerCase();
-  const pw    = document.getElementById('restore-pw')?.value;
-  const err   = document.getElementById('restore-err');
-  const btn   = document.getElementById('restore-btn');
-  if (!email || !email.includes('@')) { if(err) err.textContent = 'Enter a valid email'; return; }
-  if (!pw) { if(err) err.textContent = 'Enter your password'; return; }
-  if (btn) { btn.textContent = 'Signing in…'; btn.disabled = true; }
+  const uuid = document.getElementById('restore-uuid')?.value.trim();
+  const err  = document.getElementById('restore-err');
+  const btn  = document.getElementById('restore-btn');
+  if (!uuid) { if(err) err.textContent = 'Enter your UUID'; return; }
+  if (btn) { btn.textContent = 'Fetching…'; btn.disabled = true; }
   if (err) err.textContent = '';
   try {
-    const cloud = await fetchFromCloud(email);
-    const salt  = b64ToU8(cloud.salt);
-    const key   = await deriveKey(pw, salt);
-    await aesDecrypt(key, cloud.verify); // throws if password wrong
+    const cloud = await fetchFromCloud(uuid);
     localStorage.setItem(SALT_KEY,   cloud.salt);
     localStorage.setItem(VERIFY_KEY, cloud.verify);
     localStorage.setItem(ENC_KEY,    cloud.data);
-    localStorage.setItem(EMAIL_KEY,  email);
+    localStorage.setItem(UUID_KEY,   uuid);
     localStorage.removeItem(ATTEMPTS_KEY);
-    cryptoKey = key;
-    const found = await load();
-    if (!found) { data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS)); }
-    startActivityTracking();
-    document.getElementById('setupOv').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
-    renderApp();
-    setSyncStatus('synced');
+    renderLockScreen();
+    showToast('Data restored — enter your password to unlock');
   } catch(e) {
-    const msg = e.message.includes('404') ? 'No account found for this email'
-              : 'Wrong password — check your email and password';
-    if (err) err.textContent = msg;
-    if (btn) { btn.textContent = 'Sign In →'; btn.disabled = false; }
+    if (err) err.textContent = 'Could not fetch data: ' + e.message;
+    if (btn) { btn.textContent = 'Fetch from Cloud →'; btn.disabled = false; }
   }
 }
 
 function renderSettings() {
-  const email = localStorage.getItem(EMAIL_KEY) || '—';
+  const uuid = localStorage.getItem(UUID_KEY) || '—';
   const syncColors = {synced:'var(--green)',syncing:'var(--orange)',offline:'var(--red)',idle:'var(--label3)'};
   const syncLabels = {synced:'Synced ✓',syncing:'Syncing…',offline:'Offline / error',idle:'Not synced yet'};
   return `
     <div class="sec-hd">Cloud Sync</div>
     <div class="card">
-      <div class="fr">
-        <div class="fl">Account</div>
-        <div class="fv" style="font-size:13px">${esc(email)}</div>
-      </div>
       <div class="fr">
         <div class="fl">Status</div>
         <div class="fv" style="color:${syncColors[syncStatus]||'var(--label3)'}">${syncLabels[syncStatus]||'—'}</div>
@@ -2370,6 +2347,17 @@ function renderSettings() {
         <button class="btn btn-s btn-sm" onclick="pushToCloud().then(()=>document.getElementById('mainContent').innerHTML=renderSettings())">Sync now</button>
       </div>
     </div>
+    <div class="sec-hd">Recovery Key</div>
+    <div class="card">
+      <div class="fr" style="align-items:flex-start;padding-top:12px">
+        <div class="fl">UUID</div>
+        <div class="fv" style="font-size:11px;font-family:monospace;word-break:break-all;text-align:right;line-height:1.6">${esc(uuid)}</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-s btn-sm" onclick="copyUUID()">Copy UUID</button>
+      </div>
+    </div>
+    <div class="tip">💡 Your UUID is your boat's unique identifier. On a new device tap "I have an existing boat" on the welcome screen and enter this UUID to restore from the cloud.</div>
     <div class="sec-hd">Manual Backup</div>
     <div class="card">
       <div class="fr">
@@ -2382,6 +2370,16 @@ function renderSettings() {
     </div>`;
 }
 
+function copyUUID() {
+  const uuid = localStorage.getItem(UUID_KEY);
+  if (!uuid) { showToast('No UUID — complete setup first', true); return; }
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(uuid).then(() => showToast('UUID copied to clipboard'));
+  } else {
+    showToast('UUID: ' + uuid);
+  }
+}
+
 // ═══════════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════════
@@ -2389,15 +2387,15 @@ function renderSettings() {
 async function init() {
   const hasSalt   = !!localStorage.getItem(SALT_KEY);
   const hasVerify = !!localStorage.getItem(VERIFY_KEY);
-  const email     = localStorage.getItem(EMAIL_KEY);
+  const uuid      = localStorage.getItem(UUID_KEY);
 
   if (hasSalt && hasVerify) {
     // Returning user on this device — show lock screen
     renderLockScreen();
-  } else if (email) {
-    // Email known but local data gone — auto-restore from cloud
+  } else if (uuid) {
+    // UUID exists but local crypto data is gone — try auto-restore from cloud
     try {
-      const cloud = await fetchFromCloud(email);
+      const cloud = await fetchFromCloud(uuid);
       localStorage.setItem(SALT_KEY,   cloud.salt);
       localStorage.setItem(VERIFY_KEY, cloud.verify);
       localStorage.setItem(ENC_KEY,    cloud.data);
@@ -2408,6 +2406,7 @@ async function init() {
       renderLandingScreen();
     }
   } else {
+    // No local data — show landing screen (restore or new setup)
     renderLandingScreen();
   }
 }
