@@ -278,13 +278,6 @@ input[type=file]{display:none}
 .sync-dot{position:absolute;right:48px;top:50%;transform:translateY(-50%);
   font-size:16px;line-height:1;cursor:pointer;transition:color .3s;color:#666}
 
-/* ── PIN boxes ── */
-.pin-boxes{display:flex;gap:12px;justify-content:center;margin:12px 0 6px}
-.pin-box{width:54px;height:62px;border:1.5px solid var(--sep);border-radius:12px;
-  font-size:28px;text-align:center;background:var(--surface);color:var(--label);
-  font-family:var(--font);outline:none;-webkit-appearance:none;appearance:none}
-.pin-box:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,122,255,.15)}
-
 </style>
 </head>
 <body>
@@ -839,7 +832,7 @@ function completeSetup() {
     data.systems = makeSystems();
   }
   // Don't save yet — we have no crypto key. Show password setup next.
-  renderPINSetup();
+  renderPasswordSetup();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1935,74 +1928,57 @@ function deepMerge(target, source) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  PIN HELPERS
+//  PASSWORD SETUP SCREEN (first launch only)
 // ═══════════════════════════════════════════════════════════
 
-function pinBoxesHTML(pfx, autoFn) {
-  const fn = autoFn ? `'${autoFn}'` : 'null';
-  return `<div class="pin-boxes">
-    <input class="pin-box" type="password" inputmode="numeric" maxlength="1" id="${pfx}0" oninput="pinFwd('${pfx}',0,${fn})" onkeydown="pinBk(event,'${pfx}',0)">
-    <input class="pin-box" type="password" inputmode="numeric" maxlength="1" id="${pfx}1" oninput="pinFwd('${pfx}',1,${fn})" onkeydown="pinBk(event,'${pfx}',1)">
-    <input class="pin-box" type="password" inputmode="numeric" maxlength="1" id="${pfx}2" oninput="pinFwd('${pfx}',2,${fn})" onkeydown="pinBk(event,'${pfx}',2)">
-    <input class="pin-box" type="password" inputmode="numeric" maxlength="1" id="${pfx}3" oninput="pinFwd('${pfx}',3,${fn})" onkeydown="pinBk(event,'${pfx}',3)">
-  </div>`;
-}
-function pinFwd(pfx, i, fn) {
-  const el = document.getElementById(pfx+i);
-  if (!el?.value) return;
-  if (!/^\d$/.test(el.value)) { el.value=''; return; }
-  if (i < 3) document.getElementById(pfx+(i+1))?.focus();
-  else if (fn) window[fn]?.();
-}
-function pinBk(e, pfx, i) {
-  if (e.key==='Backspace' && !document.getElementById(pfx+i)?.value && i>0)
-    document.getElementById(pfx+(i-1))?.focus();
-}
-function getPin(pfx) {
-  return [0,1,2,3].map(i => document.getElementById(pfx+i)?.value||'').join('');
-}
-function clearPin(pfx) {
-  [0,1,2,3].forEach(i => { const el=document.getElementById(pfx+i); if(el) el.value=''; });
-  document.getElementById(pfx+'0')?.focus();
-}
-
-// ═══════════════════════════════════════════════════════════
-//  PIN SETUP SCREEN (first launch only)
-// ═══════════════════════════════════════════════════════════
-
-function renderPINSetup() {
+function renderPasswordSetup() {
   const ov = document.getElementById('setupOv');
   ov.classList.remove('hidden');
   ov.innerHTML = `
     <div class="setup-inner">
       <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px">⚓</div>'}</div>
       <div style="font-size:44px;text-align:center;margin-bottom:12px">🔐</div>
-      <div class="setup-h">Choose a PIN</div>
-      <div class="setup-sub">Your 4-digit PIN encrypts your data with AES-256. Don't forget it — it cannot be recovered.</div>
-      <label class="setup-lbl" style="text-align:center;display:block;margin-bottom:4px">Enter PIN</label>
-      ${pinBoxesHTML('s', null)}
-      <label class="setup-lbl" style="text-align:center;display:block;margin:14px 0 4px">Confirm PIN</label>
-      ${pinBoxesHTML('c', null)}
-      <div id="pw-err" style="color:var(--red);font-size:13px;min-height:20px;margin:8px 0;text-align:center"></div>
-      <button class="setup-go" id="pw-go" onclick="createPIN()">Create Account →</button>
+      <div class="setup-h">Create a Password</div>
+      <div class="setup-sub">All your boat data will be encrypted with AES-256. This password is <b>never stored</b> — only you know it. If you forget it, data cannot be recovered.</div>
+      <label class="setup-lbl">Password (min 8 characters)</label>
+      <input class="setup-inp" type="password" id="pw-new" placeholder="Enter password"
+        oninput="checkPwMatch()" onkeydown="if(event.key==='Enter')createPassword()">
+      <label class="setup-lbl">Confirm Password</label>
+      <input class="setup-inp" type="password" id="pw-con" placeholder="Confirm password"
+        oninput="checkPwMatch()" onkeydown="if(event.key==='Enter')createPassword()">
+      <div id="pw-err" style="color:var(--red);font-size:13px;min-height:20px;margin-bottom:8px;text-align:center"></div>
+      <button class="setup-go" id="pw-go" onclick="createPassword()">Encrypt &amp; Start →</button>
     </div>`;
-  setTimeout(() => document.getElementById('s0')?.focus(), 80);
 }
 
-async function createPIN() {
-  const pin  = getPin('s');
-  const pin2 = getPin('c');
-  const err  = document.getElementById('pw-err');
-  const go   = document.getElementById('pw-go');
-  if (!/^\d{4}$/.test(pin))  { if(err) err.textContent='Enter a 4-digit PIN'; clearPin('s'); return; }
-  if (pin !== pin2) { if(err) err.textContent='PINs do not match'; clearPin('c'); return; }
-  if (err) err.textContent='';
-  if (go) { go.textContent='Creating account…'; go.disabled=true; }
+function checkPwMatch() {
+  const a = document.getElementById('pw-new')?.value || '';
+  const b = document.getElementById('pw-con')?.value || '';
+  const err = document.getElementById('pw-err');
+  const go  = document.getElementById('pw-go');
+  if (!err) return;
+  if (a.length > 0 && a.length < 8) { err.textContent = 'Minimum 8 characters'; }
+  else if (b.length > 0 && a !== b)  { err.textContent = 'Passwords do not match'; }
+  else { err.textContent = ''; }
+  if (go) go.disabled = (a.length < 8 || a !== b);
+}
+
+async function createPassword() {
+  const pw  = document.getElementById('pw-new')?.value || '';
+  const pw2 = document.getElementById('pw-con')?.value || '';
+  const err = document.getElementById('pw-err');
+  if (pw.length < 8) { if(err) err.textContent = 'Minimum 8 characters'; return; }
+  if (pw !== pw2)    { if(err) err.textContent = 'Passwords do not match'; return; }
+  if (err) err.textContent = '';
+  const go = document.getElementById('pw-go');
+  if (go) { go.textContent = 'Encrypting…'; go.disabled = true; }
   try {
     const salt = await getOrCreateSalt();
-    const key  = await deriveKey(pin, salt);
+    const key  = await deriveKey(pw, salt);
     cryptoKey  = key;
+    // Store verification canary
     localStorage.setItem(VERIFY_KEY, await aesEncrypt(key, 'BM_VERIFIED'));
+    // Save data encrypted
     await save();
     pushToCloud();
     startActivityTracking();
@@ -2010,8 +1986,8 @@ async function createPIN() {
     document.getElementById('app').classList.remove('hidden');
     renderApp();
   } catch(e) {
-    if (err) err.textContent = 'Setup failed: ' + e.message;
-    if (go) { go.textContent='Create Account →'; go.disabled=false; }
+    if (err) err.textContent = 'Encryption failed: ' + e.message;
+    if (go) { go.textContent = 'Encrypt & Start →'; go.disabled = false; }
   }
 }
 
@@ -2030,18 +2006,20 @@ let _lockCountdown = null;
 function renderLockScreen() {
   const ov = document.getElementById('setupOv');
   ov.classList.remove('hidden');
-  const at     = getAttemptState();
+  const at    = getAttemptState();
   const locked = at.lockUntil > Date.now();
-  const email  = localStorage.getItem(EMAIL_KEY);
+  const email = localStorage.getItem(EMAIL_KEY);
   ov.innerHTML = `
     <div class="setup-inner">
       <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px">⚓</div>'}</div>
       <div style="font-size:48px;text-align:center;margin-bottom:10px">🔒</div>
-      <div class="setup-h" style="text-align:center">Enter PIN</div>
-      <div class="setup-sub" style="text-align:center">${email ? esc(email) : ''}</div>
-      ${pinBoxesHTML('u', locked ? null : 'attemptUnlock')}
+      <div class="setup-h" style="text-align:center">Enter Password</div>
+      <div class="setup-sub" style="text-align:center">${email ? esc(email) : 'Enter your password to unlock.'}</div>
+      <input class="setup-inp" type="password" id="pw-unlock" placeholder="Password"
+        ${locked ? 'disabled' : ''}
+        onkeydown="if(event.key==='Enter')attemptUnlock()">
       <div id="unlock-err" style="color:var(--red);font-size:13px;min-height:20px;
-        margin:8px 0;text-align:center">
+        margin-bottom:12px;text-align:center">
         ${at.count > 0 && !locked ? `${at.count} failed attempt${at.count>1?'s':''} — ${MAX_FAILS-at.count} remaining` : ''}
         ${locked ? `<span id="lock-countdown">Too many attempts — locked</span>` : ''}
       </div>
@@ -2055,22 +2033,23 @@ function renderLockScreen() {
       </button>
     </div>`;
   if (locked) startLockCountdown(at);
-  else setTimeout(() => document.getElementById('u0')?.focus(), 80);
+  else if (!locked) setTimeout(() => document.getElementById('pw-unlock')?.focus(), 100);
 }
 
 function startLockCountdown(at) {
   if (_lockCountdown) clearInterval(_lockCountdown);
   _lockCountdown = setInterval(() => {
     const remaining = Math.ceil((at.lockUntil - Date.now()) / 1000);
-    const cd  = document.getElementById('lock-countdown');
+    const cd = document.getElementById('lock-countdown');
     const btn = document.getElementById('unlock-btn');
+    const inp = document.getElementById('pw-unlock');
     if (remaining <= 0) {
       clearInterval(_lockCountdown);
       at.count = 0; at.lockUntil = 0; setAttemptState(at);
-      if (cd)  cd.textContent = '';
+      if (cd)  cd.textContent  = '';
       if (btn) { btn.textContent = 'Unlock'; btn.disabled = false; }
+      if (inp) { inp.disabled = false; inp.focus(); }
       document.getElementById('unlock-err').textContent = '';
-      document.getElementById('u0')?.focus();
     } else {
       if (cd) cd.textContent = `Too many attempts — wait ${remaining}s`;
     }
@@ -2080,18 +2059,19 @@ function startLockCountdown(at) {
 async function attemptUnlock() {
   const at = getAttemptState();
   if (at.lockUntil > Date.now()) return;
-  const pin = getPin('u');
+  const pw  = document.getElementById('pw-unlock')?.value || '';
   const err = document.getElementById('unlock-err');
   const btn = document.getElementById('unlock-btn');
-  if (pin.length !== 4) { if(err) err.textContent='Enter your 4-digit PIN'; return; }
-  if (btn) { btn.textContent='Checking…'; btn.disabled=true; }
+  if (!pw) { if(err) err.textContent = 'Enter your password'; return; }
+  if (btn) { btn.textContent = 'Checking…'; btn.disabled = true; }
   try {
     const salt = await getOrCreateSalt();
-    const key  = await deriveKey(pin, salt);
+    const key  = await deriveKey(pw, salt);
     const stored = localStorage.getItem(VERIFY_KEY);
     if (!stored) throw new Error('No verification data');
     const result = await aesDecrypt(key, stored);
-    if (result !== 'BM_VERIFIED') throw new Error('Wrong PIN');
+    if (result !== 'BM_VERIFIED') throw new Error('Wrong password');
+    // Correct — unlock
     cryptoKey = key;
     at.count = 0; at.lockUntil = 0; setAttemptState(at);
     const found = await load();
@@ -2102,15 +2082,19 @@ async function attemptUnlock() {
     renderApp();
     pushToCloud();
   } catch(e) {
+    // Wrong password
     at.count++;
-    if (at.count >= MAX_FAILS) { at.lockUntil = Date.now() + LOCKOUT_MS; at.count = MAX_FAILS; }
+    if (at.count >= MAX_FAILS) {
+      at.lockUntil = Date.now() + LOCKOUT_MS;
+      at.count = MAX_FAILS;
+    }
     setAttemptState(at);
-    if (btn) { btn.textContent='Unlock'; btn.disabled=false; }
+    if (btn) { btn.textContent = 'Unlock'; btn.disabled = false; }
     if (err) err.textContent = at.lockUntil > Date.now()
       ? `Too many attempts — locked for ${LOCKOUT_MS/1000}s`
-      : `Wrong PIN — ${MAX_FAILS-at.count} attempt${MAX_FAILS-at.count===1?'':'s'} remaining`;
+      : `Wrong password — ${MAX_FAILS - at.count} attempt${MAX_FAILS-at.count===1?'':'s'} remaining`;
     if (at.lockUntil > Date.now()) startLockCountdown(at);
-    clearPin('u');
+    document.getElementById('pw-unlock').value = '';
   }
 }
 
@@ -2146,7 +2130,7 @@ function lockApp() {
 // ═══════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════
-//  LOGIN SCREEN
+//  LANDING SCREEN — shown when localStorage is empty
 // ═══════════════════════════════════════════════════════════
 
 function renderLoginScreen() {
@@ -2161,49 +2145,44 @@ function renderLoginScreen() {
       <label class="setup-lbl">Email</label>
       <input class="setup-inp" id="login-email" type="email" placeholder="your@email.com"
         value="${esc(savedEmail)}"
-        onkeydown="if(event.key==='Enter')document.getElementById('l0').focus()">
-      <label class="setup-lbl" style="text-align:center;display:block;margin-bottom:4px;margin-top:16px">PIN</label>
-      ${pinBoxesHTML('l', 'attemptLogin')}
+        onkeydown="if(event.key==='Enter')document.getElementById('login-pw').focus()">
+      <label class="setup-lbl">Password</label>
+      <input class="setup-inp" type="password" id="login-pw" placeholder="Password"
+        onkeydown="if(event.key==='Enter')attemptLogin()">
       <div id="login-err" style="color:var(--red);font-size:13px;min-height:20px;
-        margin:8px 0;text-align:center"></div>
+        margin-bottom:8px;text-align:center"></div>
       <button class="setup-go" id="login-btn" onclick="attemptLogin()">Login</button>
-      <div style="display:flex;justify-content:space-between;margin-top:14px">
-        <button onclick="renderForgotPIN()"
-          style="border:none;background:none;font-family:var(--font);font-size:14px;
-            color:var(--label3);cursor:pointer;padding:8px 4px">
-          Forgot PIN?
-        </button>
-        <button onclick="startNewSetupFromLogin()"
-          style="border:none;background:none;font-family:var(--font);font-size:14px;
-            color:var(--blue);cursor:pointer;padding:8px 4px">
-          New user? Set up your boat →
-        </button>
-      </div>
+      <button onclick="startNewSetupFromLogin()"
+        style="width:100%;margin-top:16px;border:none;background:none;font-family:var(--font);
+          font-size:15px;color:var(--blue);cursor:pointer;padding:10px;text-align:center">
+        New user? Set up your boat →
+      </button>
     </div>`;
   setTimeout(() => {
-    if (savedEmail) document.getElementById('l0')?.focus();
+    if (savedEmail) document.getElementById('login-pw')?.focus();
     else document.getElementById('login-email')?.focus();
   }, 80);
 }
 
 async function attemptLogin() {
   const email = document.getElementById('login-email')?.value.trim().toLowerCase();
-  const pin   = getPin('l');
+  const pw    = document.getElementById('login-pw')?.value;
   const err   = document.getElementById('login-err');
   const btn   = document.getElementById('login-btn');
-  if (!email || !email.includes('@')) { if(err) err.textContent='Enter a valid email'; return; }
-  if (pin.length !== 4) { if(err) err.textContent='Enter your 4-digit PIN'; return; }
-  if (btn) { btn.textContent='Signing in…'; btn.disabled=true; }
-  if (err) err.textContent='';
+  if (!email || !email.includes('@')) { if(err) err.textContent = 'Enter a valid email'; return; }
+  if (!pw) { if(err) err.textContent = 'Enter your password'; return; }
+  if (btn) { btn.textContent = 'Signing in…'; btn.disabled = true; }
+  if (err) err.textContent = '';
 
-  // Fast path: same device, same email — try local decrypt
   const storedEmail = localStorage.getItem(EMAIL_KEY);
   const hasSalt     = !!localStorage.getItem(SALT_KEY);
   const hasVerify   = !!localStorage.getItem(VERIFY_KEY);
+
+  // Fast path: same device, same email — try local decrypt
   if (storedEmail === email && hasSalt && hasVerify) {
     try {
       const salt = await getOrCreateSalt();
-      const key  = await deriveKey(pin, salt);
+      const key  = await deriveKey(pw, salt);
       await aesDecrypt(key, localStorage.getItem(VERIFY_KEY));
       cryptoKey = key;
       await load();
@@ -2213,14 +2192,14 @@ async function attemptLogin() {
       renderApp();
       pushToCloud();
       return;
-    } catch(e) { /* fall through to cloud */ }
+    } catch(localErr) { /* fall through to cloud */ }
   }
 
   // Cloud path: new device, different email, or corrupted local data
   try {
     const cloud = await fetchFromCloud(email);
     const salt  = b64ToU8(cloud.salt);
-    const key   = await deriveKey(pin, salt);
+    const key   = await deriveKey(pw, salt);
     await aesDecrypt(key, cloud.verify);
     localStorage.setItem(EMAIL_KEY,  email);
     localStorage.setItem(SALT_KEY,   cloud.salt);
@@ -2236,130 +2215,11 @@ async function attemptLogin() {
     setSyncStatus('synced');
   } catch(e) {
     const msg = e.message.includes('404')
-      ? 'No account found. Tap "Set up your boat" to register.'
-      : 'Wrong email or PIN.';
+      ? 'No account found. Use "Set up your boat" below to register.'
+      : 'Wrong email or password.';
     if (err) err.textContent = msg;
-    if (btn) { btn.textContent='Login'; btn.disabled=false; }
-    clearPin('l');
+    if (btn) { btn.textContent = 'Login'; btn.disabled = false; }
   }
-}
-
-// ── Forgot PIN flow ────────────────────────────────────────
-
-function renderForgotPIN() {
-  const ov = document.getElementById('setupOv');
-  const savedEmail = localStorage.getItem(EMAIL_KEY) || '';
-  ov.innerHTML = `
-    <div class="setup-inner">
-      <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px;font-weight:800">⚓</div>'}</div>
-      <div class="setup-h">Reset PIN</div>
-      <div class="setup-sub">We'll email you a 6-digit reset code.</div>
-      <label class="setup-lbl">Email</label>
-      <input class="setup-inp" id="reset-email" type="email" placeholder="your@email.com"
-        value="${esc(savedEmail)}"
-        onkeydown="if(event.key==='Enter')sendResetCode()">
-      <div id="reset-err" style="color:var(--red);font-size:13px;min-height:20px;margin-bottom:8px;text-align:center"></div>
-      <button class="setup-go" id="reset-btn" onclick="sendResetCode()">Send Reset Code</button>
-      <button onclick="renderLoginScreen()"
-        style="width:100%;margin-top:14px;border:none;background:none;font-family:var(--font);
-          font-size:15px;color:var(--label3);cursor:pointer;padding:10px">
-        ← Back to login
-      </button>
-    </div>`;
-  setTimeout(() => {
-    if (savedEmail) document.getElementById('reset-btn')?.focus();
-    else document.getElementById('reset-email')?.focus();
-  }, 80);
-}
-
-async function sendResetCode() {
-  const email = document.getElementById('reset-email')?.value.trim().toLowerCase();
-  const err   = document.getElementById('reset-err');
-  const btn   = document.getElementById('reset-btn');
-  if (!email || !email.includes('@')) { if(err) err.textContent='Enter a valid email'; return; }
-  if (btn) { btn.textContent='Sending…'; btn.disabled=true; }
-  if (err) err.textContent='';
-  try {
-    const r = await fetch(`${STORAGE_WORKER_URL}/api/reset/send`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({email})
-    });
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
-    renderEnterResetCode(email);
-  } catch(e) {
-    if (err) err.textContent = e.message.includes('No account') ? 'No account found for this email.'
-            : 'Could not send code — ' + e.message;
-    if (btn) { btn.textContent='Send Reset Code'; btn.disabled=false; }
-  }
-}
-
-function renderEnterResetCode(email) {
-  const ov = document.getElementById('setupOv');
-  ov.innerHTML = `
-    <div class="setup-inner">
-      <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px;font-weight:800">⚓</div>'}</div>
-      <div class="setup-h">Enter Reset Code</div>
-      <div class="setup-sub">Check your email at <b>${esc(email)}</b> for a 6-digit code. It expires in 10 minutes.</div>
-      <label class="setup-lbl">Reset Code</label>
-      <input class="setup-inp" id="reset-code" type="tel" maxlength="6" placeholder="000000"
-        style="text-align:center;letter-spacing:10px;font-size:26px"
-        onkeydown="if(event.key==='Enter')verifyResetCode('${esc(email)}')">
-      <div id="reset-err2" style="color:var(--red);font-size:13px;min-height:20px;margin-bottom:8px;text-align:center"></div>
-      <button class="setup-go" id="verify-btn" onclick="verifyResetCode('${esc(email)}')">Verify Code</button>
-      <button onclick="renderForgotPIN()"
-        style="width:100%;margin-top:14px;border:none;background:none;font-family:var(--font);
-          font-size:15px;color:var(--label3);cursor:pointer;padding:10px">
-        ← Back
-      </button>
-    </div>`;
-  setTimeout(() => document.getElementById('reset-code')?.focus(), 80);
-}
-
-async function verifyResetCode(email) {
-  const code = document.getElementById('reset-code')?.value.trim();
-  const err  = document.getElementById('reset-err2');
-  const btn  = document.getElementById('verify-btn');
-  if (!code || code.length < 6) { if(err) err.textContent='Enter the 6-digit code'; return; }
-  if (btn) { btn.textContent='Verifying…'; btn.disabled=true; }
-  if (err) err.textContent='';
-  try {
-    const r = await fetch(`${STORAGE_WORKER_URL}/api/reset/verify`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({email, code})
-    });
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
-    // Valid — clear local crypto, show new PIN setup
-    [SALT_KEY, VERIFY_KEY, ENC_KEY].forEach(k => localStorage.removeItem(k));
-    localStorage.setItem(EMAIL_KEY, email);
-    data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS));
-    data.meta.email = email;
-    renderSetNewPIN();
-  } catch(e) {
-    if (err) err.textContent = e.message.includes('nvalid') || e.message.includes('xpir')
-      ? 'Invalid or expired code — try again.'
-      : 'Verification failed: ' + e.message;
-    if (btn) { btn.textContent='Verify Code'; btn.disabled=false; }
-  }
-}
-
-function renderSetNewPIN() {
-  const ov = document.getElementById('setupOv');
-  ov.innerHTML = `
-    <div class="setup-inner">
-      <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px;font-weight:800">⚓</div>'}</div>
-      <div style="font-size:40px;text-align:center;margin-bottom:8px">🔐</div>
-      <div class="setup-h">Choose New PIN</div>
-      <div class="setup-sub" style="color:var(--orange)">⚠️ Your previous boat data cannot be recovered. You'll start fresh.</div>
-      <label class="setup-lbl" style="text-align:center;display:block;margin-bottom:4px;margin-top:16px">New PIN</label>
-      ${pinBoxesHTML('s', null)}
-      <label class="setup-lbl" style="text-align:center;display:block;margin:14px 0 4px">Confirm PIN</label>
-      ${pinBoxesHTML('c', null)}
-      <div id="pw-err" style="color:var(--red);font-size:13px;min-height:20px;margin:8px 0;text-align:center"></div>
-      <button class="setup-go" id="pw-go" onclick="createPIN()">Set New PIN →</button>
-    </div>`;
-  setTimeout(() => document.getElementById('s0')?.focus(), 80);
 }
 
 function startNewSetupFromLogin() {
