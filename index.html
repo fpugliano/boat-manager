@@ -867,6 +867,7 @@ const TABS = [
   {id:'photos',    icon:'📷', label:'Photos'},
   {id:'shipyard',  icon:'⚓', label:'Shipyard'},
   {id:'maint',     icon:'🔧', label:'Maintenance'},
+  {id:'upgrades',  icon:'🛠️', label:'Upgrades'},
   {id:'parts',     icon:'🔩', label:'Spare Parts'},
   {id:'systems',   icon:'🔌', label:'Systems'},
   {id:'winter',    icon:'❄️', label:'Winterize'},
@@ -913,6 +914,7 @@ function renderActiveTab() {
     case 'photos':    mc.innerHTML = renderPhotos(); break;
     case 'shipyard':  mc.innerHTML = renderShipyard(); break;
     case 'maint':     mc.innerHTML = renderMaintenance(); break;
+    case 'upgrades':  mc.innerHTML = renderUpgrades(); break;
     case 'parts':     mc.innerHTML = renderParts(); break;
     case 'systems':   mc.innerHTML = renderSystems(); break;
     case 'winter':    mc.innerHTML = renderWinterization(); break;
@@ -2062,6 +2064,222 @@ function saveEditedPart(idx) {
 //  SECTION 7 — SYSTEMS
 // ═══════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════
+//  UPGRADES & REPAIRS
+// ═══════════════════════════════════════════════════════════
+
+function getUpgradesData() {
+  if (!data.upgrades) {
+    const isOwner = localStorage.getItem(EMAIL_KEY) === 'fpugliano@gmail.com';
+    const mk = (text, cost, done) => ({id:uid(), text, cost:cost||'', checked:!!done});
+    if (isOwner) {
+      data.upgrades = { seasons:[
+        {id:uid(), name:'2022/2023', location:'Didim', open:false, items:[
+          mk('Flexible solar panel replaced','',true), mk('Fixed gelcoat under soft solar panel','',true), mk('Painted antifouling on hulls','',true)
+        ]},
+        {id:uid(), name:'2023/2024', location:'Kilada', open:false, items:[
+          mk('Saloon big screen TV','',true)
+        ]}
+      ]};
+    } else {
+      data.upgrades = { seasons:[
+        {id:uid(), name:'2024/2025', location:'Example Marina', open:true, items:[
+          mk('Replaced engine impeller','45',false), mk('Painted antifouling on hulls','280',false), mk('New shore power cable','120',false)
+        ]}
+      ]};
+    }
+  }
+  return data.upgrades;
+}
+
+function upgRerender() { document.getElementById('mainContent').innerHTML = renderUpgrades(); }
+
+function renderUpgrades() {
+  if (!ui.upgOpen) ui.upgOpen = {};
+  if (!ui.upgEdit) ui.upgEdit = null;
+  if (!ui.upgAddItem) ui.upgAddItem = null;
+  if (!ui.upgConfirmDel) ui.upgConfirmDel = null;
+  const wd = getUpgradesData();
+  const isOwner = localStorage.getItem(EMAIL_KEY) === 'fpugliano@gmail.com';
+
+  // Grand total across all seasons
+  let grandTotal = 0;
+  wd.seasons.forEach(s => s.items.forEach(it => { grandTotal += parseFloat(it.cost)||0; }));
+
+  const cards = wd.seasons.map(s => renderUpgradeSeason(s)).join('');
+  const summary = grandTotal > 0 ? `<div style="margin:4px 12px 16px;padding:12px 16px;background:var(--surface);border:1.5px solid var(--sep);border-radius:12px;font-size:13px;color:var(--label3)">All seasons total: <b style="color:var(--label)">€${grandTotal.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2})}</b></div>` : '';
+  const exMsg = !isOwner ? `<div style="margin:0 12px 12px;font-size:12px;color:var(--label3);font-style:italic">Replace these examples with your own upgrades and repairs</div>` : '';
+
+  return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 12px 8px">
+    <div style="font-size:17px;font-weight:700">🛠️ Upgrades &amp; Repairs</div>
+    <button onclick="showAddUpgradeSeason()" style="background:var(--surface);border:1.5px solid var(--sep);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;font-family:var(--font);color:var(--label);cursor:pointer">+ Add season</button>
+  </div>
+  ${exMsg}${cards}${summary}`;
+}
+
+function renderUpgradeSeason(s) {
+  const done = s.items.filter(x=>x.checked).length, total = s.items.length;
+  const complete = total > 0 && done === total;
+  const pct = total ? Math.round(done/total*100) : 0;
+  // open state: complete seasons default closed, in-progress default open
+  const open = ui.upgOpen[s.id] !== undefined ? ui.upgOpen[s.id] : !complete;
+  const badge = complete ? `<span style="background:var(--green);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:6px">✓ Complete</span>` : '';
+  const hdr = `<div onclick="ui.upgOpen['${s.id}']=!${open};upgRerender()"
+    style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;user-select:none;-webkit-user-select:none">
+    <div style="width:34px;height:34px;border-radius:9px;background:rgba(0,122,255,.1);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">⚓</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:15px;font-weight:700;color:var(--label)">${esc(s.name)}${badge}</div>
+      <div style="font-size:12px;color:var(--label3);margin-top:1px">${esc(s.location||'')}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <span style="font-size:12px;color:var(--label3)">${done}/${total}</span>
+      <span style="font-size:11px;color:var(--label3)">${open?'▲':'▼'}</span>
+    </div>
+  </div>
+  <div style="height:3px;background:var(--surface2)">
+    <div style="height:3px;background:${complete?'var(--green)':'var(--orange)'};width:${pct}%;transition:width .4s"></div>
+  </div>`;
+
+  let body = '';
+  if (!open) {
+    if (complete) body = `<div style="padding:10px 16px;font-size:12px;color:var(--label3);border-top:1px solid var(--sep)">${total} items completed · tap to expand</div>`;
+  } else {
+    const rows = s.items.map((item, idx) => renderUpgradeItem(s, item, idx)).join('');
+    const addRow = renderUpgradeAddRow(s);
+    const seasonTotal = s.items.reduce((sum,it)=>sum+(parseFloat(it.cost)||0),0);
+    const totLine = seasonTotal > 0 ? `<div style="padding:8px 16px 10px;font-size:12px;color:var(--label3);border-top:1px solid var(--sep)">Season total: <b style="color:var(--label)">€${seasonTotal.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2})}</b></div>` : '';
+    body = `<div style="border-top:1px solid var(--sep)">${rows}${addRow}${totLine}</div>`;
+  }
+
+  return `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;margin:0 12px 10px;overflow:hidden">${hdr}${body}</div>`;
+}
+
+function renderUpgradeItem(s, item, idx) {
+  const sid = s.id, iid = item.id;
+  // Inline delete confirm
+  if (ui.upgConfirmDel === iid) {
+    return `<div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--sep);background:rgba(255,59,48,.05)">
+      <span style="flex:1;font-size:13px;color:var(--label2)">Remove "${esc(item.text)}"?</span>
+      <button class="btn btn-d btn-xs" onclick="deleteUpgradeItem('${sid}','${iid}')">Remove</button>
+      <button class="btn btn-s btn-xs" onclick="ui.upgConfirmDel=null;upgRerender()">Cancel</button>
+    </div>`;
+  }
+  // Inline edit
+  if (ui.upgEdit?.iid === iid) {
+    return `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--sep);background:var(--surface2)">
+      <input id="ueit" class="fi" style="flex:1;font-size:14px" value="${esc(item.text)}"
+        onkeydown="if(event.key==='Enter')saveUpgradeItemEdit('${sid}','${iid}')">
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+        <span style="font-size:13px;color:var(--label3)">€</span>
+        <input id="uecost" class="fi" type="number" min="0" step="0.01" style="width:70px;font-size:14px" value="${esc(item.cost||'')}" placeholder="0"
+          onkeydown="if(event.key==='Enter')saveUpgradeItemEdit('${sid}','${iid}')">
+      </div>
+      <button class="btn btn-p btn-xs" onclick="saveUpgradeItemEdit('${sid}','${iid}')">Save</button>
+      <button class="btn btn-s btn-xs" onclick="ui.upgEdit=null;upgRerender()">✕</button>
+    </div>`;
+  }
+  // Normal row
+  const costTxt = item.cost ? ` <span style="color:var(--label3);font-size:12px">· €${item.cost}</span>` : '';
+  const chkStyle = item.checked
+    ? 'background:var(--green);border-color:var(--green)'
+    : 'background:var(--surface);border:2px solid var(--sep)';
+  const chkMark = item.checked ? '<svg width="11" height="9" viewBox="0 0 11 9"><polyline points="1,4.5 4,7.5 10,1" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '';
+  const txtStyle = item.checked ? 'text-decoration:line-through;color:var(--label3)' : '';
+  return `<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--sep)">
+    <div onclick="toggleUpgradeItem('${sid}','${iid}')"
+      style="width:22px;height:22px;border-radius:6px;${chkStyle};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s">
+      ${chkMark}
+    </div>
+    <div style="flex:1;font-size:14px;line-height:1.4;${txtStyle};cursor:pointer" onclick="toggleUpgradeItem('${sid}','${iid}')">${esc(item.text)}${costTxt}</div>
+    <div style="display:flex;gap:2px;flex-shrink:0">
+      <button onclick="ui.upgEdit={iid:'${iid}'};upgRerender();setTimeout(()=>document.getElementById('ueit')?.focus(),40)"
+        style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);border-radius:4px;line-height:1">✏️</button>
+      <button onclick="ui.upgConfirmDel='${iid}';upgRerender()"
+        style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);border-radius:4px;line-height:1">✕</button>
+    </div>
+  </div>`;
+}
+
+function renderUpgradeAddRow(s) {
+  if (ui.upgAddItem === s.id) {
+    return `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--sep);background:var(--surface2)">
+      <input id="uadd-t" class="fi" style="flex:1;font-size:14px" placeholder="Item description"
+        onkeydown="if(event.key==='Enter')saveUpgradeNewItem('${s.id}')">
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+        <span style="font-size:13px;color:var(--label3)">€</span>
+        <input id="uadd-c" class="fi" type="number" min="0" step="0.01" style="width:70px;font-size:14px" placeholder="0"
+          onkeydown="if(event.key==='Enter')saveUpgradeNewItem('${s.id}')">
+      </div>
+      <button class="btn btn-p btn-xs" onclick="saveUpgradeNewItem('${s.id}')">Add</button>
+      <button class="btn btn-s btn-xs" onclick="ui.upgAddItem=null;upgRerender()">✕</button>
+    </div>`;
+  }
+  return `<div onclick="ui.upgAddItem='${s.id}';upgRerender();setTimeout(()=>document.getElementById('uadd-t')?.focus(),40)"
+    style="display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;color:var(--label3)">
+    <span style="font-size:18px;line-height:1;margin-left:2px">＋</span>
+    <span style="font-size:14px">Add item</span>
+  </div>`;
+}
+
+function toggleUpgradeItem(sid, iid) {
+  const s = getUpgradesData().seasons.find(x=>x.id===sid); if (!s) return;
+  const item = s.items.find(x=>x.id===iid); if (!item) return;
+  item.checked = !item.checked;
+  save(); upgRerender();
+}
+
+function saveUpgradeItemEdit(sid, iid) {
+  const s = getUpgradesData().seasons.find(x=>x.id===sid); if (!s) return;
+  const item = s.items.find(x=>x.id===iid); if (!item) return;
+  const t = document.getElementById('ueit')?.value.trim();
+  if (t) item.text = t;
+  item.cost = document.getElementById('uecost')?.value || '';
+  ui.upgEdit = null;
+  save(); upgRerender();
+}
+
+function deleteUpgradeItem(sid, iid) {
+  const s = getUpgradesData().seasons.find(x=>x.id===sid); if (!s) return;
+  s.items = s.items.filter(x=>x.id!==iid);
+  ui.upgConfirmDel = null;
+  save(); upgRerender();
+}
+
+function saveUpgradeNewItem(sid) {
+  const s = getUpgradesData().seasons.find(x=>x.id===sid); if (!s) return;
+  const t = document.getElementById('uadd-t')?.value.trim();
+  if (!t) { showToast('Enter item description', true); return; }
+  s.items.push({id:uid(), text:t, cost:document.getElementById('uadd-c')?.value||'', checked:false});
+  ui.upgAddItem = null;
+  save(); upgRerender();
+}
+
+function showAddUpgradeSeason() {
+  showModal('Add Season', `
+    <div class="mi-label">Season name</div><input class="mi" id="uas-n" placeholder="e.g. 2027/2028" autofocus>
+    <div class="mi-label">Location</div><input class="mi" id="uas-l" placeholder="e.g. Paros">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveUpgradeSeason()">Save</button>
+    </div>`);
+}
+
+function saveUpgradeSeason() {
+  const name = document.getElementById('uas-n')?.value.trim();
+  if (!name) { showToast('Enter a season name', true); return; }
+  const wd = getUpgradesData();
+  wd.seasons.push({id:uid(), name, location:document.getElementById('uas-l')?.value.trim()||'', open:true, items:[]});
+  save(); hideModal(); upgRerender();
+}
+
+function prefillUpgradesData() {
+  if (localStorage.getItem(EMAIL_KEY) !== 'fpugliano@gmail.com') return false;
+  // Only seed if no data yet
+  if (data.upgrades) return false;
+  getUpgradesData(); // initializes with owner data
+  return true;
+}
+
 function renderSystems() {
   const systems = data.systems || [];
   const cats = [...new Set(systems.map(s=>s.cat||s.category).filter(Boolean))];
@@ -2841,6 +3059,7 @@ function migrateData() {
   if (migrateToSingleLog()) dirty = true;
   if (prefillCustomsOwnerData()) dirty = true;
   if (prefillTransitLog()) dirty = true;
+  if (prefillUpgradesData()) dirty = true;
   // Seed belt history if not already present
   if (!data.maintenance) data.maintenance = { engines:{}, sched:{}, log:[] };
   if (!data.maintenance.log) data.maintenance.log = [];
