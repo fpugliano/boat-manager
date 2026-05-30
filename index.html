@@ -2086,7 +2086,11 @@ function renderSystemCard(s) {
           <div style="font-size:15px;font-weight:600">${esc(s.make?s.make+' ':'')}${esc(s.model)}</div>
           <div style="font-size:12px;color:var(--label3)">${esc(s.notes||'')} ${s.location?'· '+esc(s.location):''}</div>
         </div>
-        <span style="color:var(--label3)">${open?'▲':'▼'}</span>
+        <div style="display:flex;align-items:center;gap:4px">
+          <button onclick="event.stopPropagation();editSystem('${s.id}')" style="background:none;border:none;padding:5px;cursor:pointer;font-size:14px;color:var(--label3);border-radius:6px;line-height:1" title="Edit">✏️</button>
+          <button onclick="event.stopPropagation();removeSystem('${s.id}')" style="background:none;border:none;padding:5px;cursor:pointer;font-size:14px;color:var(--label3);border-radius:6px;line-height:1" title="Delete">✕</button>
+          <span style="color:var(--label3);margin-left:2px">${open?'▲':'▼'}</span>
+        </div>
       </div>
       <div class="sys-body ${open?'open':''}">
         ${fr('Make','systems.'+data.systems.indexOf(s)+'.make',s.make)}
@@ -2101,10 +2105,7 @@ function renderSystemCard(s) {
           <div class="fl">Notes</div>
           <textarea class="fi-area" onblur="saveField('systems.${data.systems.indexOf(s)}.notes',this.value)">${esc(s.notes||'')}</textarea>
         </div>
-        <div class="btn-row">
-          ${s.manualUrl?`<a href="${esc(s.manualUrl)}" target="_blank"><button class="btn btn-s btn-xs">📄 Manual</button></a>`:''}
-          <button class="btn btn-d btn-xs" onclick="removeSystem('${s.id}')">Remove</button>
-        </div>
+        ${s.manualUrl?`<div class="btn-row"><a href="${esc(s.manualUrl)}" target="_blank"><button class="btn btn-s btn-xs">📄 Manual</button></a></div>`:''}
       </div>
     </div>`;
 }
@@ -2140,6 +2141,39 @@ function removeSystem(id) {
   if (!confirm('Remove this system?')) return;
   data.systems = data.systems.filter(s=>s.id!==id); save();
   document.getElementById('mainContent').innerHTML = renderSystems();
+}
+function editSystem(id) {
+  const s = (data.systems||[]).find(x=>x.id===id); if (!s) return;
+  showModal('Edit System', `
+    <div class="mi-label">Category</div><input class="mi" id="es-cat" value="${esc(s.cat||s.category||'')}">
+    <div class="mi-label">Make</div><input class="mi" id="es-mk" value="${esc(s.make||'')}">
+    <div class="mi-label">Model</div><input class="mi" id="es-md" value="${esc(s.model||'')}">
+    <div class="mi-label">Serial Number</div><input class="mi" id="es-ser" value="${esc(s.serialNumber||'')}">
+    <div class="mi-label">Location</div><input class="mi" id="es-loc" value="${esc(s.location||'')}">
+    <div class="mi-label">Install Date</div><input class="mi" id="es-inst" type="date" value="${esc(s.installDate||'')}">
+    <div class="mi-label">Last Service</div><input class="mi" id="es-svc" type="date" value="${esc(s.lastService||'')}">
+    <div class="mi-label">Warranty Expiry</div><input class="mi" id="es-war" type="date" value="${esc(s.warrantyExpiry||'')}">
+    <div class="mi-label">Manual URL</div><input class="mi" id="es-url" value="${esc(s.manualUrl||'')}">
+    <div class="mi-label">Notes</div><input class="mi" id="es-nt" value="${esc(s.notes||'')}">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveEditSystem('${id}')">Save</button>
+    </div>`);
+}
+function saveEditSystem(id) {
+  const s = (data.systems||[]).find(x=>x.id===id); if (!s) return;
+  const cat = document.getElementById('es-cat').value;
+  s.cat = cat; s.category = cat;
+  s.make          = document.getElementById('es-mk').value;
+  s.model         = document.getElementById('es-md').value;
+  s.serialNumber  = document.getElementById('es-ser').value;
+  s.location      = document.getElementById('es-loc').value;
+  s.installDate   = document.getElementById('es-inst').value;
+  s.lastService   = document.getElementById('es-svc').value;
+  s.warrantyExpiry= document.getElementById('es-war').value;
+  s.manualUrl     = document.getElementById('es-url').value;
+  s.notes         = document.getElementById('es-nt').value;
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderSystems();
 }
 
 // ═══════════════════════════════════════════════════════════
