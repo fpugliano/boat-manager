@@ -345,8 +345,9 @@ const ATTEMPTS_KEY = 'bm_attempts';   // {count, lockUntil}
 const BACKUP_TS    = 'bm_last_backup';// timestamp of last manual backup
 const logoSrc = (typeof OROBORO_LOGO !== 'undefined') ? OROBORO_LOGO : '';
 const STORAGE_WORKER_URL = 'https://boat-manager-storage.fpugliano.workers.dev';
-const EMAIL_KEY = 'bm_email';
-const HINT_KEY  = 'bm_hint';
+const EMAIL_KEY     = 'bm_email';
+const HINT_KEY      = 'bm_hint';
+const LAST_SYNC_KEY = 'bm_last_sync';
 
 // ── Crypto runtime state (memory only — never persisted) ───────
 let cryptoKey    = null;   // CryptoKey object; null = locked
@@ -678,7 +679,7 @@ function handleJsonImport(input) {
       if (!KNOWN.some(k => k in json)) throw new Error('No recognised fields found (expected: documents, crew, transitLog, etc.)');
       deepMerge(data, json);
       await save();
-      pushToCloud();
+      await pushToCloud();
       renderApp();
       showToast('Data imported successfully');
     } catch(e) {
@@ -2299,7 +2300,8 @@ async function attemptUnlock() {
     document.getElementById('setupOv').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     renderApp();
-    pushToCloud();
+    // Pull latest from cloud in background; re-render if data changed
+    pullFromCloud().then(pulled => { if (pulled) { migrateData(); renderApp(); } });
   } catch(e) {
     at.count++;
     if (at.count >= MAX_FAILS) { at.lockUntil = Date.now() + LOCKOUT_MS; at.count = MAX_FAILS; }
@@ -2681,6 +2683,7 @@ async function pushToCloud() {
       body: JSON.stringify({salt, verify, data: enc, hint: localStorage.getItem(HINT_KEY)||''})
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
     setSyncStatus('synced');
   } catch(e) {
     setSyncStatus('offline');
@@ -2697,11 +2700,44 @@ async function fetchFromCloud(email) {
   return j;
 }
 
+async function pullFromCloud() {
+  const email = localStorage.getItem(EMAIL_KEY);
+  if (!email || !cryptoKey) return false;
+  try {
+    const cloud = await fetchFromCloud(email);
+    data = JSON.parse(await aesDecrypt(cryptoKey, cloud.data));
+    localStorage.setItem(ENC_KEY,  cloud.data);
+    localStorage.setItem(HINT_KEY, cloud.hint || '');
+    localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
+    setSyncStatus('synced');
+    return true;
+  } catch(e) {
+    console.warn('Pull from cloud failed', e);
+    return false;
+  }
+}
+
+async function syncNow() {
+  setSyncStatus('syncing');
+  if (ui.tab === 'settings') document.getElementById('mainContent').innerHTML = renderSettings();
+  const pulled = await pullFromCloud();
+  if (pulled) {
+    migrateData();
+    renderApp();
+    showToast('Synced successfully');
+  } else {
+    await pushToCloud();
+    showToast(syncStatus === 'synced' ? 'Synced successfully' : 'Sync failed — check connection', syncStatus !== 'synced');
+  }
+  if (ui.tab === 'settings') document.getElementById('mainContent').innerHTML = renderSettings();
+}
 
 function renderSettings() {
   const email = localStorage.getItem(EMAIL_KEY) || '—';
   const syncColors = {synced:'var(--green)',syncing:'var(--orange)',offline:'var(--red)',idle:'var(--label3)'};
   const syncLabels = {synced:'Synced ✓',syncing:'Syncing…',offline:'Offline / error',idle:'Not synced yet'};
+  const rawTs = localStorage.getItem(LAST_SYNC_KEY);
+  const lastSync = rawTs ? new Date(rawTs).toLocaleString() : 'Never';
   return `
     <div class="sec-hd">Cloud Sync</div>
     <div class="card">
@@ -2713,8 +2749,12 @@ function renderSettings() {
         <div class="fl">Status</div>
         <div class="fv" style="color:${syncColors[syncStatus]||'var(--label3)'}">${syncLabels[syncStatus]||'—'}</div>
       </div>
+      <div class="fr">
+        <div class="fl">Last synced</div>
+        <div class="fv" style="font-size:12px;color:var(--label3)">${esc(lastSync)}</div>
+      </div>
       <div class="btn-row">
-        <button class="btn btn-s btn-sm" onclick="pushToCloud().then(()=>document.getElementById('mainContent').innerHTML=renderSettings())">Sync now</button>
+        <button class="btn btn-s btn-sm" onclick="syncNow()">↕ Sync Now</button>
       </div>
     </div>
     <div class="sec-hd">Manual Backup</div>
