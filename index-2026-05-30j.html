@@ -404,34 +404,43 @@ const EMPTY_DEFAULTS = {
 
 const YANMAR_SCHED = [
   // FUEL SYSTEM
-  {id:'fs3',sys:'Fuel System',         task:'Drain the fuel tank',                            type:'user',  intHrs:250,  initHrs:50,   intLabel:'Initial 50h, then every 250h'},
-  {id:'fs4',sys:'Fuel System',         task:'Drain the fuel filter',                          type:'user',  intHrs:50,   initHrs:null, intLabel:'Every 50h'},
-  {id:'fs5',sys:'Fuel System',         task:'Replace the fuel filter',                        type:'parts', intHrs:250,  initHrs:null, intLabel:'Every 250h'},
-  {id:'fs6',sys:'Fuel System',         task:'Check injection timing',                         type:'shop',  intHrs:1000, initHrs:null, intLabel:'Every 1000h'},
-  {id:'fs7',sys:'Fuel System',         task:'Check injection spray condition',                type:'shop',  intHrs:1000, initHrs:null, intLabel:'Every 1000h'},
+  {id:'fs1',sys:'Fuel System',        task:'Visual inspection of engine outside',            type:'user',  intHrs:null, initHrs:null, intLabel:'Before every start'},
+  {id:'fs2',sys:'Fuel System',        task:'Check fuel level and refill',                    type:'user',  intHrs:null, initHrs:null, intLabel:'Before every start'},
+  {id:'fs3',sys:'Fuel System',        task:'Drain the fuel tank',                            type:'user',  intHrs:250,  initHrs:50,   intLabel:'Initial 50h, then every 250h'},
+  {id:'fs4',sys:'Fuel System',        task:'Drain the fuel filter',                          type:'user',  intHrs:50,   initHrs:null, intLabel:'Every 50h'},
+  {id:'fs5',sys:'Fuel System',        task:'Replace the fuel filter',                        type:'parts', intHrs:250,  initHrs:null, intLabel:'Every 250h'},
+  {id:'fs6',sys:'Fuel System',        task:'Check injection timing',                         type:'shop',  intHrs:1000, initHrs:null, intLabel:'Every 1000h'},
+  {id:'fs7',sys:'Fuel System',        task:'Check injection spray condition',                type:'shop',  intHrs:1000, initHrs:null, intLabel:'Every 1000h'},
   // LUBRICATING SYSTEM
-  {id:'ls3',sys:'Lubricating System',  task:'Replace crankcase lube oil',                     type:'parts', intHrs:150,  initHrs:50,   intLabel:'Initial 50h, then every 150h'},
-  {id:'ls4',sys:'Lubricating System',  task:'Replace marine gear lube oil',                   type:'parts', intHrs:150,  initHrs:50,   intLabel:'Initial 50h, then every 150h'},
-  {id:'ls5',sys:'Lubricating System',  task:'Replace sail drive oil',                         type:'parts', intHrs:100,  initHrs:50,   intLabel:'Initial 50h, then every 100h'},
-  {id:'ls6',sys:'Lubricating System',  task:'Replace engine lube oil filter',                 type:'parts', intHrs:250,  initHrs:50,   intLabel:'Initial 50h, then every 250h'},
+  {id:'ls1',sys:'Lubricating System', task:'Check crankcase lube oil level',                 type:'user',  intHrs:null, initHrs:null, intLabel:'Before every start'},
+  {id:'ls2',sys:'Lubricating System', task:'Check marine gear lube oil level',               type:'user',  intHrs:null, initHrs:null, intLabel:'Before every start'},
+  {id:'ls3',sys:'Lubricating System', task:'Replace crankcase lube oil',                     type:'parts', intHrs:150,  initHrs:50,   intLabel:'Initial 50h, then every 150h'},
+  {id:'ls4',sys:'Lubricating System', task:'Replace marine gear lube oil',                   type:'parts', intHrs:150,  initHrs:50,   intLabel:'Initial 50h, then every 150h'},
+  {id:'ls5',sys:'Lubricating System', task:'Replace sail drive oil',                         type:'parts', intHrs:100,  initHrs:50,   intLabel:'Initial 50h, then every 100h'},
+  {id:'ls6',sys:'Lubricating System', task:'Replace engine lube oil filter',                 type:'parts', intHrs:250,  initHrs:50,   intLabel:'Initial 50h, then every 250h'},
   // COOLING SYSTEM
-  {id:'cs3',sys:'Cooling System',      task:'Check / replace impeller of cooling water pump', type:'parts', intHrs:250,  initHrs:null, intLabel:'Check every 250h, replace every 1000h'},
-  {id:'cs4',sys:'Cooling System',      task:'Replace fresh water coolant',                    type:'parts', intHrs:null, initHrs:null, intLabel:'Every year', annual:true},
-  {id:'cs5',sys:'Cooling System',      task:'Clean and check water passages',                 type:'shop',  intHrs:1000, initHrs:null, intLabel:'Every 1000h'},
+  {id:'cs1',sys:'Cooling System',     task:'Check seawater outlet during operation',         type:'user',  intHrs:null, initHrs:null, intLabel:'Before every start'},
+  {id:'cs2',sys:'Cooling System',     task:'Check cooling water level',                      type:'user',  intHrs:null, initHrs:null, intLabel:'Before every start'},
+  {id:'cs3',sys:'Cooling System',     task:'Check / replace impeller of cooling water pump', type:'parts', intHrs:250,  initHrs:null, intLabel:'Check every 250h, replace every 1000h'},
+  {id:'cs4',sys:'Cooling System',     task:'Replace fresh water coolant',                    type:'parts', intHrs:null, initHrs:null, intLabel:'Every year', annual:true},
+  {id:'cs5',sys:'Cooling System',     task:'Clean and check water passages',                 type:'shop',  intHrs:1000, initHrs:null, intLabel:'Every 1000h'},
   // AIR INTAKE & EXHAUST
-  {id:'ae1',sys:'Air Intake & Exhaust',task:'Clean air intake silencer element',              type:'user',  intHrs:250,  initHrs:null, intLabel:'Every 250h'},
-  {id:'ae2',sys:'Air Intake & Exhaust',task:'Clean exhaust / water mixing elbow',             type:'user',  intHrs:250,  initHrs:null, intLabel:'Every 250h'},
-  {id:'ae4',sys:'Air Intake & Exhaust',task:'Diaphragm assembly inspection',                  type:'shop',  intHrs:1000, initHrs:null, intLabel:'Every 1000h'},
+  {id:'ae1',sys:'Air Intake & Exhaust',task:'Clean air intake silencer element',             type:'user',  intHrs:250,  initHrs:null, intLabel:'Every 250h'},
+  {id:'ae2',sys:'Air Intake & Exhaust',task:'Clean exhaust / water mixing elbow',            type:'user',  intHrs:250,  initHrs:null, intLabel:'Every 250h'},
+  {id:'ae3',sys:'Air Intake & Exhaust',task:'Check exhaust gas condition',                   type:'user',  intHrs:null, initHrs:null, intLabel:'Before every start'},
+  {id:'ae4',sys:'Air Intake & Exhaust',task:'Diaphragm assembly inspection',                 type:'shop',  intHrs:1000, initHrs:null, intLabel:'Every 1000h'},
   // ELECTRICAL SYSTEM
-  {id:'el2',sys:'Electrical System',   task:'Check electrolyte level in battery',             type:'user',  intHrs:50,   initHrs:null, intLabel:'Every 50h'},
-  {id:'el3',sys:'Electrical System',   task:'Adjust / replace alternator driving belt',       type:'user',  intHrs:250,  initHrs:50,   intLabel:'Initial 50h, then every 250h'},
-  {id:'el4',sys:'Electrical System',   task:'Check wiring connectors',                        type:'user',  intHrs:250,  initHrs:null, intLabel:'Every 250h'},
+  {id:'el1',sys:'Electrical System',  task:'Check alarm lamps and devices',                  type:'user',  intHrs:null, initHrs:null, intLabel:'Before every start'},
+  {id:'el2',sys:'Electrical System',  task:'Check electrolyte level in battery',             type:'user',  intHrs:50,   initHrs:null, intLabel:'Every 50h'},
+  {id:'el3',sys:'Electrical System',  task:'Adjust / replace alternator driving belt',       type:'user',  intHrs:250,  initHrs:50,   intLabel:'Initial 50h, then every 250h'},
+  {id:'el4',sys:'Electrical System',  task:'Check wiring connectors',                        type:'user',  intHrs:250,  initHrs:null, intLabel:'Every 250h'},
   // CYLINDER HEAD
-  {id:'ch2',sys:'Cylinder Head',       task:'Retighten all major nuts and bolts',             type:'shop',  intHrs:1000, initHrs:null, intLabel:'Every 1000h'},
-  {id:'ch3',sys:'Cylinder Head',       task:'Adjust intake / exhaust valve clearance',        type:'shop',  intHrs:1000, initHrs:50,   intLabel:'Initial 50h, then every 1000h'},
+  {id:'ch1',sys:'Cylinder Head',      task:'Check for leakage of water and oil',             type:'user',  intHrs:null, initHrs:null, intLabel:'After starting'},
+  {id:'ch2',sys:'Cylinder Head',      task:'Retighten all major nuts and bolts',             type:'shop',  intHrs:1000, initHrs:null, intLabel:'Every 1000h'},
+  {id:'ch3',sys:'Cylinder Head',      task:'Adjust intake / exhaust valve clearance',        type:'shop',  intHrs:1000, initHrs:50,   intLabel:'Initial 50h, then every 1000h'},
   // REMOTE CONTROL
-  {id:'rc1',sys:'Remote Control',      task:'Check / adjust remote control operation',        type:'shop',  intHrs:1000, initHrs:50,   intLabel:'Initial 50h, then every 1000h'},
-  {id:'rc2',sys:'Remote Control',      task:'Adjust propeller shaft alignment',               type:'shop',  intHrs:1000, initHrs:50,   intLabel:'Initial 50h, then every 1000h'},
+  {id:'rc1',sys:'Remote Control',     task:'Check / adjust remote control operation',        type:'shop',  intHrs:1000, initHrs:50,   intLabel:'Initial 50h, then every 1000h'},
+  {id:'rc2',sys:'Remote Control',     task:'Adjust propeller shaft alignment',               type:'shop',  intHrs:1000, initHrs:50,   intLabel:'Initial 50h, then every 1000h'},
 ];
 
 // ═══════════════════════════════════════════════════════════
@@ -453,8 +462,6 @@ let _photoCtx = null; // {section, index} for upload
 function uid(){ return '_'+Math.random().toString(36).slice(2,9)+Date.now().toString(36); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function normCat(c){ if(!c) return c; if(c==='Port Engine'||c==='Starboard Engine') return 'Inboard'; if(c==='Suzuki Outboard') return 'Outboard'; return c; }
-function fmtSchedDate(d){ if(!d) return ''; return d.slice(5)+'/'+d.slice(2,4); } // "2026-05-30" → "05-30/26"
-let _lastSchedUndo = null;
 
 function daysUntil(dateStr) {
   if (!dateStr) return 9999;
@@ -1421,7 +1428,7 @@ function calcSchedStatus(item, eid) {
   const hours = data.maintenance?.engines?.[eid]?.hours || 0;
   const e = data.maintenance?.sched?.[item.id]?.[eid] || {};
   if (!item.intHrs) {
-    return { color:'grey', label: e.date ? fmtSchedDate(e.date) : '—', lastDoneAt: 0 };
+    return { color:'grey', label: e.date ? '✓ '+e.date.slice(5) : '—', lastDoneAt: 0 };
   }
   const last = e.lastDoneAt || 0;
   const nextDue = last === 0 ? (item.initHrs || item.intHrs) : last + item.intHrs;
@@ -1431,53 +1438,20 @@ function calcSchedStatus(item, eid) {
   return { color, label, remaining, nextDue, lastDoneAt: last };
 }
 
-function _schedHistory(eid, taskId) {
-  const e = data.maintenance?.sched?.[taskId]?.[eid] || {};
-  return e.history
-    ? [...e.history]
-    : (e.lastDoneAt ? [{hours: e.lastDoneAt, date: e.date||'', notes: e.notes||'', cost: e.cost||''}] : []);
-}
-
 function markSchedDone(taskId, eid) {
   ensureEngine(eid);
   if (!data.maintenance.sched) data.maintenance.sched = {};
   if (!data.maintenance.sched[taskId]) data.maintenance.sched[taskId] = {};
-  const item   = YANMAR_SCHED.find(t => t.id === taskId);
-  const hours  = data.maintenance.engines[eid].hours || 0;
-  const prev   = JSON.parse(JSON.stringify(data.maintenance.sched[taskId][eid] || {}));
-  _lastSchedUndo = {taskId, eid, prevEntry: prev};
-  const history = _schedHistory(eid, taskId);
-  const entry  = {hours: item?.intHrs ? hours : 0, date: new Date().toISOString().slice(0,10), notes:'', cost:''};
-  history.push(entry);
-  history.sort((a,b) => a.hours - b.hours);
-  const last = history[history.length - 1];
-  data.maintenance.sched[taskId][eid] = {lastDoneAt: last.hours, date: last.date, history};
+  const item = YANMAR_SCHED.find(t => t.id === taskId);
+  const hours = data.maintenance.engines[eid].hours || 0;
+  const prev = data.maintenance.sched[taskId][eid] || {};
+  data.maintenance.sched[taskId][eid] = {
+    ...prev,
+    lastDoneAt: item?.intHrs ? hours : (prev.lastDoneAt || 0),
+    date: new Date().toISOString().slice(0, 10)
+  };
   save(); renderAlertBar();
   document.getElementById('mainContent').innerHTML = renderMaintenance();
-  showUndoToast();
-}
-
-function undoSchedDone() {
-  if (!_lastSchedUndo) return;
-  const {taskId, eid, prevEntry} = _lastSchedUndo;
-  _lastSchedUndo = null;
-  if (!data.maintenance.sched) data.maintenance.sched = {};
-  data.maintenance.sched[taskId] = data.maintenance.sched[taskId] || {};
-  data.maintenance.sched[taskId][eid] = prevEntry;
-  save(); renderAlertBar();
-  document.getElementById('mainContent').innerHTML = renderMaintenance();
-  document.getElementById('undo-toast')?.remove();
-  showToast('Undone');
-}
-
-function showUndoToast() {
-  document.getElementById('undo-toast')?.remove();
-  const t = document.createElement('div');
-  t.id = 'undo-toast';
-  t.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3);display:flex;align-items:center;gap:12px;white-space:nowrap';
-  t.innerHTML = `<span>Marked done</span><button onclick="undoSchedDone()" style="background:rgba(255,255,255,.2);border:none;color:#fff;padding:4px 12px;border-radius:12px;font-family:inherit;font-size:13px;cursor:pointer;font-weight:600">Undo</button>`;
-  document.body.appendChild(t);
-  setTimeout(() => { t.remove(); _lastSchedUndo = null; }, 5000);
 }
 
 function renderSchedItemRow(item, eids, isCat, eLbl) {
@@ -1485,13 +1459,10 @@ function renderSchedItemRow(item, eids, isCat, eLbl) {
   const bLbl = {user:'USER', parts:'PARTS', shop:'SHOP'}[item.type] || '';
   const cols = eids.map(eid => {
     const s = calcSchedStatus(item, eid);
-    const e = data.maintenance?.sched?.[item.id]?.[eid] || {};
-    const cnt = e.history?.length || (e.lastDoneAt ? 1 : 0);
-    const sub = cnt > 0 ? `${cnt > 1 ? '×'+cnt+' · ' : ''}${fmtSchedDate(e.date||'')}` : '';
     return `<div class="maint-eng-col">
       ${isCat ? `<div class="maint-eng-lbl">${eLbl[eid]}</div>` : ''}
       <button class="msb msb-${s.color}" onclick="markSchedDone('${item.id}','${eid}')">${esc(s.label)}</button>
-      ${sub ? `<div class="maint-last-done">${esc(sub)}</div>` : ''}
+      ${s.lastDoneAt ? `<div class="maint-last-done">${s.lastDoneAt}h</div>` : ''}
     </div>`;
   }).join('');
   return `<div class="maint-row2">
@@ -1505,84 +1476,43 @@ function renderSchedItemRow(item, eids, isCat, eLbl) {
 
 function showEditSchedItem(taskId) {
   const item = YANMAR_SCHED.find(t => t.id === taskId); if (!item) return;
-  showModal(esc(item.task), buildEditSchedHTML(taskId));
-}
-
-function buildEditSchedHTML(taskId) {
-  const item  = YANMAR_SCHED.find(t => t.id === taskId) || {};
   const eids  = getEngines();
   const isCat = data.meta.hullType === 'catamaran';
   const eLbl  = {port:'Port', starboard:'Starboard', main:'Engine'};
-  const today = new Date().toISOString().slice(0,10);
-
-  const engSections = eids.map(eid => {
-    const history = _schedHistory(eid, taskId);
-    const curHrs  = data.maintenance?.engines?.[eid]?.hours || 0;
-    const rows = history.length
-      ? history.slice().reverse().map((h, ri) => {
-          const origIdx = history.length - 1 - ri;
-          return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--sep)">
-            <div style="flex:1;font-size:13px">${fmtSchedDate(h.date)} · ${h.hours}h${h.notes?' · '+esc(h.notes):''}</div>
-            <button class="btn btn-d btn-xs" onclick="deleteSchedHistEntry('${taskId}','${eid}',${origIdx})">✕</button>
-          </div>`;
-        }).join('')
-      : `<div style="font-size:13px;color:var(--label3);padding:6px 0">No entries yet</div>`;
-
-    return `${isCat ? `<div style="font-weight:600;color:var(--blue);font-size:13px;margin-top:14px;margin-bottom:6px">${eLbl[eid]}</div>` : ''}
-      ${rows}
-      <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><div class="mi-label">Hours</div>
-          <input class="mi" id="ea-h-${eid}" type="number" min="0" placeholder="${curHrs}"></div>
-        <div><div class="mi-label">Date</div>
-          <input class="mi" id="ea-d-${eid}" type="date" value="${today}"></div>
-      </div>
-      <div class="mi-label">Notes</div><input class="mi" id="ea-n-${eid}" placeholder="Optional">
-      <div class="mi-label">Cost (€)</div><input class="mi" id="ea-c-${eid}" type="number" min="0" placeholder="0">
-      <button class="btn btn-p btn-sm w-full" onclick="addSchedHistEntry('${taskId}','${eid}')" style="margin-bottom:4px">+ Add Entry${isCat?' ('+eLbl[eid]+')':''}</button>`;
+  const fields = eids.map(eid => {
+    const e = data.maintenance?.sched?.[taskId]?.[eid] || {};
+    return `${isCat ? `<div style="font-weight:600;color:var(--blue);font-size:13px;margin-top:14px">${eLbl[eid]}</div>` : ''}
+      <div class="mi-label">Last done at engine hours</div>
+      <input class="mi" id="es-h-${eid}" type="number" min="0" value="${e.lastDoneAt||0}">
+      <div class="mi-label">Date</div>
+      <input class="mi" id="es-d-${eid}" type="date" value="${e.date||''}">
+      <div class="mi-label">Notes</div>
+      <input class="mi" id="es-n-${eid}" placeholder="Optional" value="${esc(e.notes||'')}">
+      <div class="mi-label">Cost (€)</div>
+      <input class="mi" id="es-c-${eid}" type="number" min="0" placeholder="0" value="${e.cost||''}">`;
   }).join('');
-
-  return `<div style="font-size:12px;color:var(--label3);margin-bottom:10px">${esc(item.intLabel||'')}</div>
-    ${engSections}
-    <div class="modal-btns" style="margin-top:12px">
-      <button class="btn btn-p w-full" onclick="hideModal();document.getElementById('mainContent').innerHTML=renderMaintenance()">Done</button>
-    </div>`;
+  showModal(esc(item.task), `
+    <div style="font-size:12px;color:var(--label3);margin-bottom:10px">${esc(item.intLabel)}</div>
+    ${fields}
+    <div class="modal-btns" style="margin-top:16px">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveEditSchedItem('${taskId}')">Save</button>
+    </div>`);
 }
 
-function addSchedHistEntry(taskId, eid) {
-  ensureEngine(eid);
+function saveEditSchedItem(taskId) {
+  if (!data.maintenance) data.maintenance = {engines:{}, sched:{}};
   if (!data.maintenance.sched) data.maintenance.sched = {};
   if (!data.maintenance.sched[taskId]) data.maintenance.sched[taskId] = {};
-  const defHrs = data.maintenance.engines[eid]?.hours || 0;
-  const hours  = parseInt(document.getElementById(`ea-h-${eid}`)?.value) || defHrs;
-  const date   = document.getElementById(`ea-d-${eid}`)?.value || new Date().toISOString().slice(0,10);
-  const notes  = document.getElementById(`ea-n-${eid}`)?.value || '';
-  const cost   = document.getElementById(`ea-c-${eid}`)?.value || '';
-  const history = _schedHistory(eid, taskId);
-  history.push({hours, date, notes, cost});
-  history.sort((a,b) => a.hours - b.hours);
-  const last = history[history.length - 1];
-  data.maintenance.sched[taskId][eid] = {lastDoneAt: last.hours, date: last.date, history};
-  save(); renderAlertBar();
-  document.getElementById('modalBody').innerHTML =
-    `<div class="modal-title">${esc(YANMAR_SCHED.find(t=>t.id===taskId)?.task||'')}</div>`
-    + buildEditSchedHTML(taskId);
-  document.getElementById('mainContent').innerHTML = renderMaintenance();
-}
-
-function deleteSchedHistEntry(taskId, eid, idx) {
-  const history = _schedHistory(eid, taskId);
-  history.splice(idx, 1);
-  history.sort((a,b) => a.hours - b.hours);
-  const last = history[history.length - 1];
-  if (!data.maintenance.sched) data.maintenance.sched = {};
-  if (!data.maintenance.sched[taskId]) data.maintenance.sched[taskId] = {};
-  data.maintenance.sched[taskId][eid] = last
-    ? {lastDoneAt: last.hours, date: last.date, history}
-    : {lastDoneAt: 0, date: '', history: []};
-  save(); renderAlertBar();
-  document.getElementById('modalBody').innerHTML =
-    `<div class="modal-title">${esc(YANMAR_SCHED.find(t=>t.id===taskId)?.task||'')}</div>`
-    + buildEditSchedHTML(taskId);
+  getEngines().forEach(eid => {
+    data.maintenance.sched[taskId][eid] = {
+      lastDoneAt: parseInt(document.getElementById(`es-h-${eid}`)?.value) || 0,
+      date:  document.getElementById(`es-d-${eid}`)?.value || '',
+      notes: document.getElementById(`es-n-${eid}`)?.value || '',
+      cost:  document.getElementById(`es-c-${eid}`)?.value || '',
+    };
+  });
+  save(); hideModal();
   document.getElementById('mainContent').innerHTML = renderMaintenance();
 }
 
