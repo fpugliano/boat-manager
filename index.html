@@ -676,8 +676,39 @@ function handleJsonImport(input) {
       const json = JSON.parse(e.target.result);
       if (typeof json !== 'object' || Array.isArray(json) || json === null) throw new Error('Expected a JSON object');
       const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2'];
-      if (!KNOWN.some(k => k in json)) throw new Error('No recognised fields found (expected: documents, crew, transitLog, etc.)');
-      deepMerge(data, json);
+      if (!KNOWN.some(k => k in json)) throw new Error('No recognised fields found (expected: documents, crew, maintenance, transitLog, etc.)');
+
+      // Handle maintenance separately — flat import format (engineHours, log[])
+      // differs from the internal nested structure (engines.port.hours, engines.port.log[])
+      if (json.maintenance) {
+        const m = json.maintenance;
+        if (!data.maintenance) data.maintenance = { engines: {}, sched: {} };
+        if (!data.maintenance.engines) data.maintenance.engines = {};
+        ['port', 'starboard'].forEach(eid => {
+          if (!data.maintenance.engines[eid])
+            data.maintenance.engines[eid] = { hours: 0, schedule: [], log: [], customTasks: [] };
+          const eng = data.maintenance.engines[eid];
+          if (m.engineHours !== undefined)
+            eng.hours = Math.max(0, parseInt(m.engineHours) || 0);
+          if (Array.isArray(m.log)) {
+            if (!eng.log) eng.log = [];
+            m.log.forEach(entry => eng.log.push({
+              id:    uid(),
+              date:  entry.date  || '',
+              hours: entry.hours !== undefined ? String(entry.hours) : '',
+              task:  entry.task  || '',
+              cost:  entry.cost  || '',
+              notes: entry.location || entry.notes || ''
+            }));
+          }
+        });
+      }
+
+      // Merge everything else (documents, crew, transitLog, spareParts, etc.)
+      const rest = Object.assign({}, json);
+      delete rest.maintenance;
+      if (Object.keys(rest).length > 0) deepMerge(data, rest);
+
       await save();
       await pushToCloud();
       renderApp();
