@@ -864,7 +864,6 @@ function completeSetup() {
 
 const TABS = [
   {id:'documents', icon:'📄', label:'Documents'},
-  {id:'crew',      icon:'🛂', label:'Crew'},
   {id:'photos',    icon:'📷', label:'Photos'},
   {id:'shipyard',  icon:'⚓', label:'Shipyard'},
   {id:'maint',     icon:'🔧', label:'Maintenance'},
@@ -930,7 +929,7 @@ function renderDocuments() {
     <div class="subtab-bar">
       ${['vessel','insurance','customs'].map(s=>`
         <div class="pill ${ui.docSub===s?'active':''}" onclick="setDocSub('${s}')">
-          ${s==='vessel'?'🚢 Vessel Doc':s==='insurance'?'🛡️ Insurance':'🛃 Customs / eTEPAY'}
+          ${s==='vessel'?'🚢 Vessel Doc':s==='insurance'?'🛡️ Insurance':'🛃 eTEPAY'}
         </div>`).join('')}
     </div>
     ${ui.docSub==='vessel' ? renderVesselDoc() : ui.docSub==='insurance' ? renderInsurance() : renderCustoms()}`;
