@@ -323,9 +323,10 @@ input[type=file]{display:none}
   </div>
 </div>
 
-<input type="file" id="photoFile"  accept="image/*"        onchange="handlePhotoUpload(this)">
-<input type="file" id="importFile" accept=".json"          onchange="handleImport(this)">
-<input type="file" id="backupFile" accept=".json,text/json" onchange="loadBackupFile(this)">
+<input type="file" id="photoFile"    accept="image/*"        onchange="handlePhotoUpload(this)">
+<input type="file" id="importFile"  accept=".json"          onchange="handleImport(this)">
+<input type="file" id="backupFile"  accept=".json,text/json" onchange="loadBackupFile(this)">
+<input type="file" id="jsonImportFile" accept=".json"       onchange="handleJsonImport(this)">
 
 <script src="logo.js"></script>
 <script src="oroboro-icon.js"></script>
@@ -663,6 +664,28 @@ async function doImport(fileJsonStr) {
       if (errEl) errEl.textContent = 'Wrong password or corrupted file';
     }
   }
+}
+
+function handleJsonImport(input) {
+  const file = input.files[0]; if (!file) return;
+  input.value = '';
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const json = JSON.parse(e.target.result);
+      if (typeof json !== 'object' || Array.isArray(json) || json === null) throw new Error('Expected a JSON object');
+      const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2'];
+      if (!KNOWN.some(k => k in json)) throw new Error('No recognised fields found (expected: documents, crew, transitLog, etc.)');
+      deepMerge(data, json);
+      await save();
+      pushToCloud();
+      renderApp();
+      showToast('Data imported successfully');
+    } catch(e) {
+      showToast('Import failed — ' + e.message, true);
+    }
+  };
+  reader.readAsText(file);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2702,6 +2725,16 @@ function renderSettings() {
       </div>
       <div class="btn-row">
         <button class="btn btn-s btn-sm" onclick="saveBackup()">⬇ Export backup</button>
+      </div>
+    </div>
+    <div class="sec-hd">Import Data</div>
+    <div class="card">
+      <div class="fr">
+        <div class="fl">Import from JSON</div>
+        <div class="fv" style="font-size:12px;color:var(--label3)">Merge plain JSON into app data</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-s btn-sm" onclick="document.getElementById('jsonImportFile').click()">⬆ Import Data from JSON</button>
       </div>
     </div>`;
 }
