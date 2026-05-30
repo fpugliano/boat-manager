@@ -1834,7 +1834,7 @@ function renderUpgrades() {
   let grandTotal = 0;
   wd.seasons.forEach(s => s.items.forEach(it => { grandTotal += parseFloat(it.cost)||0; }));
 
-  const cards = wd.seasons.map(s => renderUpgradeSeason(s)).join('');
+  const cards = wd.seasons.slice().reverse().map(s => renderUpgradeSeason(s)).join('');
   const summary = grandTotal > 0 ? `<div style="margin:4px 12px 16px;padding:12px 16px;background:var(--surface);border:1.5px solid var(--sep);border-radius:12px;font-size:13px;color:var(--label3)">All seasons total: <b style="color:var(--label)">€${grandTotal.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2})}</b></div>` : '';
   const exMsg = !isOwner ? `<div style="margin:0 12px 12px;font-size:12px;color:var(--label3);font-style:italic">Replace these examples with your own upgrades and repairs</div>` : '';
 
