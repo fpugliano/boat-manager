@@ -13,6 +13,7 @@ const logoSrc = (typeof OROBORO_LOGO !== 'undefined') ? OROBORO_LOGO : '';
 const STORAGE_WORKER_URL = 'https://boat-manager-storage.fpugliano.workers.dev';
 const EMAIL_KEY     = 'bm_email';
 const HINT_KEY      = 'bm_hint';
+const UPGRADES_DATA_VERSION = 2;
 const LAST_SYNC_KEY = 'bm_last_sync';
 
 // ── Crypto runtime state (memory only — never persisted) ───────
@@ -531,7 +532,7 @@ const TABS = [
   {id:'photos',    icon:'📷', label:'Photos'},
   {id:'shipyard',  icon:'⚓', label:'Shipyard'},
   {id:'maint',     icon:'🔧', label:'Maintenance'},
-  {id:'upgrades',  icon:'🛠️', label:'Upgrades'},
+  {id:'upgrades',  icon:'🔧', label:'Upgrades & Repairs'},
   {id:'parts',     icon:'🔩', label:'Spare Parts'},
   {id:'systems',   icon:'🔌', label:'Systems'},
   {id:'winter',    icon:'❄️', label:'Winterize'},
@@ -782,7 +783,7 @@ function frExpiry(path, value, badge, label) {
 function frMonths(path, value) {
   const ABB  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const sel  = new Set((value||'').split(',').map(s=>s.trim()).filter(Boolean));
+  const sel  = new Set(Array.isArray(value) ? value : (value||'').split(',').map(s=>s.trim()).filter(Boolean));
   const boxes = ABB.map((a,i) => `<label style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font-size:11px">
     <input type="checkbox" ${sel.has(FULL[i])?'checked':''} data-month="${FULL[i]}" onchange="saveMonthsField('${path}',this)" style="margin:0">
     ${a}</label>`).join('');
@@ -1745,22 +1746,73 @@ function saveEditedPart(idx) {
 // ═══════════════════════════════════════════════════════════
 
 function getUpgradesData() {
-  if (!data.upgrades) {
-    const isOwner = localStorage.getItem(EMAIL_KEY) === 'fpugliano@gmail.com';
+  const isOwner = localStorage.getItem(EMAIL_KEY) === 'fpugliano@gmail.com';
+  if (!data.upgrades || !data.upgrades.seasons || (isOwner && data.upgrades.seasons.length < 5)) {
     const mk = (text, cost, done) => ({id:uid(), text, cost:cost||'', checked:!!done});
     if (isOwner) {
-      data.upgrades = { seasons:[
-        {id:uid(), name:'2022/2023', location:'Didim', open:false, items:[
-          mk('Flexible solar panel replaced','',true), mk('Fixed gelcoat under soft solar panel','',true), mk('Painted antifouling on hulls','',true)
+      data.upgrades = { version: UPGRADES_DATA_VERSION, seasons:[
+        {id:uid(), name:'2022/2023', location:'Didim', items:[
+          mk('Flexible solar panel replaced','',true),
+          mk('Fixed gelcoat under soft solar panel','',true),
+          mk('Painted antifouling on hulls','',true)
         ]},
-        {id:uid(), name:'2023/2024', location:'Kilada', open:false, items:[
-          mk('Saloon big screen TV','',true)
+        {id:uid(), name:'2023/2024', location:'Kilada', items:[
+          mk('Saloon big stbd window panel replaced','',true),
+          mk('Anchor winch motor rebuild','',true),
+          mk('Yanmar engine alternators rebuild','',true),
+          mk('New helm station dodger cover','',true),
+          mk('New jib sheets green and red','',true),
+          mk('New anchor chain from Italy','',true),
+          mk('Saildrive shafts stbd and port replaced','',true)
+        ]},
+        {id:uid(), name:'2024/2025', location:'Leros', items:[
+          mk('Upgraded saloon cushions sponges','',true),
+          mk('Placed a new water inlet/outlet port','',true),
+          mk('Replaced trampoline line','',true),
+          mk('Placed new water tank gauges','',true),
+          mk('Replaced the water heaters','',true),
+          mk('Fixed stbd hull gelcoat from the accident Nisiros','',true),
+          mk('Fixed small gelcoat holes','',true),
+          mk('Replaced saloon small port window panel','',true),
+          mk('Fixed some stitches on the jib','',true),
+          mk('Repainted keel with sika','',true),
+          mk('Stainless solar panel scratch brushed up','',true),
+          mk('Saildrive paint','',true),
+          mk('Changed solenoid Lewmar winch port side','',true),
+          mk('Changed foot step of Lewmar winch port side','',true),
+          mk('Added extra 200Ah lithium battery and hub','',true),
+          mk('Painted the bathroom door frame (humidity damage from winter in marina)','',true)
+        ]},
+        {id:uid(), name:'2025/2026', location:'Kilada', items:[
+          mk('Watermaker cylinder replaced','',false),
+          mk('Port head door squeaking issue fixed','',false),
+          mk('Port rudder housing and ball replaced','',false),
+          mk('Repainted antifouling on hulls','',false),
+          mk('New bridal','',false),
+          mk('All hatch frames sandblasting and repainted','',false),
+          mk('Dinghy air hole leak patched','',false),
+          mk('Sailpack zipper replaced','',false),
+          mk('New fridge and housing structure added','',false),
+          mk('Stern shore line reels rebuilt and painted','',false),
+          mk('Dinghy davit motor cleaned','',false),
+          mk('Top starboard deck sika patched','',false),
+          mk('Flexible solar panels replaced (warranty)','',false),
+          mk('Flexible solar panel gelcoat patched','',false),
+          mk('Regluing the starboard aft window panel','',false),
+          mk('Engine gauge replaced','',false),
+          mk('Water heaters replaced under warranty','',false)
+        ]},
+        {id:uid(), name:'2026/2027', location:'', items:[
+          mk('Top deck sika replaced','',false),
+          mk('Aft dodger cover replaced','',false)
         ]}
       ]};
     } else {
-      data.upgrades = { seasons:[
-        {id:uid(), name:'2024/2025', location:'Example Marina', open:true, items:[
-          mk('Replaced engine impeller','45',false), mk('Painted antifouling on hulls','280',false), mk('New shore power cable','120',false)
+      data.upgrades = { version: UPGRADES_DATA_VERSION, seasons:[
+        {id:uid(), name:'2024/2025', location:'Example Marina', items:[
+          mk('Replaced engine impeller','45',false),
+          mk('Painted antifouling on hulls','280',false),
+          mk('New shore power cable','120',false)
         ]}
       ]};
     }
@@ -1787,7 +1839,7 @@ function renderUpgrades() {
   const exMsg = !isOwner ? `<div style="margin:0 12px 12px;font-size:12px;color:var(--label3);font-style:italic">Replace these examples with your own upgrades and repairs</div>` : '';
 
   return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 12px 8px">
-    <div style="font-size:17px;font-weight:700">🛠️ Upgrades &amp; Repairs</div>
+    <div style="font-size:17px;font-weight:700">🔧 Upgrades &amp; Repairs</div>
     <button onclick="showAddUpgradeSeason()" style="background:var(--surface);border:1.5px solid var(--sep);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;font-family:var(--font);color:var(--label);cursor:pointer">+ Add season</button>
   </div>
   ${exMsg}${cards}${summary}`;
@@ -1949,10 +2001,17 @@ function saveUpgradeSeason() {
 }
 
 function prefillUpgradesData() {
+  const forceReseed = localStorage.getItem('force_upgrades_reseed');
+  if (forceReseed) {
+    localStorage.removeItem('force_upgrades_reseed');
+    delete data.upgrades;
+    getUpgradesData();
+    return true;
+  }
   if (localStorage.getItem(EMAIL_KEY) !== 'fpugliano@gmail.com') return false;
-  // Only seed if no data yet
-  if (data.upgrades) return false;
-  getUpgradesData(); // initializes with owner data
+  if (data.upgrades?.version >= UPGRADES_DATA_VERSION) return false;
+  delete data.upgrades;
+  getUpgradesData();
   return true;
 }
 
@@ -2738,9 +2797,6 @@ function migrateData() {
   let dirty = false;
   try { (data.spareParts || []).forEach(p => { const n = normCat(p.category); if (n !== p.category) { p.category = n; dirty = true; } }); } catch(e) { console.warn('migrate spareParts', e); }
   try { if (migrateToSingleLog()) dirty = true; } catch(e) { console.warn('migrateToSingleLog', e); }
-  try { if (prefillCustomsOwnerData()) dirty = true; } catch(e) { console.warn('prefillCustoms', e); }
-  try { if (prefillTransitLog()) dirty = true; } catch(e) { console.warn('prefillTransitLog', e); }
-  try { if (prefillUpgradesData()) dirty = true; } catch(e) { console.warn('prefillUpgrades', e); }
   // Seed belt history if not already present
   if (!data.maintenance) data.maintenance = { engines:{}, sched:{}, log:[] };
   if (!data.maintenance.log) data.maintenance.log = [];
@@ -2927,7 +2983,14 @@ async function attemptUnlock() {
     if (!found) { data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS)); }
     if (!localStorage.getItem(EMAIL_KEY) && data.meta?.email) localStorage.setItem(EMAIL_KEY, data.meta.email);
     const pulled = await pullFromCloud();
-    if (!pulled) await pushToCloud(); // cloud has no record yet — seed it with local data
+    if (!pulled) {
+      let prefillDirty = false;
+      try { if (prefillCustomsOwnerData()) prefillDirty = true; } catch(e) { console.warn('prefillCustoms', e); }
+      try { if (prefillTransitLog()) prefillDirty = true; } catch(e) { console.warn('prefillTransitLog', e); }
+      try { if (prefillUpgradesData()) prefillDirty = true; } catch(e) { console.warn('prefillUpgrades', e); }
+      if (prefillDirty) save();
+      await pushToCloud();
+    }
     migrateData();
     startActivityTracking();
     document.getElementById('setupOv').classList.add('hidden');
@@ -3042,7 +3105,14 @@ async function attemptLogin() {
       await load();
       if (!localStorage.getItem(EMAIL_KEY) && data.meta?.email) localStorage.setItem(EMAIL_KEY, data.meta.email);
       const pulled = await pullFromCloud();
-      if (!pulled) await pushToCloud(); // cloud has no record yet — seed it with local data
+      if (!pulled) {
+        let prefillDirty = false;
+        try { if (prefillCustomsOwnerData()) prefillDirty = true; } catch(e) { console.warn('prefillCustoms', e); }
+        try { if (prefillTransitLog()) prefillDirty = true; } catch(e) { console.warn('prefillTransitLog', e); }
+        try { if (prefillUpgradesData()) prefillDirty = true; } catch(e) { console.warn('prefillUpgrades', e); }
+        if (prefillDirty) save();
+        await pushToCloud();
+      }
       migrateData();
       startActivityTracking();
       document.getElementById('setupOv').classList.add('hidden');
@@ -3073,6 +3143,10 @@ async function attemptLogin() {
     renderApp();
     setSyncStatus('synced');
   } catch(e) {
+    if (e.message.includes('404') && !hasSalt && !hasVerify) {
+      startNewSetupFromLogin();
+      return;
+    }
     const msg = e.message.includes('404')
       ? 'No account found. Tap "Set up your boat" to register.'
       : 'Wrong email or PIN.';
@@ -3369,6 +3443,12 @@ async function syncNow() {
   if (ui.tab === 'settings') document.getElementById('mainContent').innerHTML = renderSettings();
 }
 
+function logOut() {
+  if (!confirm('This will log you out and you may lose access to your data if you forget your PIN.\n\nAre you sure?')) return;
+  [SALT_KEY, VERIFY_KEY, ENC_KEY, HINT_KEY].forEach(k => localStorage.removeItem(k));
+  renderLoginScreen();
+}
+
 function renderSettings() {
   const email = localStorage.getItem(EMAIL_KEY) || '—';
   const syncColors = {synced:'var(--green)',syncing:'var(--orange)',offline:'var(--red)',idle:'var(--label3)'};
@@ -3412,6 +3492,12 @@ function renderSettings() {
       </div>
       <div class="btn-row">
         <button class="btn btn-s btn-sm" onclick="document.getElementById('jsonImportFile').click()">⬆ Import Data from JSON</button>
+      </div>
+    </div>
+    <div class="sec-hd">Account</div>
+    <div class="card">
+      <div class="btn-row">
+        <button class="btn btn-d btn-sm" onclick="logOut()">Log out / Switch account</button>
       </div>
     </div>`;
 }
