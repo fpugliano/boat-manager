@@ -681,7 +681,8 @@ function handleJsonImport(input) {
       await save();
       await pushToCloud();
       renderApp();
-      showToast('Data imported successfully');
+      const cloudOk = syncStatus === 'synced';
+      showToast(cloudOk ? 'Data imported and synced to cloud' : 'Data imported locally — cloud sync failed, tap Sync Now to retry', !cloudOk);
     } catch(e) {
       showToast('Import failed — ' + e.message, true);
     }
@@ -2702,17 +2703,18 @@ async function fetchFromCloud(email) {
 
 async function pullFromCloud() {
   const email = localStorage.getItem(EMAIL_KEY);
-  if (!email || !cryptoKey) return false;
+  if (!email || !cryptoKey) { console.warn('pullFromCloud: no email or key'); return false; }
   try {
     const cloud = await fetchFromCloud(email);
-    data = JSON.parse(await aesDecrypt(cryptoKey, cloud.data));
+    const decrypted = JSON.parse(await aesDecrypt(cryptoKey, cloud.data));
+    data = decrypted;
     localStorage.setItem(ENC_KEY,  cloud.data);
     localStorage.setItem(HINT_KEY, cloud.hint || '');
     localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
     setSyncStatus('synced');
     return true;
   } catch(e) {
-    console.warn('Pull from cloud failed', e);
+    console.warn('pullFromCloud failed:', e.message);
     return false;
   }
 }
@@ -2724,10 +2726,12 @@ async function syncNow() {
   if (pulled) {
     migrateData();
     renderApp();
-    showToast('Synced successfully');
+    showToast('Synced — latest data loaded from cloud');
   } else {
-    await pushToCloud();
-    showToast(syncStatus === 'synced' ? 'Synced successfully' : 'Sync failed — check connection', syncStatus !== 'synced');
+    // Pull failed: do not overwrite cloud with potentially stale local data.
+    // Just report the failure so the user knows.
+    setSyncStatus('offline');
+    showToast('Sync failed — could not reach cloud. Check connection.', true);
   }
   if (ui.tab === 'settings') document.getElementById('mainContent').innerHTML = renderSettings();
 }
