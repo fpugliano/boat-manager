@@ -331,6 +331,100 @@ const MAX_FAILS  = 5;              // attempts before lockout
 const LOCKOUT_MS = 30 * 1000;      // lockout duration
 let syncStatus = 'idle'; // 'idle'|'syncing'|'synced'|'offline'
 
+// Yanmar maintenance schedule template
+const YANMAR_SCHED = [
+  {id:'y50',   interval:50,   task:'Check raw water pump belts, visual inspection'},
+  {id:'y250',  interval:250,  task:'Engine oil & filter, fuel filter, zinc anodes check'},
+  {id:'y500',  interval:500,  task:'Full service — impeller, raw water pump, sail drive oil change, all filters'},
+  {id:'y1000', interval:1000, task:'Valve clearance, injectors, heat exchanger clean, shaft seals'},
+  {id:'y2000', interval:2000, task:'Major overhaul'},
+];
+
+function freshSchedule() {
+  return YANMAR_SCHED.map(t => ({...t, lastDoneAt:0}));
+}
+
+// Spare parts template (engine-bay parts, before cat/mono split)
+const ENGINE_PARTS = [
+  {pn:'128370-13201',    desc:'Heat Exchanger gasket',            qty:4,  min:2, price:0},
+  {pn:'128370-13530',    desc:'Exhaust Elbow',                    qty:2,  min:1, price:94},
+  {pn:'119305-35170-9',  desc:'Engine Oil filter',                qty:2,  min:1, price:8},
+  {pn:'104500-55710',    desc:'Fuel filter 10-15 microns',        qty:4,  min:2, price:15},
+  {pn:'24341-000440',    desc:'Fuel filter O-ring',               qty:10, min:4, price:0},
+  {pn:'R2010PM-or',      desc:'Racor filter 10 microns',          qty:2,  min:1, price:18},
+  {pn:'128990-42570',    desc:'Impeller',                         qty:6,  min:2, price:26},
+  {pn:'128990-77580',    desc:'Flat belts',                       qty:5,  min:2, price:18},
+  {pn:'25111-002100',    desc:'V belts M21',                      qty:5,  min:2, price:13},
+  {pn:'196450-02501',    desc:'Half Moon Anodes',                 qty:4,  min:2, price:17},
+  {pn:'796420-09200',    desc:'SD25 Prop Nuts',                   qty:2,  min:1, price:126},
+  {pn:'24341-000125',    desc:'O-Rings Oil drain',                qty:9,  min:4, price:2},
+  {pn:'196420-02530',    desc:'Oil Drain Plug M10',               qty:4,  min:2, price:33},
+  {pn:'128995-42500',    desc:'Water pump assembly',              qty:2,  min:1, price:251},
+  {pn:'27210-200550',    desc:'Sail drive anodes internal',       qty:4,  min:2, price:10.73},
+  {pn:'196420-12240',    desc:'Sail Drive O-ring',                qty:7,  min:3, price:0},
+  {pn:'196313-02591',    desc:'Shaft lip seals',                  qty:6,  min:2, price:34.9},
+  {pn:'24321-000950',    desc:'Sail Drive Shaft o-rings',         qty:4,  min:2, price:13.55},
+  {pn:'',                desc:'Engine oil 15W40 5L Shell',        qty:6,  min:2, price:25},
+  {pn:'',                desc:'Sail Drive oil 80W90 5L Shell',    qty:1,  min:1, price:28},
+];
+const SUZUKI_PARTS = [
+  {pn:'1098 BR7HS-10', desc:'Spark plugs',   qty:2, min:1, price:0},
+  {pn:'',              desc:'Impeller',       qty:1, min:1, price:0},
+  {pn:'',              desc:'Head gasket',    qty:1, min:1, price:0},
+];
+
+function makeParts(hullType) {
+  const parts = [];
+  if (hullType === 'catamaran') {
+    ['Port Engine','Starboard Engine'].forEach((cat, ci) => {
+      ENGINE_PARTS.forEach((p,i) => parts.push({
+        id:`${ci===0?'port':'stbd'}_${i}`, category:cat,
+        location:`${ci===0?'port':'starboard'} engine bay`,
+        ...p, qty:p.qty, unitPrice:p.price
+      }));
+    });
+  } else {
+    ENGINE_PARTS.forEach((p,i) => parts.push({
+      id:`main_${i}`, category:'Yanmar Engine',
+      location:'engine bay', ...p, unitPrice:p.price
+    }));
+  }
+  SUZUKI_PARTS.forEach((p,i) => parts.push({
+    id:`suz_${i}`, category:'Suzuki Outboard',
+    location:'tender locker', ...p, unitPrice:p.price
+  }));
+  return parts;
+}
+
+const OROBORO_SYSTEMS = [
+  {cat:'Battery Storage',       make:'Victron', model:'Lithium Battery A',         serial:'', location:'engine room port',       note:'12V'},
+  {cat:'Battery Storage',       make:'Victron', model:'Lithium Battery B',         serial:'', location:'engine room centre',     note:'12V'},
+  {cat:'Battery Storage',       make:'Victron', model:'Lithium Battery C',         serial:'', location:'engine room starboard',  note:'12V'},
+  {cat:'Battery Storage',       make:'Victron', model:'AGM Motor Battery',         serial:'', location:'engine room',            note:'12V'},
+  {cat:'Charge Controllers',    make:'Victron', model:'MPPT 75/15',                serial:'', location:'',                       note:'Solar controller 1'},
+  {cat:'Charge Controllers',    make:'Victron', model:'MPPT 75/15',                serial:'', location:'',                       note:'Solar controller 2'},
+  {cat:'Charge Controllers',    make:'Victron', model:'MPPT 75/15',                serial:'', location:'',                       note:'Solar controller 3'},
+  {cat:'Charge Controllers',    make:'Victron', model:'Orion-TR Smart 12/12-30',   serial:'', location:'',                       note:'DC-DC charger 1'},
+  {cat:'Charge Controllers',    make:'Victron', model:'Orion-TR Smart 12/12-30',   serial:'', location:'',                       note:'DC-DC charger 2'},
+  {cat:'Charge Controllers',    make:'Victron', model:'Orion-TR Smart 12/12-30',   serial:'', location:'',                       note:'DC-DC charger 3'},
+  {cat:'Charge Controllers',    make:'Victron', model:'Orion-TR Smart 12/12-30',   serial:'', location:'',                       note:'DC-DC charger 4'},
+  {cat:'Protection',            make:'Victron', model:'BatteryProtect 220A',       serial:'', location:'',                       note:'Charge disconnect'},
+  {cat:'Protection',            make:'Victron', model:'BatteryProtect 220A',       serial:'', location:'',                       note:'Load disconnect'},
+  {cat:'Protection',            make:'Victron', model:'VE.Bus BMS',                serial:'', location:'',                       note:'Battery management'},
+  {cat:'Inverter/Charger',      make:'Victron', model:'Multiplus',                 serial:'', location:'',                       note:'Inverter/Charger'},
+  {cat:'Monitoring',            make:'Victron', model:'Venus GX',                  serial:'', location:'',                       note:'System monitor'},
+  {cat:'Monitoring',            make:'Victron', model:'BMV-712',                   serial:'', location:'',                       note:'Battery monitor'},
+  {cat:'Propulsion',            make:'',        model:'Alternator 1',              serial:'', location:'port engine',            note:''},
+  {cat:'Propulsion',            make:'',        model:'Alternator 2',              serial:'', location:'starboard engine',       note:''},
+  {cat:'Propulsion',            make:'Yanmar',  model:'Diesel 30hp — Sail Drive',  serial:'', location:'engines',               note:''},
+];
+
+function makeSystems() {
+  return OROBORO_SYSTEMS.map((s,i) => ({
+    id:'sys_'+i, ...s,
+    installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', notes:s.note, photos:[]
+  }));
+}
 
 const EMPTY_DEFAULTS = {
   meta:{ boatName:'', ownerName:'', email:'', flag:'', hullType:'catamaran', setupComplete:false },
@@ -730,7 +824,22 @@ function completeSetup() {
   data.meta.flag      = flag;
   localStorage.setItem(EMAIL_KEY, email);
   data.meta.setupComplete = true;
-  // Don't save yet — we have no crypto key. Show PIN setup next.
+  // Initialize maintenance if not set
+  if (!data.maintenance) {
+    data.maintenance = { engines:{} };
+    getEngines().forEach(eid => {
+      data.maintenance.engines[eid] = { hours:0, schedule:freshSchedule(), log:[], customTasks:[] };
+    });
+  }
+  // Initialize spare parts
+  if (!data.spareParts || !data.spareParts.length) {
+    data.spareParts = makeParts(data.meta.hullType);
+  }
+  // Initialize systems
+  if (!data.systems || !data.systems.length) {
+    data.systems = makeSystems();
+  }
+  // Don't save yet — we have no crypto key. Show password setup next.
   renderPINSetup();
 }
 
@@ -1349,7 +1458,7 @@ function renderMaintenance() {
   const eid = isCat ? ui.maintEngine : engines[0];
   const eng = data.maintenance?.engines?.[eid] || {hours:0, schedule:[], log:[], customTasks:[]};
   const hours = eng.hours || 0;
-  const schedule = eng.schedule || [];
+  const schedule = eng.schedule?.length ? eng.schedule : freshSchedule();
 
   return `
     ${isCat ? `
@@ -1446,7 +1555,7 @@ function setHours(eid, val) {
 function ensureEngine(eid) {
   if (!data.maintenance) data.maintenance = {engines:{}};
   if (!data.maintenance.engines) data.maintenance.engines = {};
-  if (!data.maintenance.engines[eid]) data.maintenance.engines[eid] = {hours:0, schedule:[], log:[], customTasks:[]};
+  if (!data.maintenance.engines[eid]) data.maintenance.engines[eid] = {hours:0, schedule:freshSchedule(), log:[], customTasks:[]};
 }
 function logMaintenanceDone(eid, taskId, currentHours) {
   ensureEngine(eid);
@@ -2258,6 +2367,7 @@ function startNewSetupFromLogin() {
 
 function startNewSetup(prefillEmail = '') {
   data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS));
+  if (typeof OROBORO_DATA !== 'undefined') deepMerge(data, OROBORO_DATA);
   if (prefillEmail) data.meta.email = prefillEmail;
   renderSetup();
 }
