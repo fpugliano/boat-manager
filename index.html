@@ -925,14 +925,16 @@ function renderActiveTab() {
 // ═══════════════════════════════════════════════════════════
 
 function renderDocuments() {
+  const SUBS = {vessel:'🚢 Vessel Doc', insurance:'🛡️ Insurance', customs:'🛃 eTEPAY', transitlog:'📜 Transit Log'};
   return `
     <div class="subtab-bar">
-      ${['vessel','insurance','customs'].map(s=>`
-        <div class="pill ${ui.docSub===s?'active':''}" onclick="setDocSub('${s}')">
-          ${s==='vessel'?'🚢 Vessel Doc':s==='insurance'?'🛡️ Insurance':'🛃 eTEPAY'}
-        </div>`).join('')}
+      ${Object.keys(SUBS).map(s=>`
+        <div class="pill ${ui.docSub===s?'active':''}" onclick="setDocSub('${s}')">${SUBS[s]}</div>`).join('')}
     </div>
-    ${ui.docSub==='vessel' ? renderVesselDoc() : ui.docSub==='insurance' ? renderInsurance() : renderCustoms()}`;
+    ${ui.docSub==='vessel' ? renderVesselDoc()
+    : ui.docSub==='insurance' ? renderInsurance()
+    : ui.docSub==='transitlog' ? renderTransitLog()
+    : renderCustoms()}`;
 }
 
 function setDocSub(s) {
@@ -2596,6 +2598,188 @@ function migrateToSingleLog() {
   return true;
 }
 
+// ═══════════════════════════════════════════════════════════
+//  TRANSIT LOG
+// ═══════════════════════════════════════════════════════════
+
+function getTLData() {
+  if (!data.transitLog) {
+    data.transitLog = { currentLog:'tl_2526', logs:{ tl_2526:{
+      season:'2025-2026', archived:false, stamps:[],
+      docNumber:'', issueDate:'', validFrom:'', validUntil:'',
+      customsAuthority:'', validityType:'Limited (Ορισμένη)', prevDocCount:'', otherNotes:'', provisions:'',
+      vesselName:'', flag:'', portOfRegistry:'', regNumber:'', callSign:'',
+      vesselType:'', gt:'', engine:'', loa:'', yearBuilt:'', yearFirstReg:'',
+      ownerName:'', holderName:'', address:'', telephone:'', email:'', afm:'', idNumber:''
+    }}};
+  }
+  return data.transitLog;
+}
+
+function nextTLSeason(s) {
+  const m = s.match(/(\d{4})-(\d{4})/);
+  return m ? `${+m[1]+1}-${+m[2]+1}` : s;
+}
+
+function saveTLField(key, value) {
+  const wd = getTLData();
+  const log = wd.logs[wd.currentLog];
+  if (!log || log.archived) return;
+  log[key] = value; save();
+}
+
+function frTL(label, key, value, type) {
+  return `<div class="fr"><div class="fl">${esc(label)}</div>
+    <input class="fi" type="${type==='date'?'date':'text'}" value="${esc(value||'')}" onblur="saveTLField('${key}',this.value)" placeholder="—"></div>`;
+}
+function frTLArea(label, key, value) {
+  return `<div class="fr" style="align-items:flex-start;padding-top:12px"><div class="fl">${esc(label)}</div>
+    <textarea class="fi-area" onblur="saveTLField('${key}',this.value)" placeholder="—">${esc(value||'')}</textarea></div>`;
+}
+function frTLSelect(label, key, value, opts) {
+  return `<div class="fr"><div class="fl">${esc(label)}</div>
+    <select class="fi" onchange="saveTLField('${key}',this.value)">${opts.map(o=>`<option ${o===value?'selected':''}>${esc(o)}</option>`).join('')}</select></div>`;
+}
+
+function tlSection(n, title, body) {
+  const k = 's'+n, open = ui.tlOpen?.[k] !== false;
+  return `<div class="card" style="margin-bottom:12px;overflow:hidden">
+    <div onclick="if(!ui.tlOpen)ui.tlOpen={};ui.tlOpen['${k}']=!${open};document.getElementById('mainContent').innerHTML=renderDocuments()"
+      style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;user-select:none">
+      <span style="font-size:15px;font-weight:700">${title}</span>
+      <span style="color:var(--label3);font-size:12px">${open?'▲':'▼'}</span>
+    </div>
+    ${open?`<div style="border-top:1px solid var(--sep)">${body}</div>`:''}
+  </div>`;
+}
+
+function renderTLStamps(log, archived) {
+  const stamps = (log.stamps||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
+  const addBtn = archived ? '' : `<div class="btn-row"><button class="btn btn-p btn-sm" onclick="showAddTLStamp()">+ Add stamp</button></div>`;
+  if (!stamps.length) return addBtn + `<div style="text-align:center;padding:24px;color:var(--label3);font-size:13px">No stamps yet</div>`;
+  const rows = stamps.map(s => {
+    if (ui.tlEditStampId === s.id) return `<tr style="background:var(--surface2)">
+      <td><input id="tles-d" class="fi" style="min-width:90px;font-size:12px;padding:4px 6px" value="${esc(s.date||'')}"></td>
+      <td><input id="tles-p" class="fi" style="min-width:80px;font-size:12px;padding:4px 6px" value="${esc(s.port||'')}"></td>
+      <td><select id="tles-t" class="fi" style="font-size:12px;padding:4px 6px"><option ${s.type==='Arrival'?'selected':''}>Arrival</option><option ${s.type==='Departure'?'selected':''}>Departure</option><option ${s.type==='Stamp'?'selected':''}>Stamp</option></select></td>
+      <td><input id="tles-a" class="fi" style="min-width:80px;font-size:12px;padding:4px 6px" value="${esc(s.authority||'')}"></td>
+      <td><input id="tles-n" class="fi" style="min-width:60px;font-size:12px;padding:4px 6px" value="${esc(s.notes||'')}"></td>
+      <td style="white-space:nowrap"><button class="btn btn-p btn-xs" onclick="saveTLStampEdit('${s.id}')">Save</button> <button class="btn btn-s btn-xs" onclick="ui.tlEditStampId=null;document.getElementById('mainContent').innerHTML=renderDocuments()">✕</button></td></tr>`;
+    const typeCls = s.type==='Arrival'?'b-green':s.type==='Departure'?'b-red':'b-orange';
+    const acts = archived ? '' : `<button onclick="startTLStampEdit('${s.id}')" style="background:none;border:none;padding:4px;cursor:pointer;font-size:13px;color:var(--label3)">✏️</button><button onclick="deleteTLStamp('${s.id}')" style="background:none;border:none;padding:4px;cursor:pointer;font-size:13px;color:var(--label3)">✕</button>`;
+    return `<tr><td style="white-space:nowrap;font-size:13px">${esc(s.date)}</td><td style="font-size:13px">${esc(s.port)}</td>
+      <td><span class="badge ${typeCls}" style="font-size:10px">${esc(s.type)}</span></td>
+      <td style="font-size:12px;color:var(--label2)">${esc(s.authority||'')}</td>
+      <td style="font-size:12px;color:var(--label2)">${esc(s.notes||'')}</td>
+      <td style="white-space:nowrap">${acts}</td></tr>`;
+  }).join('');
+  return addBtn + `<div style="overflow-x:auto"><table class="tbl">
+    <thead><tr><th>Date</th><th>Port</th><th>Type</th><th>Authority</th><th>Notes</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+
+function renderTransitLog() {
+  const wd = getTLData();
+  if (!ui.tlSeasonId) ui.tlSeasonId = wd.currentLog;
+  if (!ui.tlOpen) ui.tlOpen = {s1:true, s2:true, s3:true};
+  const log = wd.logs[ui.tlSeasonId]; if (!log) return '';
+  const archived = log.archived, isCurrent = ui.tlSeasonId === wd.currentLog;
+  const opts = Object.keys(wd.logs).reverse().map(id=>
+    `<option value="${id}" ${id===ui.tlSeasonId?'selected':''}>${esc(wd.logs[id].season)}${wd.logs[id].archived?' 🔒':''}</option>`
+  ).join('');
+  const hdr = `<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+    <select onchange="ui.tlSeasonId=this.value;ui.tlOpen={s1:true,s2:true,s3:true};ui.tlEditStampId=null;document.getElementById('mainContent').innerHTML=renderDocuments()"
+      style="flex:1;background:var(--surface);border:1.5px solid var(--sep);border-radius:20px;padding:7px 14px;font-size:14px;font-weight:600;font-family:var(--font);color:var(--label);cursor:pointer;min-width:140px">${opts}</select>
+    ${isCurrent&&!archived?`<button class="btn btn-s btn-sm" onclick="archiveTransitLog()">Archive &amp; New</button>`:''}
+    ${archived?`<span style="font-size:12px;font-weight:500;padding:6px 10px;background:var(--surface2);border-radius:12px;color:var(--label3)">🔒 Archived</span>`:''}
+  </div>`;
+  const exp = expiryBadge(log.validUntil, 60);
+  const s1 = `<div class="card-body">
+    ${frTL('Document Number (Αρ. Δελτίου)','docNumber',log.docNumber)}
+    ${frTL('Issue Date (Ημερομηνία)','issueDate',log.issueDate)}
+    ${frTL('Valid From (Από)','validFrom',log.validFrom)}
+    <div class="fr"><div class="fl">Valid Until (Μέχρι) ${exp}</div><input class="fi" type="text" value="${esc(log.validUntil||'')}" onblur="saveTLField('validUntil',this.value)" placeholder="—"></div>
+    ${frTL('Customs Authority (Τελ. Αρχή)','customsAuthority',log.customsAuthority)}
+    ${frTLSelect('Validity Type','validityType',log.validityType||'Limited (Ορισμένη)',['Limited (Ορισμένη)','Unlimited (Αόριστη)'])}
+    ${frTL('Previous Documents Count','prevDocCount',log.prevDocCount)}
+    ${frTLArea('Other Notes','otherNotes',log.otherNotes)}
+    ${frTLArea('Vessel Provisions and Bonded Stores','provisions',log.provisions)}
+  </div>`;
+  const s2 = `<div class="card-body">
+    ${frTL('Vessel Name','vesselName',log.vesselName)}
+    ${frTL('Flag','flag',log.flag)}
+    ${frTL('Port of Registry','portOfRegistry',log.portOfRegistry)}
+    ${frTL('Registration Number','regNumber',log.regNumber)}
+    ${frTL('Call Sign','callSign',log.callSign)}
+    ${frTL('Type of Vessel','vesselType',log.vesselType)}
+    ${frTL('Gross Tonnage (GT)','gt',log.gt)}
+    ${frTL('Engine','engine',log.engine)}
+    ${frTL('Length (LOA)','loa',log.loa)}
+    ${frTL('Year Built','yearBuilt',log.yearBuilt)}
+    ${frTL('Year of First Registration','yearFirstReg',log.yearFirstReg)}
+    ${frTL('Owner Name (Πλοιοκτήτης)','ownerName',log.ownerName)}
+    ${frTL('Holder/User (Κατοχος-Χρηστης)','holderName',log.holderName)}
+    ${frTL('Address','address',log.address)}
+    ${frTL('Telephone','telephone',log.telephone)}
+    ${frTL('Email','email',log.email)}
+    ${frTL('AFM/TIN (ΑΦΜ)','afm',log.afm)}
+    ${frTL('ID / Passport (ΑΔΤ ή Διαβατήριο)','idNumber',log.idNumber)}
+  </div>`;
+  return hdr + tlSection(1,'📋 Document Info',s1) + tlSection(2,'🚢 Vessel & Owner',s2) + tlSection(3,'🛂 Port Stamps (Δελτίο Κίνησης)',renderTLStamps(log,archived));
+}
+
+function showAddTLStamp() {
+  showModal('Add Port Stamp', `
+    <div class="mi-label">Date</div><input class="mi" id="tl-d" type="date" value="${new Date().toISOString().slice(0,10)}">
+    <div class="mi-label">Port</div><input class="mi" id="tl-p" placeholder="e.g. Paros">
+    <div class="mi-label">Type</div><select class="mi" id="tl-t"><option>Arrival</option><option>Departure</option><option>Stamp</option></select>
+    <div class="mi-label">Authority</div><input class="mi" id="tl-a" placeholder="e.g. Syros Coast Guard">
+    <div class="mi-label">Notes</div><input class="mi" id="tl-n" placeholder="Optional">
+    <div class="modal-btns"><button class="btn btn-s" onclick="hideModal()">Cancel</button><button class="btn btn-p" onclick="saveTLStamp()">Add</button></div>`);
+}
+function saveTLStamp() {
+  const wd=getTLData(), log=wd.logs[wd.currentLog]; if (!log) return;
+  if (!log.stamps) log.stamps=[];
+  log.stamps.push({id:uid(), date:document.getElementById('tl-d').value, port:document.getElementById('tl-p').value,
+    type:document.getElementById('tl-t').value, authority:document.getElementById('tl-a').value, notes:document.getElementById('tl-n').value});
+  save(); hideModal(); document.getElementById('mainContent').innerHTML=renderDocuments();
+}
+function deleteTLStamp(id) {
+  if (!confirm('Remove this stamp?')) return;
+  const wd=getTLData(), log=wd.logs[wd.currentLog]; if (!log) return;
+  log.stamps=(log.stamps||[]).filter(s=>s.id!==id);
+  save(); document.getElementById('mainContent').innerHTML=renderDocuments();
+}
+function startTLStampEdit(id) {
+  ui.tlEditStampId=id;
+  document.getElementById('mainContent').innerHTML=renderDocuments();
+  setTimeout(()=>document.getElementById('tles-d')?.focus(), 40);
+}
+function saveTLStampEdit(id) {
+  const wd=getTLData(), log=wd.logs[wd.currentLog];
+  const s=(log?.stamps||[]).find(x=>x.id===id); if (!s) return;
+  s.date     =document.getElementById('tles-d')?.value||s.date;
+  s.port     =document.getElementById('tles-p')?.value||'';
+  s.type     =document.getElementById('tles-t')?.value||s.type;
+  s.authority=document.getElementById('tles-a')?.value||'';
+  s.notes    =document.getElementById('tles-n')?.value||'';
+  ui.tlEditStampId=null;
+  save(); document.getElementById('mainContent').innerHTML=renderDocuments();
+}
+function archiveTransitLog() {
+  if (!confirm('Archive this transit log and start a new one for the next season?')) return;
+  const wd=getTLData(), cur=wd.logs[wd.currentLog]; if (!cur) return;
+  cur.archived=true;
+  const ns=nextTLSeason(cur.season), nid='tl'+ns.replace(/[^0-9]/g,'');
+  wd.logs[nid]={season:ns, archived:false, stamps:[],
+    docNumber:'', issueDate:'', validFrom:'', validUntil:'', customsAuthority:'', validityType:'Limited (Ορισμένη)',
+    prevDocCount:'', otherNotes:'', provisions:'', vesselName:'', flag:'', portOfRegistry:'', regNumber:'',
+    callSign:'', vesselType:'', gt:'', engine:'', loa:'', yearBuilt:'', yearFirstReg:'',
+    ownerName:'', holderName:'', address:'', telephone:'', email:'', afm:'', idNumber:''};
+  wd.currentLog=nid; ui.tlSeasonId=nid; ui.tlOpen={s1:true,s2:true,s3:true}; ui.tlEditStampId=null;
+  save(); document.getElementById('mainContent').innerHTML=renderDocuments();
+}
+
 function prefillCustomsOwnerData() {
   if (localStorage.getItem(EMAIL_KEY) !== 'fpugliano@gmail.com') return false;
   if (!data.documents?.customs) return false;
@@ -2617,6 +2801,37 @@ function prefillCustomsOwnerData() {
   return dirty;
 }
 
+function prefillTransitLog() {
+  if (localStorage.getItem(EMAIL_KEY) !== 'fpugliano@gmail.com') return false;
+  const wd = getTLData();
+  const log = wd.logs[wd.currentLog];
+  if (!log || log.archived || log.docNumber) return false;
+  let dirty = false;
+  const f = (k,v) => { if (!log[k]) { log[k]=v; dirty=true; } };
+  f('docNumber','25GRDK123600000241'); f('issueDate','05/05/2025');
+  f('validFrom','05/05/2025');         f('validUntil','04/11/2026');
+  f('customsAuthority','GR001236 PATMOS'); f('validityType','Limited (Ορισμένη)');
+  f('prevDocCount','0');
+  f('vesselName','OROBORO');           f('flag','US');
+  f('portOfRegistry','San Francisco'); f('regNumber','1290676');
+  f('callSign','WDK 5272');            f('vesselType','Sail Yacht');
+  f('gt','28');                        f('engine','Yanmar 30hp Diesel');
+  f('loa','11.9m');                    f('yearBuilt','2018');
+  f('yearFirstReg','2018');            f('ownerName','Francesco Pugliano');
+  f('holderName','Francesco Pugliano'); f('address','San Francisco CA 94115');
+  f('telephone','0');                  f('email','fpugliano@gmail.com');
+  f('afm','SKAN-SDB-242908');          f('idNumber','30');
+  if (!log.stamps.length) {
+    log.stamps = [
+      {id:uid(), date:'2026-05-07', port:'Porto Heli', type:'Arrival',   authority:'Syros Coast Guard', notes:''},
+      {id:uid(), date:'2026-05-09', port:'Paros',      type:'Departure', authority:'Syros Coast Guard', notes:''},
+      {id:uid(), date:'2026-05-27', port:'Syros',      type:'Departure', authority:'Syros Coast Guard', notes:'To Didim/Turkey'}
+    ];
+    dirty = true;
+  }
+  return dirty;
+}
+
 function migrateData() {
   let dirty = false;
   (data.spareParts || []).forEach(p => {
@@ -2625,6 +2840,7 @@ function migrateData() {
   });
   if (migrateToSingleLog()) dirty = true;
   if (prefillCustomsOwnerData()) dirty = true;
+  if (prefillTransitLog()) dirty = true;
   // Seed belt history if not already present
   if (!data.maintenance) data.maintenance = { engines:{}, sched:{}, log:[] };
   if (!data.maintenance.log) data.maintenance.log = [];
