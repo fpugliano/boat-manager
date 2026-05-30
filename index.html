@@ -947,7 +947,13 @@ function renderDocuments() {
 
 function setDocSub(s) {
   ui.docSub = s;
-  document.getElementById('mainContent').innerHTML = renderDocuments();
+  try {
+    document.getElementById('mainContent').innerHTML = renderDocuments();
+  } catch(e) {
+    console.error('setDocSub error for sub-tab "' + s + '":', e);
+    const mc = document.getElementById('mainContent');
+    if (mc) mc.innerHTML = `<div style="padding:20px;color:var(--red);font-size:13px">Error loading tab: ${esc(e.message)}</div>`;
+  }
 }
 
 function renderVesselDoc() {
@@ -2903,6 +2909,9 @@ function renderTLStamps(log, archived) {
 }
 
 function renderTransitLog() {
+  try { return _renderTransitLog(); } catch(e) { console.error('renderTransitLog:', e); return `<div style="padding:20px;color:var(--red);font-size:13px">Transit Log error: ${esc(e.message)}<br><small style="color:var(--label3)">${esc(e.stack||'')}</small></div>`; }
+}
+function _renderTransitLog() {
   const wd = getTLData();
   if (!ui.tlSeasonId) ui.tlSeasonId = wd.currentLog;
   if (!ui.tlOpen) ui.tlOpen = {s1:true, s2:true, s3:true};
