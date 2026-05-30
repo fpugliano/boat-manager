@@ -376,6 +376,7 @@ function handleJsonImport(input) {
       if (Object.keys(rest).length > 0) deepMerge(data, rest);
 
       await save();
+      localStorage.setItem('bm_just_imported', Date.now());
       await pushToCloud();
       renderApp();
       const cloudOk = syncStatus === 'synced';
@@ -3391,6 +3392,7 @@ async function pushToCloud() {
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
+    localStorage.removeItem('bm_just_imported');
     setSyncStatus('synced');
   } catch(e) {
     setSyncStatus('offline');
@@ -3411,6 +3413,11 @@ async function pullFromCloud() {
   const email = localStorage.getItem(EMAIL_KEY);
   console.log('[pullFromCloud] email:', email?.slice(0,10)||'NULL', 'cryptoKey:', cryptoKey?'SET':'NULL');
   if (!email || !cryptoKey) { console.warn('pullFromCloud: no email or key'); return false; }
+  const importTs = localStorage.getItem('bm_just_imported');
+  if (importTs && Date.now() - parseInt(importTs) < 30000) {
+    console.log('[pullFromCloud] skipping — recent import detected');
+    return false;
+  }
   try {
     const cloud = await fetchFromCloud(email);
     const decrypted = JSON.parse(await aesDecrypt(cryptoKey, cloud.data));
