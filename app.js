@@ -349,28 +349,25 @@ function handleJsonImport(input) {
       // differs from the internal nested structure (engines.port.hours, engines.port.log[])
       if (json.maintenance) {
         const m = json.maintenance;
-        if (!data.maintenance) data.maintenance = { engines: {}, sched: {} };
+        if (!data.maintenance) data.maintenance = { engines: {}, sched: {}, log: [] };
         if (!data.maintenance.engines) data.maintenance.engines = {};
+        if (!data.maintenance.log) data.maintenance.log = [];
         ['port', 'starboard'].forEach(eid => {
           if (!data.maintenance.engines[eid])
             data.maintenance.engines[eid] = { hours: 0, schedule: [], log: [], customTasks: [] };
-          const eng = data.maintenance.engines[eid];
           if (m.engineHours !== undefined)
-            eng.hours = Math.max(0, parseInt(m.engineHours) || 0);
-          if (Array.isArray(m.log)) {
-            console.log('[import maintenance] log entries found:', m.log?.length, 'engines:', Object.keys(data.maintenance.engines));
-            if (!eng.log) eng.log = [];
-            m.log.forEach(entry => eng.log.push({
-              id:    uid(),
-              date:  entry.date  || '',
-              hours: entry.hours !== undefined ? String(entry.hours) : '',
-              task:  entry.task  || '',
-              cost:  entry.cost  || '',
-              notes: entry.location || entry.notes || ''
-            }));
-            console.log('[import maintenance] port log now has:', data.maintenance.engines.port?.log?.length, 'entries');
-          }
+            data.maintenance.engines[eid].hours = Math.max(0, parseInt(m.engineHours) || 0);
         });
+        if (Array.isArray(m.log)) {
+          m.log.forEach(entry => data.maintenance.log.push({
+            id:    uid(),
+            date:  entry.date  || '',
+            hours: entry.hours !== undefined ? String(entry.hours) : '',
+            task:  entry.task  || '',
+            cost:  entry.cost  || '',
+            notes: entry.location || entry.notes || ''
+          }));
+        }
       }
 
       // Merge everything else (documents, crew, transitLog, spareParts, etc.)
