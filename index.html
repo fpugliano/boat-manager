@@ -1745,18 +1745,23 @@ function renderMaintenance() {
   // ── Log ──
   const log = getMaintLog();
   const logRows = log.map((e,i) => {
+    const num = log.length - i;
     const engBadges = isCat ? (e.engines||[]).map(eid =>
       `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--label3);margin-left:4px">${eLbl[eid]||eid}</span>`
     ).join('') : '';
     return `<tr>
+      <td style="color:var(--label3);font-size:11px;white-space:nowrap">${num}</td>
       <td style="white-space:nowrap">${esc(e.date)}</td>
       <td style="white-space:nowrap">${esc(String(e.hours))}</td>
       <td>${esc(e.task)}${engBadges}</td>
       <td>${esc(e.cost||'')}</td>
       <td>${esc(e.notes||'')}</td>
-      <td><button class="btn btn-d btn-xs" onclick="removeMaintEntry(${i})">✕</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-s btn-xs" onclick="editMaintEntry(${i})" style="margin-right:4px">✏</button>
+        <button class="btn btn-d btn-xs" onclick="removeMaintEntry(${i})">✕</button>
+      </td>
     </tr>`;
-  }).join('') || '<tr><td colspan="6" style="color:var(--label3);padding:12px">No entries yet</td></tr>';
+  }).join('') || '<tr><td colspan="7" style="color:var(--label3);padding:12px">No entries yet</td></tr>';
   const logHtml = `
     <div class="sec-hd">Maintenance Log</div>
     <div class="btn-row">
@@ -1764,7 +1769,7 @@ function renderMaintenance() {
       <button class="btn btn-s btn-sm" onclick="exportSection('maintenance')">⬇ Export</button>
     </div>
     <div class="card"><div style="overflow-x:auto">
-      <table class="tbl"><thead><tr><th>Date</th><th>Hours</th><th>Task</th><th>Cost</th><th>Notes</th><th></th></tr></thead>
+      <table class="tbl"><thead><tr><th>#</th><th>Date</th><th>Hours</th><th>Task</th><th>Cost</th><th>Notes</th><th></th></tr></thead>
       <tbody>${logRows}</tbody></table>
     </div></div>`;
   return hoursHtml + comingUpHtml + logHtml;
@@ -1829,6 +1834,44 @@ function removeMaintEntry(i) {
   if (!data.maintenance?.log) return;
   data.maintenance.log.splice(i, 1);
   save(); document.getElementById('mainContent').innerHTML = renderMaintenance();
+}
+
+function editMaintEntry(i) {
+  const e = data.maintenance?.log?.[i]; if (!e) return;
+  const isCat = data.meta.hullType === 'catamaran';
+  const portChk = (e.engines||[]).includes('port')      ? 'checked' : '';
+  const stbdChk = (e.engines||[]).includes('starboard') ? 'checked' : '';
+  showModal('Edit Maintenance Entry', `
+    <div class="mi-label">Date</div><input class="mi" id="me-ld" type="date" value="${esc(e.date||'')}">
+    <div class="mi-label">Engine Hours</div><input class="mi" id="me-lh" type="number" value="${esc(String(e.hours||''))}">
+    <div class="mi-label">Task Performed</div><input class="mi" id="me-lt" value="${esc(e.task||'')}">
+    ${isCat ? `<div class="mi-label">Engine</div>
+    <div style="display:flex;gap:16px;margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="me-ep" ${portChk}> Port</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="me-es" ${stbdChk}> Stbd</label>
+    </div>` : ''}
+    <div class="mi-label">Cost (€)</div><input class="mi" id="me-lc" value="${esc(e.cost||'')}">
+    <div class="mi-label">Notes / Location</div><input class="mi" id="me-ln" value="${esc(e.notes||'')}">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveEditMaintEntry(${i})">Save</button>
+    </div>`);
+}
+
+function saveEditMaintEntry(i) {
+  const e = data.maintenance?.log?.[i]; if (!e) return;
+  const isCat = data.meta.hullType === 'catamaran';
+  const engines = isCat
+    ? ['port','starboard'].filter(eng => document.getElementById(eng==='port'?'me-ep':'me-es')?.checked)
+    : getEngines();
+  if (!engines.length) { showToast('Select at least one engine', true); return; }
+  e.date    = document.getElementById('me-ld').value;
+  e.hours   = document.getElementById('me-lh').value;
+  e.task    = document.getElementById('me-lt').value;
+  e.cost    = document.getElementById('me-lc').value || '';
+  e.notes   = document.getElementById('me-ln').value || '';
+  e.engines = engines;
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderMaintenance();
 }
 
 // ═══════════════════════════════════════════════════════════
