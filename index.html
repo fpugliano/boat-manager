@@ -183,10 +183,15 @@ select.fi{-webkit-appearance:none}
 .sys-body.open{display:block}
 
 /* ── Winterization ── */
-.wcheck-row{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--sep);cursor:pointer}
-.wcheck-row:last-child{border-bottom:none}
-.wcheck-row input[type=checkbox]{width:18px;height:18px;flex-shrink:0;cursor:pointer}
-.wcheck-row.done span{text-decoration:line-through;color:var(--label3)}
+.wcard{background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;margin-bottom:12px;overflow:hidden}
+.whdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;user-select:none;-webkit-user-select:none}
+.wrow{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--sep)}
+.wrow:last-child{border-bottom:none}
+.wbox{width:22px;height:22px;border-radius:6px;border:2px solid var(--sep);background:var(--surface);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;cursor:pointer}
+.wbox.on{background:var(--green);border-color:var(--green)}
+.wact{background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);border-radius:4px;line-height:1;font-family:var(--font)}
+.wact:active{background:var(--surface2)}
+.wgrp{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--label3);padding:8px 16px 3px;background:rgba(0,0,0,.025)}
 
 /* ── Photos ── */
 .photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
@@ -2097,52 +2102,55 @@ function removeSystem(id) {
 const WINTER_DEFS = (() => {
   const i = (t, a) => ({t, a:!!a});
   return {
-    winterize: {
-      label:'Winterization', icon:'❄️',
-      groups:[
-        {title:null,                   items:[i('Submit / freeze transit log')]},
-        {title:'General',              items:[i('Anti calcare washing machine'),i('Remove sails'),i('Remove bowsprit'),i('Wash standing rigging'),i('Clean toilets'),i('Wash boat outside'),i('Clean stainless'),i('Wax boat')]},
-        {title:'Engine',               items:[i('Change Yanmar engine oil'),i('Change Yanmar gear oil'),i('Flush Yanmar coolant'),i('Flush raw water system'),i('Remove impellers'),i('Clean propellers'),i('Change propeller anodes'),i('Replace SD internal anodes')]},
-        {title:'Dinghy',               items:[i('Drop dinghy'),i('Clean dinghy'),i('Change dinghy engine gear oil'),i('Fog dinghy engine'),i('Winterize dinghy engine'),i('Wrap dinghy with cover'),i('Replace anodes Suzuki engine')]},
-        {title:'Others',               items:[i('Drop and replace starboard rudder',1),i('Dinghy valve air leak patch',1),i('Drop anchor and anchor chain'),i('Clean anchor locker'),i('Paint anchor'),i('Grease throttle handles'),i('Update Raymarine software',1),i('Fill up diesel tanks'),i('Yanmar inventory'),i('Bring main, jib, sail pack to sail maker'),i('Plug the battery bank hole',1),i('Measure size for duvet cover 240'),i('Empty water heaters'),i('Recreate aft side dodger cover',1),i('Recreate new dinghy cover',1),i('Replace top deck sika',1),i('Order made anodes')]},
-        {title:'Right before leaving', items:[i('Place vaseline on hatches'),i('Cover helm station'),i('Defrost freezer'),i('Wash cushions'),i('Pay marina'),i('Place dry powder in wardrobes'),i('Change helm dodger cover'),i('Trickle charge battery'),i('Disconnect engine batteries'),i('International driving license (Maria)'),i('Winterize water maker'),i('Close engine batteries'),i('Empty fridge'),i('Disconnect gas'),i('Disconnect house batteries'),i('Cover front windows'),i('Order Japan sim')]},
-      ]
-    },
-    needs: {
-      label:'Needs', icon:'🛒',
-      groups:[
-        {title:null, items:[i('Gear oil x2 changes + dinghy 10 litre + 170ml'),i('Sail drive antifoul spray'),i('Oil extraction pump'),i('Oroboro logo')]}
-      ]
-    },
-    backOnBoard: {
-      label:'Back on board', icon:'⛵',
-      groups:[
-        {title:null, items:[i('Get flight tickets'),i('Get hotel in Athens'),i('Get Cosmote sim card'),i('Pick up sails and pay (main, jib, sail pack, wash)'),i('Pick up main halyard'),i('Buy bread'),i('Pick up bridal'),i('Get olive oil'),i('Connect house batteries'),i('Reopen toilets, shower stbd, water maker'),i('Reconnect paddle wheel'),i('Paint antifouling',1),i('Paint sail drive'),i('Wash and wax boat'),i('Place Yanmar impellers'),i('Open SD through hole'),i('Raise dinghy up'),i('Place chain and anchor back'),i('Replace solar panels'),i('Hutch windows replace',1),i('Water heater shipping'),i('Marina payment'),i('Change helm dodger cover'),i('Pay eTEPAY'),i('Transit log port police'),i('Gasoline for dinghy'),i('Fill up LPG'),i('Hoist main and jib'),i('Watermaker flush')]}
-      ]
-    }
+    winterize: { label:'Winterization', icon:'❄️', groups:[
+      {title:null,                   items:[i('Submit / freeze transit log')]},
+      {title:'General',              items:[i('Anti calcare washing machine'),i('Remove sails'),i('Remove bowsprit'),i('Wash standing rigging'),i('Clean toilets'),i('Wash boat outside'),i('Clean stainless'),i('Wax boat')]},
+      {title:'Engine',               items:[i('Change Yanmar engine oil'),i('Change Yanmar gear oil'),i('Flush Yanmar coolant'),i('Flush raw water system'),i('Remove impellers'),i('Clean propellers'),i('Change propeller anodes'),i('Replace SD internal anodes')]},
+      {title:'Dinghy',               items:[i('Drop dinghy'),i('Clean dinghy'),i('Change dinghy engine gear oil'),i('Fog dinghy engine'),i('Winterize dinghy engine'),i('Wrap dinghy with cover'),i('Replace anodes Suzuki engine')]},
+      {title:'Others',               items:[i('Drop and replace starboard rudder',1),i('Dinghy valve air leak patch',1),i('Drop anchor and anchor chain'),i('Clean anchor locker'),i('Paint anchor'),i('Grease throttle handles'),i('Update Raymarine software',1),i('Fill up diesel tanks'),i('Yanmar inventory'),i('Bring main, jib, sail pack to sail maker'),i('Plug the battery bank hole',1),i('Measure size for duvet cover 240'),i('Empty water heaters'),i('Recreate aft side dodger cover',1),i('Recreate new dinghy cover',1),i('Replace top deck sika',1),i('Order made anodes')]},
+      {title:'Right before leaving', items:[i('Place vaseline on hatches'),i('Cover helm station'),i('Defrost freezer'),i('Wash cushions'),i('Pay marina'),i('Place dry powder in wardrobes'),i('Change helm dodger cover'),i('Trickle charge battery'),i('Disconnect engine batteries'),i('International driving license (Maria)'),i('Winterize water maker'),i('Close engine batteries'),i('Empty fridge'),i('Disconnect gas'),i('Disconnect house batteries'),i('Cover front windows'),i('Order Japan sim')]},
+    ]},
+    needs: { label:'Needs', icon:'🛒', groups:[
+      {title:null, items:[i('Gear oil x2 changes + dinghy 10 litre + 170ml'),i('Sail drive antifoul spray'),i('Oil extraction pump'),i('Oroboro logo')]}
+    ]},
+    backOnBoard: { label:'Back on board', icon:'⛵', groups:[
+      {title:null, items:[i('Get flight tickets'),i('Get hotel in Athens'),i('Get Cosmote sim card'),i('Pick up sails and pay (main, jib, sail pack, wash)'),i('Pick up main halyard'),i('Buy bread'),i('Pick up bridal'),i('Get olive oil'),i('Connect house batteries'),i('Reopen toilets, shower stbd, water maker'),i('Reconnect paddle wheel'),i('Paint antifouling',1),i('Paint sail drive'),i('Wash and wax boat'),i('Place Yanmar impellers'),i('Open SD through hole'),i('Raise dinghy up'),i('Place chain and anchor back'),i('Replace solar panels'),i('Hutch windows replace',1),i('Water heater shipping'),i('Marina payment'),i('Change helm dodger cover'),i('Pay eTEPAY'),i('Transit log port police'),i('Gasoline for dinghy'),i('Fill up LPG'),i('Hoist main and jib'),i('Watermaker flush')]}
+    ]}
   };
 })();
 
-function winterItems(sid) {
-  return (WINTER_DEFS[sid]?.groups || []).flatMap(g => g.items);
+function buildWinterSectionItems(sid, preChecked) {
+  const chk = new Set(preChecked || []);
+  let fi = 0;
+  const items = [];
+  (WINTER_DEFS[sid]?.groups || []).forEach(g => {
+    g.items.forEach(item => { items.push({id:uid(), text:item.t, asterisk:item.a, checked:chk.has(fi), group:g.title||null}); fi++; });
+  });
+  return items;
 }
 
 function getWinterData() {
   if (!data.winterization) {
-    data.winterization = {
-      currentSeason: 'w2526',
-      seasons: {
-        w2526: {
-          name: 'Winter 2025/26', archived: false,
-          checked: {
-            winterize: [],
-            needs: [0,1,2],
-            backOnBoard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,21,22,23,24,25,26,27,28]
-          }
-        }
+    const BOB_PRE = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,21,22,23,24,25,26,27,28];
+    data.winterization = { currentSeason:'w2526', seasons:{ w2526:{
+      name:'Winter 2025/26', archived:false,
+      sections:{
+        winterize:  {items: buildWinterSectionItems('winterize',  [])},
+        needs:      {items: buildWinterSectionItems('needs',      [0,1,2])},
+        backOnBoard:{items: buildWinterSectionItems('backOnBoard', BOB_PRE)}
       }
-    };
+    }}};
   }
+  // Migrate old format (season.checked arrays → season.sections item objects)
+  Object.values(data.winterization.seasons).forEach(season => {
+    if (!season.sections) {
+      season.sections = {};
+      ['winterize','needs','backOnBoard'].forEach(sid => {
+        season.sections[sid] = {items: buildWinterSectionItems(sid, season.checked?.[sid] || [])};
+      });
+      delete season.checked;
+    }
+  });
   return data.winterization;
 }
 
@@ -2153,44 +2161,61 @@ function nextWinterName(name) {
   return `${y1}/${String((y1+1)%100).padStart(2,'0')}`;
 }
 
+function winterRerender() { document.getElementById('mainContent').innerHTML = renderWinterization(); }
+
 function renderWinterSection(sid, season, archived) {
-  const def = WINTER_DEFS[sid];
-  const items = winterItems(sid);
-  const checked = new Set(season.checked[sid] || []);
-  const total = items.length, done = checked.size;
-  const pct = total ? Math.round(done/total*100) : 0;
+  const def  = WINTER_DEFS[sid];
+  const sec  = season.sections?.[sid] || {items:[]};
+  const items = sec.items;
+  const done  = items.filter(x => x.checked).length;
+  const total = items.length;
+  const pct   = total ? Math.round(done/total*100) : 0;
   const complete = done === total && total > 0;
   const open = complete ? !!(ui.winterOpen?.[sid]) : (ui.winterOpen?.[sid] !== false);
-  const badge = complete ? `<span style="background:var(--green);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px">✓ Complete</span>` : '';
-  const header = `
-    <div onclick="if(!ui.winterOpen)ui.winterOpen={};ui.winterOpen['${sid}']=!${open};document.getElementById('mainContent').innerHTML=renderWinterization()"
-      style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;user-select:none">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:16px">${def.icon}</span>
-        <span style="font-size:15px;font-weight:600">${esc(def.label)}</span>${badge}
-      </div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:12px;color:var(--label3)">${done}/${total}</span>
-        <span style="color:var(--label3);font-size:13px">${open?'▲':'▼'}</span>
-      </div>
+  const badge = complete
+    ? `<span style="background:var(--green);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px">✓ Complete</span>` : '';
+  const hdr = `<div class="whdr" onclick="if(!ui.winterOpen)ui.winterOpen={};ui.winterOpen['${sid}']=!${open};winterRerender()">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:17px">${def.icon}</span>
+      <span style="font-size:15px;font-weight:700;color:var(--label)">${esc(def.label)}</span>${badge}
     </div>
-    <div style="height:4px;background:var(--surface2)"><div style="height:4px;background:${complete?'var(--green)':'var(--blue)'};width:${pct}%;transition:width .3s"></div></div>`;
-  if (!open) return `<div class="card" style="margin-bottom:10px;overflow:hidden">${header}</div>`;
-  let idx = 0;
-  const body = def.groups.map(g => {
-    const gh = g.title ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--label3);padding:10px 16px 4px;border-top:1px solid var(--sep)">${esc(g.title)}</div>` : '';
-    const rows = g.items.map(item => {
-      const n = idx++;
-      const chk = checked.has(n);
-      const star = item.a ? ' <span title="Needs a decision" style="font-size:11px">⚠️</span>' : '';
-      return `<label class="wcheck-row${chk?' done':''}" style="${item.a&&!chk?'opacity:.8':''}">
-        <input type="checkbox" ${chk?'checked':''} ${archived?'disabled':''} onchange="toggleWinterItem('${sid}',${n})">
-        <span style="font-size:14px">${esc(item.t)}${star}</span>
-      </label>`;
-    }).join('');
-    return gh + rows;
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:12px;color:var(--label3);font-weight:500">${done}/${total}</span>
+      <span style="font-size:11px;color:var(--label3)">${open?'▲':'▼'}</span>
+    </div>
+  </div>
+  <div style="height:3px;background:var(--surface2)">
+    <div style="height:3px;background:${complete?'var(--green)':'var(--blue)'};width:${pct}%;transition:width .4s"></div>
+  </div>`;
+  if (!open) return `<div class="wcard">${hdr}</div>`;
+  let lastGrp = '\x00';
+  const rows = items.map((item, i) => {
+    const grpHdr = item.group !== lastGrp ? (lastGrp = item.group, item.group ? `<div class="wgrp">${esc(item.group)}</div>` : '') : '';
+    const isEdit = ui.winterEditItem?.sid === sid && ui.winterEditItem?.idx === i;
+    if (isEdit) return grpHdr + `<div class="wrow">
+      <input id="wedit-inp" class="mi" style="flex:1;margin:0;font-size:14px" value="${esc(item.text)}"
+        onkeydown="if(event.key==='Enter')saveWinterItemEdit('${sid}',${i})" onkeyup="if(event.key==='Escape'){ui.winterEditItem=null;winterRerender()}">
+      <button class="btn btn-p btn-xs" onclick="saveWinterItemEdit('${sid}',${i})">Save</button>
+      <button class="wact" onclick="ui.winterEditItem=null;winterRerender()">✕</button>
+    </div>`;
+    const star = item.asterisk ? ` <span style="font-size:11px;opacity:.7">⚠️</span>` : '';
+    const ts = item.checked ? 'text-decoration:line-through;color:var(--label3)' : item.asterisk ? 'color:var(--label2)' : '';
+    const acts = archived ? '' : `<div style="display:flex;gap:1px;flex-shrink:0">
+      <button class="wact" onclick="startWinterEdit('${sid}',${i})" title="Edit">✏️</button>
+      <button class="wact" onclick="deleteWinterItem('${sid}',${i})" title="Delete">✕</button>
+    </div>`;
+    return grpHdr + `<div class="wrow">
+      <div class="wbox${item.checked?' on':''}" onclick="toggleWinterItem('${sid}',${i})">
+        ${item.checked?'<svg width="11" height="9" viewBox="0 0 11 9"><polyline points="1,4.5 4,7.5 10,1" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
+      </div>
+      <div style="flex:1;font-size:14px;line-height:1.4;${ts};cursor:pointer" onclick="toggleWinterItem('${sid}',${i})">${esc(item.text)}${star}</div>
+      ${acts}
+    </div>`;
   }).join('');
-  return `<div class="card" style="margin-bottom:10px;overflow:hidden">${header}<div style="border-top:1px solid var(--sep)">${body}</div></div>`;
+  const addRow = archived ? '' : `<div style="padding:10px 16px;border-top:1px solid var(--sep)">
+    <button onclick="showAddWinterItem('${sid}')" style="background:none;border:none;padding:0;cursor:pointer;font-size:13px;font-weight:500;color:var(--blue);font-family:var(--font)">+ Add item</button>
+  </div>`;
+  return `<div class="wcard">${hdr}<div style="border-top:1px solid var(--sep)">${rows}${addRow}</div></div>`;
 }
 
 function renderWinterization() {
@@ -2202,56 +2227,106 @@ function renderWinterization() {
   const archived = season.archived;
   const isCurrent = ui.winterSeasonId === wd.currentSeason;
   const sids = ['winterize','needs','backOnBoard'];
-  const allComplete = sids.every(sid => { const items=winterItems(sid); const chk=new Set(season.checked[sid]||[]); return items.length>0&&chk.size===items.length; });
+  const allComplete = sids.every(sid => { const items=(season.sections?.[sid]?.items||[]); return items.length>0&&items.every(x=>x.checked); });
   const seasonOpts = Object.keys(wd.seasons).reverse().map(id =>
     `<option value="${id}" ${id===ui.winterSeasonId?'selected':''}>${esc(wd.seasons[id].name)}${wd.seasons[id].archived?' (archived)':''}</option>`
   ).join('');
-  const selector = `<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
-    <select class="fi" style="flex:1;min-width:160px" onchange="ui.winterSeasonId=this.value;ui.winterOpen=null;document.getElementById('mainContent').innerHTML=renderWinterization()">${seasonOpts}</select>
-    ${isCurrent&&!archived?`<button class="btn btn-d btn-sm" onclick="resetWinterSeason()">Reset</button>`:''}
-    ${archived?`<span class="badge" style="background:var(--surface2);color:var(--label3)">Archived</span>`:''}
+  const hdr = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:8px;flex-wrap:wrap">
+    <select onchange="ui.winterSeasonId=this.value;ui.winterOpen=null;ui.winterEditItem=null;winterRerender()"
+      style="background:var(--surface);border:1.5px solid var(--sep);border-radius:20px;padding:7px 14px;font-size:14px;font-weight:600;font-family:var(--font);color:var(--label);cursor:pointer;max-width:220px">${seasonOpts}</select>
+    ${isCurrent&&!archived?`<button class="btn btn-d btn-sm" onclick="resetWinterSeason()">Reset season</button>`:''}
+    ${archived?`<span style="font-size:12px;color:var(--label3);font-weight:500;padding:6px 12px;background:var(--surface2);border-radius:12px">Archived</span>`:''}
   </div>`;
-  const congr = allComplete && !archived ? `
-    <div style="background:rgba(52,199,89,.12);border:2px solid var(--green);border-radius:14px;padding:18px 20px;margin-bottom:14px;text-align:center">
-      <div style="font-size:20px;font-weight:700;color:var(--green)">${esc(season.name)} complete! ⚓</div>
-      <div style="font-size:13px;color:var(--label3);margin:6px 0 14px">All sections done. Ready to archive.</div>
-      <button class="btn btn-p btn-sm" onclick="startNewWinterSeason()">Start Winter ${nextWinterName(season.name)} →</button>
-    </div>` : '';
-  return selector + congr + sids.map(sid => renderWinterSection(sid, season, archived)).join('');
+  const congr = allComplete&&!archived ? `<div style="background:rgba(52,199,89,.12);border:2px solid var(--green);border-radius:14px;padding:18px 20px;margin-bottom:16px;text-align:center">
+    <div style="font-size:20px;font-weight:700;color:var(--green)">${esc(season.name)} complete! ⚓</div>
+    <div style="font-size:13px;color:var(--label3);margin:6px 0 14px">All sections done. Ready to archive.</div>
+    <button class="btn btn-p btn-sm" onclick="startNewWinterSeason()">Start Winter ${nextWinterName(season.name)} →</button>
+  </div>` : '';
+  return hdr + congr + sids.map(sid => renderWinterSection(sid, season, archived)).join('');
 }
 
 function toggleWinterItem(sid, idx) {
+  const season = getWinterData().seasons[getWinterData().currentSeason];
+  if (!season||season.archived) return;
+  const item = season.sections?.[sid]?.items?.[idx]; if (!item) return;
+  item.checked = !item.checked;
+  save(); winterRerender();
+}
+
+function startWinterEdit(sid, idx) {
+  ui.winterEditItem = {sid, idx};
+  winterRerender();
+  setTimeout(() => document.getElementById('wedit-inp')?.focus(), 40);
+}
+
+function saveWinterItemEdit(sid, idx) {
+  const season = getWinterData().seasons[getWinterData().currentSeason];
+  const item = season?.sections?.[sid]?.items?.[idx]; if (!item) return;
+  const v = document.getElementById('wedit-inp')?.value.trim();
+  if (v) item.text = v;
+  ui.winterEditItem = null;
+  save(); winterRerender();
+}
+
+function deleteWinterItem(sid, idx) {
+  if (!confirm('Remove this item?')) return;
+  const season = getWinterData().seasons[getWinterData().currentSeason];
+  if (!season||season.archived) return;
+  season.sections?.[sid]?.items?.splice(idx, 1);
+  save(); winterRerender();
+}
+
+function showAddWinterItem(sid) {
+  showModal('Add Item', `
+    <div class="mi-label">Item text</div>
+    <input class="mi" id="m-wadd" placeholder="e.g. Check anchor chain" autofocus>
+    <label style="display:flex;align-items:center;gap:8px;font-size:14px;margin:12px 0">
+      <input type="checkbox" id="m-wstar"> Mark as ⚠️ (needs a decision)
+    </label>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="addWinterItem('${sid}')">Add</button>
+    </div>`);
+}
+
+function addWinterItem(sid) {
+  const text = document.getElementById('m-wadd')?.value.trim();
+  if (!text) { showToast('Enter item text', true); return; }
   const wd = getWinterData();
   const season = wd.seasons[wd.currentSeason];
-  if (!season || season.archived) return;
-  const arr = season.checked[sid] = season.checked[sid] || [];
-  const pos = arr.indexOf(idx);
-  if (pos >= 0) arr.splice(pos, 1); else arr.push(idx);
-  save(); document.getElementById('mainContent').innerHTML = renderWinterization();
+  if (!season||season.archived) return;
+  if (!season.sections[sid]) season.sections[sid] = {items:[]};
+  season.sections[sid].items.push({id:uid(), text, asterisk:!!document.getElementById('m-wstar')?.checked, checked:false, group:null});
+  save(); hideModal(); winterRerender();
 }
 
 function resetWinterSeason() {
   if (!confirm('Reset all checkboxes for this season?')) return;
   const wd = getWinterData();
   const season = wd.seasons[wd.currentSeason];
-  if (!season || season.archived) return;
-  season.checked = {winterize:[], needs:[], backOnBoard:[]};
+  if (!season||season.archived) return;
+  ['winterize','needs','backOnBoard'].forEach(sid => { (season.sections?.[sid]?.items||[]).forEach(item => item.checked=false); });
   ui.winterOpen = {winterize:true, needs:true, backOnBoard:true};
-  save(); document.getElementById('mainContent').innerHTML = renderWinterization();
+  ui.winterEditItem = null;
+  save(); winterRerender();
 }
 
 function startNewWinterSeason() {
   const wd = getWinterData();
-  const cur = wd.seasons[wd.currentSeason];
-  if (!cur) return;
+  const cur = wd.seasons[wd.currentSeason]; if (!cur) return;
   cur.archived = true;
   const newName = 'Winter ' + nextWinterName(cur.name);
   const newId = 'w' + newName.replace(/[^0-9]/g,'');
-  wd.seasons[newId] = {name:newName, archived:false, checked:{winterize:[],needs:[],backOnBoard:[]}};
+  wd.seasons[newId] = { name:newName, archived:false, sections:{
+    winterize:  {items: buildWinterSectionItems('winterize',  [])},
+    needs:      {items: buildWinterSectionItems('needs',      [])},
+    backOnBoard:{items: buildWinterSectionItems('backOnBoard', [])}
+  }};
   wd.currentSeason = newId;
   ui.winterSeasonId = newId;
   ui.winterOpen = {winterize:true, needs:true, backOnBoard:true};
-  save(); document.getElementById('mainContent').innerHTML = renderWinterization();
+  ui.winterEditItem = null;
+  save(); winterRerender();
 }
 
 function renderLogbook() {
