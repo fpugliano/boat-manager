@@ -1874,15 +1874,6 @@ function deepMerge(target, source) {
   }
 }
 
-function migrateData() {
-  let dirty = false;
-  (data.spareParts || []).forEach(p => {
-    const n = normCat(p.category);
-    if (n !== p.category) { p.category = n; dirty = true; }
-  });
-  if (dirty) save();
-}
-
 // ═══════════════════════════════════════════════════════════
 //  PIN HELPERS
 // ═══════════════════════════════════════════════════════════
@@ -2051,7 +2042,6 @@ async function attemptUnlock() {
     at.count = 0; at.lockUntil = 0; setAttemptState(at);
     const found = await load();
     if (!found) { data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS)); }
-    migrateData();
     startActivityTracking();
     document.getElementById('setupOv').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
@@ -2163,7 +2153,6 @@ async function attemptLogin() {
       await aesDecrypt(key, localStorage.getItem(VERIFY_KEY));
       cryptoKey = key;
       await load();
-      migrateData();
       startActivityTracking();
       document.getElementById('setupOv').classList.add('hidden');
       document.getElementById('app').classList.remove('hidden');
@@ -2187,7 +2176,6 @@ async function attemptLogin() {
     localStorage.removeItem(ATTEMPTS_KEY);
     cryptoKey = key;
     await load();
-    migrateData();
     startActivityTracking();
     document.getElementById('setupOv').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
@@ -2318,7 +2306,6 @@ function startNewSetupFromLogin() {
 
 function startNewSetup(prefillEmail = '') {
   data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS));
-  if (typeof OROBORO_DATA !== 'undefined') deepMerge(data, OROBORO_DATA);
   if (prefillEmail) data.meta.email = prefillEmail;
   renderSetup();
 }
