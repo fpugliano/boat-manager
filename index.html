@@ -1030,26 +1030,50 @@ function renderCustoms() {
       <button class="btn btn-s btn-sm" onclick="exportSection('documents')">⬇ Export</button>
       <button class="btn btn-s btn-sm" onclick="document.getElementById('importFile').click()">⬆ Import</button>
     </div>
-    <div class="sec-hd">eTEPAY / Transit Log</div>
+    <div class="sec-hd">eTEPAY Application</div>
+    <div class="card"><div class="card-body">
+      ${fr('Application Number','documents.customs.applicationNumber',C.applicationNumber)}
+      ${fr('Application Date','documents.customs.applicationDate',C.applicationDate)}
+      ${fr('Entry into Greek Waters','documents.customs.entryDate',C.entryDate)}
+      ${fr('Year','documents.customs.year',C.year)}
+      ${frMonths('documents.customs.monthsCovered',C.monthsCovered)}
+      ${fr('Amount Paid','documents.customs.amountPaid',C.amountPaid)}
+      ${fr('Payment Code (RF)','documents.customs.paymentCode',C.paymentCode)}
+      ${fr('Admin Fee Code (e-Paravolo)','documents.customs.adminFeeCode',C.adminFeeCode)}
+      ${frSelect('Status','documents.customs.status',C.status||'New',['New','Paid','Pending'])}
+      ${frExpiry('documents.customs.validUntil',C.validUntil,exp,'Valid Until')}
+    </div></div>
+    <div class="sec-hd">Holder Details</div>
     <div class="card"><div class="card-body">
       ${fr('Holder Name','documents.customs.holderName',C.holderName)}
-      ${fr('Address','documents.customs.address',C.address)}
-      ${fr('Email','documents.customs.email',C.email)}
       ${fr('AFM / Tax No.','documents.customs.afm',C.afm)}
       ${fr('Customs Office','documents.customs.customsOffice',C.customsOffice)}
       ${fr('Clearance No.','documents.customs.clearanceNumber',C.clearanceNumber)}
+      ${fr('Email','documents.customs.email',C.email)}
       ${fr('Payment Ref.','documents.customs.paymentRef',C.paymentRef)}
-      ${frExpiry('documents.customs.validUntil',C.validUntil,exp,'Valid Until')}
     </div></div>
-    <div class="sec-hd">Renewal Cost History</div>
+    <div class="sec-hd">Owner Details</div>
+    <div class="card"><div class="card-body">
+      ${fr('Passport Number','documents.customs.ownerPassportNumber',C.ownerPassportNumber)}
+      ${fr('Phone','documents.customs.ownerPhone',C.ownerPhone)}
+      ${frArea('Address','documents.customs.ownerAddress',C.ownerAddress||C.address)}
+    </div></div>
+    <div class="sec-hd">Renewal History</div>
     <div class="card">
       <div class="card-hd">History <button class="card-hd-btn" onclick="addCustomsRenewal()">+ Add</button></div>
       <div style="overflow-x:auto">
-        <table class="tbl"><thead><tr><th>Year</th><th>Cost</th><th>Valid Until</th><th>Notes</th><th></th></tr></thead>
+        <table class="tbl"><thead><tr><th>Year</th><th>Months</th><th>Amount</th><th>Payment Code</th><th>Date Paid</th><th>Notes</th><th></th></tr></thead>
         <tbody>${(C.renewalHistory||[]).map((r,i)=>`
-          <tr><td>${esc(r.year)}</td><td>${esc(r.cost)}</td><td>${esc(r.validUntil)}</td>
-          <td>${esc(r.notes)}</td><td><button class="btn btn-d btn-xs" onclick="removeCustomsRenewal(${i})">✕</button></td></tr>`
-        ).join('') || '<tr><td colspan="5" style="color:var(--label3);padding:12px">No history yet</td></tr>'}</tbody>
+          <tr>
+            <td>${esc(r.year)}</td>
+            <td>${esc(r.months||r.cost||'')}</td>
+            <td>${esc(r.amount||r.cost||'')}</td>
+            <td style="font-size:11px">${esc(r.paymentCode||'')}</td>
+            <td>${esc(r.datePaid||r.validUntil||'')}</td>
+            <td>${esc(r.notes||'')}</td>
+            <td><button class="btn btn-d btn-xs" onclick="removeCustomsRenewal(${i})">✕</button></td>
+          </tr>`
+        ).join('') || '<tr><td colspan="7" style="color:var(--label3);padding:12px">No history yet</td></tr>'}</tbody>
         </table>
       </div>
     </div>
@@ -1075,6 +1099,24 @@ function frExpiry(path, value, badge, label) {
     <div class="fl">${esc(label||'Expiry Date')} ${badge}</div>
     <input class="fi" type="date" value="${esc(value||'')}" onblur="saveField('${path}',this.value)">
   </div>`;
+}
+function frMonths(path, value) {
+  const ABB  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const sel  = new Set((value||'').split(',').map(s=>s.trim()).filter(Boolean));
+  const boxes = ABB.map((a,i) => `<label style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font-size:11px">
+    <input type="checkbox" ${sel.has(FULL[i])?'checked':''} data-month="${FULL[i]}" onchange="saveMonthsField('${path}',this)" style="margin:0">
+    ${a}</label>`).join('');
+  return `<div class="fr" style="align-items:flex-start;padding-top:12px">
+    <div class="fl">Months Covered</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;padding-top:2px">${boxes}</div>
+  </div>`;
+}
+function saveMonthsField(path, el) {
+  const FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const boxes = el.closest('.fr').querySelectorAll('input[type=checkbox]');
+  const sorted = FULL.filter(m => [...boxes].some(b => b.dataset.month===m && b.checked));
+  saveField(path, sorted.join(','));
 }
 
 function addInsuranceRenewal() {
@@ -1103,22 +1145,27 @@ function removeInsuranceRenewal(i) {
 }
 
 function addCustomsRenewal() {
-  showModal('Add Customs Renewal', `
-    <div class="mi-label">Year</div><input class="mi" id="m-year" placeholder="2025">
-    <div class="mi-label">Cost (€)</div><input class="mi" id="m-cost" placeholder="30">
-    <div class="mi-label">Valid Until</div><input class="mi" id="m-vu" type="date">
+  showModal('Add Renewal Entry', `
+    <div class="mi-label">Year</div><input class="mi" id="m-year" placeholder="2026">
+    <div class="mi-label">Months Covered</div><input class="mi" id="m-months" placeholder="e.g. April,May,June">
+    <div class="mi-label">Amount Paid</div><input class="mi" id="m-amount" placeholder="€231.00">
+    <div class="mi-label">Payment Code (RF)</div><input class="mi" id="m-pcode" placeholder="RF…">
+    <div class="mi-label">Date Paid</div><input class="mi" id="m-dpaid" type="date">
     <div class="mi-label">Notes</div><input class="mi" id="m-notes" placeholder="Optional">
     <div class="modal-btns">
-      <button class="btn btn-p w-full" onclick="saveCustomsRenewal()">Add</button>
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveCustomsRenewal()">Add</button>
     </div>`);
 }
 function saveCustomsRenewal() {
   if (!data.documents.customs.renewalHistory) data.documents.customs.renewalHistory = [];
   data.documents.customs.renewalHistory.push({
-    year: document.getElementById('m-year').value,
-    cost: document.getElementById('m-cost').value,
-    validUntil: document.getElementById('m-vu').value,
-    notes: document.getElementById('m-notes').value
+    year:        document.getElementById('m-year').value,
+    months:      document.getElementById('m-months').value,
+    amount:      document.getElementById('m-amount').value,
+    paymentCode: document.getElementById('m-pcode').value,
+    datePaid:    document.getElementById('m-dpaid').value,
+    notes:       document.getElementById('m-notes').value
   });
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderDocuments();
 }
@@ -2501,6 +2548,27 @@ function migrateToSingleLog() {
   return true;
 }
 
+function prefillCustomsOwnerData() {
+  if (localStorage.getItem(EMAIL_KEY) !== 'fpugliano@gmail.com') return false;
+  if (!data.documents?.customs) return false;
+  const C = data.documents.customs;
+  let dirty = false;
+  const f = (k, v) => { if (!C[k]) { C[k] = v; dirty = true; } };
+  f('applicationNumber', '795910');
+  f('applicationDate',   '20/04/2026');
+  f('entryDate',         '24/04/2026');
+  f('year',              '2026');
+  f('monthsCovered',     'April,May,June,July,August,September,October');
+  f('amountPaid',        '€231.00');
+  f('paymentCode',       'RF62 9051 0400 9500 1605 4341 3');
+  f('adminFeeCode',      '16054341395610190097');
+  f('status',            'New');
+  f('ownerPassportNumber','624450398');
+  f('ownerPhone',        '+14156490737');
+  f('ownerAddress',      '211 W Latimer Ave, Campbell, 95008, United States');
+  return dirty;
+}
+
 function migrateData() {
   let dirty = false;
   (data.spareParts || []).forEach(p => {
@@ -2508,6 +2576,7 @@ function migrateData() {
     if (n !== p.category) { p.category = n; dirty = true; }
   });
   if (migrateToSingleLog()) dirty = true;
+  if (prefillCustomsOwnerData()) dirty = true;
   // Seed belt history if not already present
   if (!data.maintenance) data.maintenance = { engines:{}, sched:{}, log:[] };
   if (!data.maintenance.log) data.maintenance.log = [];
