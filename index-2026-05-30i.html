@@ -278,26 +278,6 @@ input[type=file]{display:none}
 .sync-dot{position:absolute;right:48px;top:50%;transform:translateY(-50%);
   font-size:16px;line-height:1;cursor:pointer;transition:color .3s;color:#666}
 
-/* ── Maintenance v2 ── */
-.maint-hours-grid{display:grid;gap:10px;margin-bottom:14px}
-.maint-hours-grid.cat{grid-template-columns:1fr 1fr}
-.maint-row2{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--sep);gap:8px;flex-wrap:wrap;min-height:52px}
-.maint-row2:last-child{border-bottom:none}
-.maint-badge{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap;flex-shrink:0;letter-spacing:.3px}
-.mb-user{background:rgba(100,100,100,.1);color:var(--label3)}
-.mb-parts{background:rgba(0,122,255,.1);color:var(--blue)}
-.mb-shop{background:rgba(255,149,0,.12);color:var(--orange)}
-.maint-task-name{flex:1;font-size:13px;font-weight:500;color:var(--label);min-width:0}
-.maint-int-lbl{font-size:11px;color:var(--label3);display:block;margin-top:1px;font-weight:400}
-.maint-eng-col{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:62px}
-.maint-eng-lbl{font-size:10px;color:var(--label3);font-weight:700;text-transform:uppercase;letter-spacing:.3px}
-.msb{border:none;border-radius:8px;padding:5px 8px;font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;width:100%;text-align:center;line-height:1.3}
-.msb-green{background:rgba(52,199,89,.15);color:var(--green)}
-.msb-orange{background:rgba(255,149,0,.15);color:var(--orange)}
-.msb-red{background:rgba(255,59,48,.15);color:var(--red)}
-.msb-grey{background:var(--surface2);color:var(--label3)}
-.maint-last-done{font-size:10px;color:var(--label3)}
-
 /* ── PIN boxes ── */
 .pin-boxes{display:flex;gap:12px;justify-content:center;margin:12px 0 6px}
 .pin-box{width:54px;height:62px;border:1.5px solid var(--sep);border-radius:12px;
@@ -397,51 +377,6 @@ const EMPTY_DEFAULTS = {
     {id:'ex_s3', cat:'Battery Storage', category:'Battery Storage', make:'Victron', model:'Lithium Battery C', serialNumber:'', location:'engine room starboard',  installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', notes:'12V', photos:[]},
   ]
 };
-
-// ═══════════════════════════════════════════════════════════
-//  YANMAR FULL MAINTENANCE SCHEDULE
-// ═══════════════════════════════════════════════════════════
-
-const YANMAR_SCHED = [
-  // FUEL SYSTEM
-  {id:'fs1',sys:'Fuel System',        task:'Visual inspection of engine outside',            type:'user',  intHrs:null, initHrs:null, intLabel:'Before every start'},
-  {id:'fs2',sys:'Fuel System',        task:'Check fuel level and refill',                    type:'user',  intHrs:null, initHrs:null, intLabel:'Before every start'},
-  {id:'fs3',sys:'Fuel System',        task:'Drain the fuel tank',                            type:'user',  intHrs:250,  initHrs:50,   intLabel:'Initial 50h, then every 250h'},
-  {id:'fs4',sys:'Fuel System',        task:'Drain the fuel filter',                          type:'user',  intHrs:50,   initHrs:null, intLabel:'Every 50h'},
-  {id:'fs5',sys:'Fuel System',        task:'Replace the fuel filter',                        type:'parts', intHrs:250,  initHrs:null, intLabel:'Every 250h'},
-  {id:'fs6',sys:'Fuel System',        task:'Check injection timing',                         type:'shop',  intHrs:1000, initHrs:null, intLabel:'Every 1000h'},
-  {id:'fs7',sys:'Fuel System',        task:'Check injection spray condition',                type:'shop',  intHrs:1000, initHrs:null, intLabel:'Every 1000h'},
-  // LUBRICATING SYSTEM
-  {id:'ls1',sys:'Lubricating System', task:'Check crankcase lube oil level',                 type:'user',  intHrs:null, initHrs:null, intLabel:'Before every start'},
-  {id:'ls2',sys:'Lubricating System', task:'Check marine gear lube oil level',               type:'user',  intHrs:null, initHrs:null, intLabel:'Before every start'},
-  {id:'ls3',sys:'Lubricating System', task:'Replace crankcase lube oil',                     type:'parts', intHrs:150,  initHrs:50,   intLabel:'Initial 50h, then every 150h'},
-  {id:'ls4',sys:'Lubricating System', task:'Replace marine gear lube oil',                   type:'parts', intHrs:150,  initHrs:50,   intLabel:'Initial 50h, then every 150h'},
-  {id:'ls5',sys:'Lubricating System', task:'Replace sail drive oil',                         type:'parts', intHrs:100,  initHrs:50,   intLabel:'Initial 50h, then every 100h'},
-  {id:'ls6',sys:'Lubricating System', task:'Replace engine lube oil filter',                 type:'parts', intHrs:250,  initHrs:50,   intLabel:'Initial 50h, then every 250h'},
-  // COOLING SYSTEM
-  {id:'cs1',sys:'Cooling System',     task:'Check seawater outlet during operation',         type:'user',  intHrs:null, initHrs:null, intLabel:'Before every start'},
-  {id:'cs2',sys:'Cooling System',     task:'Check cooling water level',                      type:'user',  intHrs:null, initHrs:null, intLabel:'Before every start'},
-  {id:'cs3',sys:'Cooling System',     task:'Check / replace impeller of cooling water pump', type:'parts', intHrs:250,  initHrs:null, intLabel:'Check every 250h, replace every 1000h'},
-  {id:'cs4',sys:'Cooling System',     task:'Replace fresh water coolant',                    type:'parts', intHrs:null, initHrs:null, intLabel:'Every year', annual:true},
-  {id:'cs5',sys:'Cooling System',     task:'Clean and check water passages',                 type:'shop',  intHrs:1000, initHrs:null, intLabel:'Every 1000h'},
-  // AIR INTAKE & EXHAUST
-  {id:'ae1',sys:'Air Intake & Exhaust',task:'Clean air intake silencer element',             type:'user',  intHrs:250,  initHrs:null, intLabel:'Every 250h'},
-  {id:'ae2',sys:'Air Intake & Exhaust',task:'Clean exhaust / water mixing elbow',            type:'user',  intHrs:250,  initHrs:null, intLabel:'Every 250h'},
-  {id:'ae3',sys:'Air Intake & Exhaust',task:'Check exhaust gas condition',                   type:'user',  intHrs:null, initHrs:null, intLabel:'Before every start'},
-  {id:'ae4',sys:'Air Intake & Exhaust',task:'Diaphragm assembly inspection',                 type:'shop',  intHrs:1000, initHrs:null, intLabel:'Every 1000h'},
-  // ELECTRICAL SYSTEM
-  {id:'el1',sys:'Electrical System',  task:'Check alarm lamps and devices',                  type:'user',  intHrs:null, initHrs:null, intLabel:'Before every start'},
-  {id:'el2',sys:'Electrical System',  task:'Check electrolyte level in battery',             type:'user',  intHrs:50,   initHrs:null, intLabel:'Every 50h'},
-  {id:'el3',sys:'Electrical System',  task:'Adjust / replace alternator driving belt',       type:'user',  intHrs:250,  initHrs:50,   intLabel:'Initial 50h, then every 250h'},
-  {id:'el4',sys:'Electrical System',  task:'Check wiring connectors',                        type:'user',  intHrs:250,  initHrs:null, intLabel:'Every 250h'},
-  // CYLINDER HEAD
-  {id:'ch1',sys:'Cylinder Head',      task:'Check for leakage of water and oil',             type:'user',  intHrs:null, initHrs:null, intLabel:'After starting'},
-  {id:'ch2',sys:'Cylinder Head',      task:'Retighten all major nuts and bolts',             type:'shop',  intHrs:1000, initHrs:null, intLabel:'Every 1000h'},
-  {id:'ch3',sys:'Cylinder Head',      task:'Adjust intake / exhaust valve clearance',        type:'shop',  intHrs:1000, initHrs:50,   intLabel:'Initial 50h, then every 1000h'},
-  // REMOTE CONTROL
-  {id:'rc1',sys:'Remote Control',     task:'Check / adjust remote control operation',        type:'shop',  intHrs:1000, initHrs:50,   intLabel:'Initial 50h, then every 1000h'},
-  {id:'rc2',sys:'Remote Control',     task:'Adjust propeller shaft alignment',               type:'shop',  intHrs:1000, initHrs:50,   intLabel:'Initial 50h, then every 1000h'},
-];
 
 // ═══════════════════════════════════════════════════════════
 //  STATE
@@ -715,17 +650,14 @@ function getAlerts() {
     const sd = calcSchengen(p.schengenLog);
     if (sd >= 75) alerts.push({color:sd>=90?'red':'orange', days:90-sd, text:`${p.name} — ${sd} Schengen days used (${90-sd} remaining)`});
   });
-  // Maintenance — Yanmar full schedule
+  // Maintenance
   getEngines().forEach(eid => {
-    const h = data.maintenance?.engines?.[eid]?.hours || 0;
-    YANMAR_SCHED.filter(t => t.intHrs).forEach(item => {
-      const s = calcSchedStatus(item, eid);
-      if (s.color === 'red' || s.color === 'orange') {
-        const label = s.remaining <= 0
-          ? `${Math.abs(s.remaining)}h overdue`
-          : `${s.remaining}h remaining`;
-        alerts.push({color:s.color, days:s.remaining, text:`${engLabel(eid)}: ${item.task} — ${label}`});
-      }
+    const eng = data.maintenance?.engines?.[eid];
+    if (!eng) return;
+    const h = eng.hours||0;
+    (eng.schedule||[]).forEach(t => {
+      const st = maintStatus(t, h);
+      if (st.color !== 'green') alerts.push({color:st.color, days:t.lastDoneAt+t.interval-h, text:`${engLabel(eid)}: ${t.task} — ${st.label}`});
     });
   });
   return alerts.sort((a,b) => a.days - b.days);
@@ -1422,193 +1354,94 @@ function removeShipyardHistory(i) {
 //  SECTION 5 — MAINTENANCE
 // ═══════════════════════════════════════════════════════════
 
-// ── Schedule helpers ──────────────────────────────────────
-
-function calcSchedStatus(item, eid) {
-  const hours = data.maintenance?.engines?.[eid]?.hours || 0;
-  const e = data.maintenance?.sched?.[item.id]?.[eid] || {};
-  if (!item.intHrs) {
-    return { color:'grey', label: e.date ? '✓ '+e.date.slice(5) : '—', lastDoneAt: 0 };
-  }
-  const last = e.lastDoneAt || 0;
-  const nextDue = last === 0 ? (item.initHrs || item.intHrs) : last + item.intHrs;
-  const remaining = nextDue - hours;
-  const color = remaining <= 0 ? 'red' : remaining <= item.intHrs * 0.2 ? 'orange' : 'green';
-  const label = remaining <= 0 ? `${Math.abs(remaining)}h OD` : `${remaining}h`;
-  return { color, label, remaining, nextDue, lastDoneAt: last };
-}
-
-function markSchedDone(taskId, eid) {
-  ensureEngine(eid);
-  if (!data.maintenance.sched) data.maintenance.sched = {};
-  if (!data.maintenance.sched[taskId]) data.maintenance.sched[taskId] = {};
-  const item = YANMAR_SCHED.find(t => t.id === taskId);
-  const hours = data.maintenance.engines[eid].hours || 0;
-  const prev = data.maintenance.sched[taskId][eid] || {};
-  data.maintenance.sched[taskId][eid] = {
-    ...prev,
-    lastDoneAt: item?.intHrs ? hours : (prev.lastDoneAt || 0),
-    date: new Date().toISOString().slice(0, 10)
-  };
-  save(); renderAlertBar();
-  document.getElementById('mainContent').innerHTML = renderMaintenance();
-}
-
-function renderSchedItemRow(item, eids, isCat, eLbl) {
-  const bCls = {user:'mb-user', parts:'mb-parts', shop:'mb-shop'}[item.type] || 'mb-user';
-  const bLbl = {user:'USER', parts:'PARTS', shop:'SHOP'}[item.type] || '';
-  const cols = eids.map(eid => {
-    const s = calcSchedStatus(item, eid);
-    return `<div class="maint-eng-col">
-      ${isCat ? `<div class="maint-eng-lbl">${eLbl[eid]}</div>` : ''}
-      <button class="msb msb-${s.color}" onclick="markSchedDone('${item.id}','${eid}')">${esc(s.label)}</button>
-      ${s.lastDoneAt ? `<div class="maint-last-done">${s.lastDoneAt}h</div>` : ''}
-    </div>`;
-  }).join('');
-  return `<div class="maint-row2">
-    <span class="maint-badge ${bCls}">${bLbl}</span>
-    <div class="maint-task-name">${esc(item.task)}<span class="maint-int-lbl">${esc(item.intLabel)}</span></div>
-    <div style="display:flex;gap:6px;align-items:flex-end">${cols}
-      <button class="btn btn-s btn-xs" onclick="showEditSchedItem('${item.id}')" style="flex-shrink:0;margin-bottom:2px">✏</button>
-    </div>
-  </div>`;
-}
-
-function showEditSchedItem(taskId) {
-  const item = YANMAR_SCHED.find(t => t.id === taskId); if (!item) return;
-  const eids  = getEngines();
-  const isCat = data.meta.hullType === 'catamaran';
-  const eLbl  = {port:'Port', starboard:'Starboard', main:'Engine'};
-  const fields = eids.map(eid => {
-    const e = data.maintenance?.sched?.[taskId]?.[eid] || {};
-    return `${isCat ? `<div style="font-weight:600;color:var(--blue);font-size:13px;margin-top:14px">${eLbl[eid]}</div>` : ''}
-      <div class="mi-label">Last done at engine hours</div>
-      <input class="mi" id="es-h-${eid}" type="number" min="0" value="${e.lastDoneAt||0}">
-      <div class="mi-label">Date</div>
-      <input class="mi" id="es-d-${eid}" type="date" value="${e.date||''}">
-      <div class="mi-label">Notes</div>
-      <input class="mi" id="es-n-${eid}" placeholder="Optional" value="${esc(e.notes||'')}">
-      <div class="mi-label">Cost (€)</div>
-      <input class="mi" id="es-c-${eid}" type="number" min="0" placeholder="0" value="${e.cost||''}">`;
-  }).join('');
-  showModal(esc(item.task), `
-    <div style="font-size:12px;color:var(--label3);margin-bottom:10px">${esc(item.intLabel)}</div>
-    ${fields}
-    <div class="modal-btns" style="margin-top:16px">
-      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
-      <button class="btn btn-p" onclick="saveEditSchedItem('${taskId}')">Save</button>
-    </div>`);
-}
-
-function saveEditSchedItem(taskId) {
-  if (!data.maintenance) data.maintenance = {engines:{}, sched:{}};
-  if (!data.maintenance.sched) data.maintenance.sched = {};
-  if (!data.maintenance.sched[taskId]) data.maintenance.sched[taskId] = {};
-  getEngines().forEach(eid => {
-    data.maintenance.sched[taskId][eid] = {
-      lastDoneAt: parseInt(document.getElementById(`es-h-${eid}`)?.value) || 0,
-      date:  document.getElementById(`es-d-${eid}`)?.value || '',
-      notes: document.getElementById(`es-n-${eid}`)?.value || '',
-      cost:  document.getElementById(`es-c-${eid}`)?.value || '',
-    };
-  });
-  save(); hideModal();
-  document.getElementById('mainContent').innerHTML = renderMaintenance();
-}
-
 function renderMaintenance() {
   const isCat = data.meta.hullType === 'catamaran';
-  const eids  = getEngines();
-  const eLbl  = {port:'Port', starboard:'Stbd', main:'Engine'};
+  const engines = getEngines();
+  const eid = isCat ? ui.maintEngine : engines[0];
+  const eng = data.maintenance?.engines?.[eid] || {hours:0, schedule:[], log:[], customTasks:[]};
+  const hours = eng.hours || 0;
+  const schedule = eng.schedule || [];
 
-  // Engine hours cards (side-by-side for catamaran)
-  const hoursHtml = `<div class="maint-hours-grid ${isCat?'cat':''}">
-    ${eids.map(eid => {
-      const h = data.maintenance?.engines?.[eid]?.hours || 0;
-      return `<div class="card">
-        <div class="card-hd">${isCat ? eLbl[eid]+' ' : ''}Engine Hours</div>
-        <div class="hours-box">
-          <div class="hours-num">${h}</div>
-          <div class="hours-lbl">hours</div>
-          <div class="hours-edit">
-            <button class="h-btn" onclick="adjustHours('${eid}',-10)">−10</button>
-            <button class="h-btn" onclick="adjustHours('${eid}',-1)">−</button>
-            <input class="h-input" type="number" value="${h}" min="0" onblur="setHours('${eid}',this.value)">
-            <button class="h-btn" onclick="adjustHours('${eid}',1)">+</button>
-            <button class="h-btn" onclick="adjustHours('${eid}',10)">+10</button>
+  return `
+    ${isCat ? `
+      <div class="subtab-bar">
+        <div class="pill ${ui.maintEngine==='port'?'active':''}" onclick="ui.maintEngine='port';document.getElementById('mainContent').innerHTML=renderMaintenance()">
+          ⚙️ Port Engine
+        </div>
+        <div class="pill ${ui.maintEngine==='starboard'?'active':''}" onclick="ui.maintEngine='starboard';document.getElementById('mainContent').innerHTML=renderMaintenance()">
+          ⚙️ Starboard Engine
+        </div>
+      </div>` : ''}
+    <div class="card">
+      <div class="card-hd">${isCat ? (eid==='port'?'Port':'Starboard')+' Engine ' : ''}Engine Hours</div>
+      <div class="hours-box">
+        <div class="hours-num">${hours}</div>
+        <div class="hours-lbl">hours</div>
+        <div class="hours-edit">
+          <button class="h-btn" onclick="adjustHours('${eid}',-10)">−10</button>
+          <button class="h-btn" onclick="adjustHours('${eid}',-1)">−</button>
+          <input class="h-input" type="number" value="${hours}" min="0"
+            onblur="setHours('${eid}',this.value)">
+          <button class="h-btn" onclick="adjustHours('${eid}',1)">+</button>
+          <button class="h-btn" onclick="adjustHours('${eid}',10)">+10</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-hd">Maintenance Schedule — Yanmar Diesel</div>
+    <div class="card"><div class="card-body">
+      ${schedule.map(t => {
+        const st = maintStatus(t, hours);
+        return `<div class="maint-row">
+          <div class="mdot ${st.color}"></div>
+          <div class="m-info">
+            <div class="m-task">${esc(t.task)}</div>
+            <div class="m-meta">Every ${t.interval}h · Last done at ${t.lastDoneAt}h · Next due at ${t.lastDoneAt+t.interval}h</div>
+            <div class="m-due ${st.color}">${st.label}</div>
           </div>
-        </div>
-      </div>`;
-    }).join('')}
-  </div>`;
+          <button class="btn btn-s btn-xs" onclick="logMaintenanceDone('${eid}','${t.id}',${hours})">✓ Done</button>
+        </div>`;
+      }).join('')}
+    </div></div>
 
-  // Overdue / due-soon banner
-  let nOver = 0, nSoon = 0;
-  YANMAR_SCHED.filter(t => t.intHrs).forEach(item =>
-    eids.forEach(eid => {
-      const c = calcSchedStatus(item, eid).color;
-      if (c === 'red') nOver++; else if (c === 'orange') nSoon++;
-    })
-  );
-  const bannerHtml = nOver
-    ? `<div style="background:rgba(255,59,48,.1);border:1.5px solid var(--red);border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:var(--red);font-weight:600">⚠️ ${nOver} overdue${nSoon?' · '+nSoon+' due soon':''} — tap item to mark done</div>`
-    : nSoon
-    ? `<div style="background:rgba(255,149,0,.1);border:1.5px solid var(--orange);border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:var(--orange);font-weight:600">⏱ ${nSoon} item${nSoon>1?'s':''} due soon</div>`
-    : '';
+    ${(eng.customTasks||[]).length ? `
+      <div class="sec-hd">Custom Tasks</div>
+      <div class="card"><div class="card-body">
+        ${eng.customTasks.map(t => {
+          const st = maintStatus(t, hours);
+          return `<div class="maint-row">
+            <div class="mdot ${st.color}"></div>
+            <div class="m-info">
+              <div class="m-task">${esc(t.task)}</div>
+              <div class="m-meta">Every ${t.interval}h · Last done at ${t.lastDoneAt}h</div>
+              <div class="m-due ${st.color}">${st.label}</div>
+            </div>
+            <button class="btn btn-s btn-xs" onclick="logCustomDone('${eid}','${t.id}',${hours})">✓ Done</button>
+          </div>`;
+        }).join('')}
+      </div></div>` : ''}
 
-  // Full Yanmar schedule grouped by system
-  const systems = [...new Set(YANMAR_SCHED.map(t => t.sys))];
-  const schedHtml = systems.map(sys => `
-    <div class="sec-hd">${esc(sys)}</div>
-    <div class="card">${YANMAR_SCHED.filter(t => t.sys === sys).map(item => renderSchedItemRow(item, eids, isCat, eLbl)).join('')}</div>`
-  ).join('');
+    <div class="btn-row">
+      <button class="btn btn-s btn-sm" onclick="showAddCustomTask('${eid}')">+ Custom Task</button>
+      <button class="btn btn-s btn-sm" onclick="showAddMaintenanceLog('${eid}')">+ Log Entry</button>
+      <button class="btn btn-s btn-sm" onclick="exportSection('maintenance')">⬇ Export</button>
+    </div>
 
-  // Custom tasks
-  const allCustom = eids.flatMap(eid =>
-    (data.maintenance?.engines?.[eid]?.customTasks || []).map(t => ({...t, eid}))
-  );
-  const customHtml = allCustom.length ? `
-    <div class="sec-hd">Custom Tasks</div>
-    <div class="card"><div class="card-body">${allCustom.map(t => {
-      const h = data.maintenance?.engines?.[t.eid]?.hours || 0;
-      const st = maintStatus(t, h);
-      return `<div class="maint-row">
-        <div class="mdot ${st.color}"></div>
-        <div class="m-info">
-          <div class="m-task">${esc(t.task)}${isCat?` <span style="font-size:11px;color:var(--label3)">(${eLbl[t.eid]})</span>`:''}</div>
-          <div class="m-meta">Every ${t.interval}h · Last at ${t.lastDoneAt}h</div>
-          <div class="m-due ${st.color}">${st.label}</div>
-        </div>
-        <button class="btn btn-s btn-xs" onclick="logCustomDone('${t.eid}','${t.id}',${h})">✓ Done</button>
-      </div>`;
-    }).join('')}</div></div>` : '';
-
-  // Buttons + log sections (one per engine for catamaran)
-  const btns = `<div class="btn-row">
-    ${eids.map(eid => `
-      <button class="btn btn-s btn-sm" onclick="showAddCustomTask('${eid}')">+ Custom${isCat?' '+eLbl[eid]:''}</button>
-      <button class="btn btn-s btn-sm" onclick="showAddMaintenanceLog('${eid}')">+ Log${isCat?' '+eLbl[eid]:''}</button>`).join('')}
-    <button class="btn btn-s btn-sm" onclick="exportSection('maintenance')">⬇ Export</button>
-  </div>`;
-
-  const logHtml = eids.map(eid => {
-    const origLog = data.maintenance?.engines?.[eid]?.log || [];
-    const rev = origLog.slice().reverse();
-    return `
-      <div class="sec-hd">${isCat ? eLbl[eid]+' Engine ' : ''}Maintenance Log</div>
-      <div class="card"><div style="overflow-x:auto">
+    <div class="sec-hd">Maintenance Log</div>
+    <div class="card">
+      <div style="overflow-x:auto">
         <table class="tbl"><thead><tr><th>Date</th><th>Hours</th><th>Task</th><th>Cost</th><th>Notes</th><th></th></tr></thead>
-        <tbody>${rev.map((l, ri) => {
-          const i = origLog.length - 1 - ri;
-          return `<tr><td>${esc(l.date)}</td><td>${esc(l.hours)}</td><td>${esc(l.task)}</td>
+        <tbody>${(eng.log||[]).slice().reverse().map((l,ri)=>{
+          const i = (eng.log.length-1)-ri;
+          return `<tr>
+            <td>${esc(l.date)}</td><td>${esc(l.hours)}</td><td>${esc(l.task)}</td>
             <td>${esc(l.cost||'')}</td><td>${esc(l.notes||'')}</td>
-            <td><button class="btn btn-d btn-xs" onclick="removeMaintenanceLog('${eid}',${i})">✕</button></td></tr>`;
+            <td><button class="btn btn-d btn-xs" onclick="removeMaintenanceLog('${eid}',${i})">✕</button></td>
+          </tr>`;
         }).join('') || '<tr><td colspan="6" style="color:var(--label3);padding:12px">No entries</td></tr>'}
         </tbody></table>
-      </div></div>`;
-  }).join('');
-
-  return hoursHtml + bannerHtml + schedHtml + customHtml + btns + logHtml;
+      </div>
+    </div>`;
 }
 
 function adjustHours(eid, delta) {
@@ -1626,7 +1459,19 @@ function ensureEngine(eid) {
   if (!data.maintenance.engines) data.maintenance.engines = {};
   if (!data.maintenance.engines[eid]) data.maintenance.engines[eid] = {hours:0, schedule:[], log:[], customTasks:[]};
 }
-
+function logMaintenanceDone(eid, taskId, currentHours) {
+  ensureEngine(eid);
+  const sched = data.maintenance.engines[eid].schedule;
+  const t = sched.find(x=>x.id===taskId); if (!t) return;
+  t.lastDoneAt = currentHours;
+  // Auto-add log entry
+  if (!data.maintenance.engines[eid].log) data.maintenance.engines[eid].log = [];
+  data.maintenance.engines[eid].log.push({
+    id:uid(), date:new Date().toISOString().slice(0,10),
+    hours:currentHours, task:t.task, cost:'', notes:'Scheduled maintenance completed'
+  });
+  save(); renderAlertBar(); document.getElementById('mainContent').innerHTML = renderMaintenance();
+}
 function logCustomDone(eid, taskId, currentHours) {
   ensureEngine(eid);
   const t = data.maintenance.engines[eid].customTasks?.find(x=>x.id===taskId); if (!t) return;
