@@ -1739,7 +1739,7 @@ function adjustHours(eid, delta) {
 function setHours(eid, val) {
   ensureEngine(eid);
   data.maintenance.engines[eid].hours = Math.max(0, parseInt(val)||0);
-  save(); renderAlertBar();
+  save(); renderAlertBar(); document.getElementById('mainContent').innerHTML = renderMaintenance();
 }
 function ensureEngine(eid) {
   if (!data.maintenance) data.maintenance = {engines:{}};
@@ -2327,13 +2327,12 @@ async function attemptUnlock() {
     at.count = 0; at.lockUntil = 0; setAttemptState(at);
     const found = await load();
     if (!found) { data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS)); }
+    await pullFromCloud(); // sync with cloud before showing app; silently uses local if offline
     migrateData();
     startActivityTracking();
     document.getElementById('setupOv').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     renderApp();
-    // Pull latest from cloud in background; re-render if data changed
-    pullFromCloud().then(pulled => { if (pulled) { migrateData(); renderApp(); } });
   } catch(e) {
     at.count++;
     if (at.count >= MAX_FAILS) { at.lockUntil = Date.now() + LOCKOUT_MS; at.count = MAX_FAILS; }
@@ -2441,12 +2440,12 @@ async function attemptLogin() {
       await aesDecrypt(key, localStorage.getItem(VERIFY_KEY));
       cryptoKey = key;
       await load();
+      await pullFromCloud(); // sync with cloud before showing app; silently uses local if offline
       migrateData();
       startActivityTracking();
       document.getElementById('setupOv').classList.add('hidden');
       document.getElementById('app').classList.remove('hidden');
       renderApp();
-      pushToCloud();
       return;
     } catch(e) { /* fall through to cloud */ }
   }
@@ -2759,10 +2758,9 @@ async function syncNow() {
     renderApp();
     showToast('Synced — latest data loaded from cloud');
   } else {
-    // Pull failed: do not overwrite cloud with potentially stale local data.
-    // Just report the failure so the user knows.
-    setSyncStatus('offline');
-    showToast('Sync failed — could not reach cloud. Check connection.', true);
+    // Pull failed (offline or error) — push local data so changes made offline are not lost
+    await pushToCloud();
+    showToast(syncStatus === 'synced' ? 'Pushed local data to cloud' : 'Sync failed — check connection', syncStatus !== 'synced');
   }
   if (ui.tab === 'settings') document.getElementById('mainContent').innerHTML = renderSettings();
 }
