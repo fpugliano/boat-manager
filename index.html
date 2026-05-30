@@ -2833,17 +2833,22 @@ function migrateToSingleLog() {
 // ═══════════════════════════════════════════════════════════
 
 function getTLData() {
-  if (!data.transitLog) {
-    data.transitLog = { currentLog:'tl_2526', logs:{ tl_2526:{
+  if (!data.transitLog) data.transitLog = {};
+  const tl = data.transitLog;
+  // Ensure required properties exist even if cloud returned a partial object
+  if (!tl.logs) tl.logs = {};
+  if (!tl.currentLog) tl.currentLog = 'tl_2526';
+  if (!tl.logs[tl.currentLog]) {
+    tl.logs[tl.currentLog] = {
       season:'2025-2026', archived:false, stamps:[],
       docNumber:'', issueDate:'', validFrom:'', validUntil:'',
       customsAuthority:'', validityType:'Limited (Ορισμένη)', prevDocCount:'', otherNotes:'', provisions:'',
       vesselName:'', flag:'', portOfRegistry:'', regNumber:'', callSign:'',
       vesselType:'', gt:'', engine:'', loa:'', yearBuilt:'', yearFirstReg:'',
       ownerName:'', holderName:'', address:'', telephone:'', email:'', afm:'', idNumber:''
-    }}};
+    };
   }
-  return data.transitLog;
+  return tl;
 }
 
 function nextTLSeason(s) {
