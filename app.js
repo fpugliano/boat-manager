@@ -3480,14 +3480,21 @@ function renderSettings() {
         <button class="btn btn-s btn-sm" onclick="syncNow()">↕ Sync Now</button>
       </div>
     </div>
-    <div class="sec-hd">Manual Backup</div>
+    <div class="sec-hd">Backup &amp; Restore</div>
     <div class="card">
       <div class="fr">
-        <div class="fl">Export JSON</div>
-        <div class="fv" style="font-size:12px;color:var(--label3)">Encrypted offline copy</div>
+        <div class="fl">Export Encrypted Backup</div>
+        <div class="fv" style="font-size:12px;color:var(--label3)">Save this file to iCloud Drive. Use it to restore your data on any device.</div>
       </div>
       <div class="btn-row">
-        <button class="btn btn-s btn-sm" onclick="saveBackup()">⬇ Export backup</button>
+        <button class="btn btn-s btn-sm" onclick="saveBackup()">⬇ Export Encrypted Backup</button>
+      </div>
+      <div class="fr" style="border-top:1px solid var(--sep)">
+        <div class="fl">Restore from Backup</div>
+        <div class="fv" style="font-size:12px;color:var(--label3)">Import a previously exported encrypted backup file</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-p btn-sm" onclick="document.getElementById('importFile').click()">⬆ Restore from Backup</button>
       </div>
     </div>
     <div class="sec-hd">Import Data</div>
