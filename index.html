@@ -685,44 +685,33 @@ function showToast(msg, err) {
 
 function getAlerts() {
   const alerts = [];
-  const V = data.documents?.vessel;
   const I = data.documents?.insurance;
   const C = data.documents?.customs;
 
-  if (V?.expiryDate) {
-    const d = daysUntil(V.expiryDate);
-    if (d <= 90) alerts.push({color:alertColor(d,90), days:d, text:`Vessel Documentation expires ${d<0?Math.abs(d)+'d ago':'in '+d+'d'}`});
-  }
   if (I?.expiryDate) {
     const d = daysUntil(I.expiryDate);
     if (d <= 60) alerts.push({color:alertColor(d,60), days:d, text:`Insurance expires ${d<0?Math.abs(d)+'d ago':'in '+d+'d'}`});
   }
   if (C?.validUntil) {
     const d = daysUntil(C.validUntil);
-    if (d <= 60) alerts.push({color:alertColor(d,60), days:d, text:`eTEPAY Transit Log expires ${d<0?Math.abs(d)+'d ago':'in '+d+'d'}`});
+    if (d <= 30) alerts.push({color:alertColor(d,30), days:d, text:`eTEPAY Transit Log expires ${d<0?Math.abs(d)+'d ago':'in '+d+'d'}`});
   }
   (data.crew||[]).forEach(p => {
     if (p.passportExpiry) {
       const d = daysUntil(p.passportExpiry);
-      if (d <= 180) alerts.push({color:alertColor(d,180), days:d, text:`${p.name} — passport expires in ${d}d`});
+      if (d <= 10) alerts.push({color:alertColor(d,10), days:d, text:`${p.name} — passport expires ${d<0?Math.abs(d)+'d ago':'in '+d+'d'}`});
     }
     if (p.seamanBookExpiry) {
       const d = daysUntil(p.seamanBookExpiry);
-      if (d <= 180) alerts.push({color:alertColor(d,180), days:d, text:`${p.name} — seaman book expires in ${d}d`});
+      if (d <= 10) alerts.push({color:alertColor(d,10), days:d, text:`${p.name} — seaman book expires ${d<0?Math.abs(d)+'d ago':'in '+d+'d'}`});
     }
-    const sd = calcSchengen(p.schengenLog);
-    if (sd >= 75) alerts.push({color:sd>=90?'red':'orange', days:90-sd, text:`${p.name} — ${sd} Schengen days used (${90-sd} remaining)`});
   });
-  // Maintenance — Yanmar full schedule
+  // Maintenance — only overdue tasks
   getEngines().forEach(eid => {
-    const h = data.maintenance?.engines?.[eid]?.hours || 0;
     YANMAR_SCHED.filter(t => t.intHrs).forEach(item => {
       const s = calcSchedStatus(item, eid);
-      if (s.color === 'red' || s.color === 'orange') {
-        const label = s.remaining <= 0
-          ? `${Math.abs(s.remaining)}h overdue`
-          : `${s.remaining}h remaining`;
-        alerts.push({color:s.color, days:s.remaining, text:`${engLabel(eid)}: ${item.task} — ${label}`});
+      if (s.remaining <= 0 && s.color === 'red') {
+        alerts.push({color:'red', days:s.remaining, text:`${engLabel(eid)}: ${item.task} — ${Math.abs(s.remaining)}h overdue`});
       }
     });
   });
@@ -1488,21 +1477,19 @@ function showUndoToast() {
 }
 
 function renderSchedItemRow(item, eids, isCat, eLbl) {
-  const bCls = {user:'mb-user', parts:'mb-parts', shop:'mb-shop'}[item.type] || 'mb-user';
-  const bLbl = {user:'USER', parts:'PARTS', shop:'SHOP'}[item.type] || '';
   const cols = eids.map(eid => {
     const s = calcSchedStatus(item, eid);
-    const e = data.maintenance?.sched?.[item.id]?.[eid] || {};
-    const cnt = e.history?.length || (e.lastDoneAt ? 1 : 0);
-    const sub = cnt > 0 ? `${cnt > 1 ? '×'+cnt+' · ' : ''}${fmtSchedDate(e.date||'')}` : '';
+    const history = _schedHistory(eid, item.id);
+    const histHtml = history.slice().reverse().map(h =>
+      `<div class="maint-last-done">${fmtSchedDate(h.date)}${h.hours ? ' · '+h.hours+'h' : ''}</div>`
+    ).join('');
     return `<div class="maint-eng-col">
       ${isCat ? `<div class="maint-eng-lbl">${eLbl[eid]}</div>` : ''}
       <button class="msb msb-${s.color}" onclick="markSchedDone('${item.id}','${eid}')">${esc(s.label)}</button>
-      ${sub ? `<div class="maint-last-done">${esc(sub)}</div>` : ''}
+      ${histHtml}
     </div>`;
   }).join('');
   return `<div class="maint-row2">
-    <span class="maint-badge ${bCls}">${bLbl}</span>
     <div class="maint-task-name">${esc(item.task)}<span class="maint-int-lbl">${esc(item.intLabel)}</span></div>
     <div style="display:flex;gap:6px;align-items:flex-end">${cols}
       <button class="btn btn-s btn-xs" onclick="showEditSchedItem('${item.id}')" style="flex-shrink:0;margin-bottom:2px">✏</button>
