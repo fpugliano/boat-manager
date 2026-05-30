@@ -2136,14 +2136,25 @@ function buildWinterSectionItems(sid, preChecked) {
 
 function getWinterData() {
   if (!data.winterization) {
-    const BOB_PRE = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,21,22,23,24,25,26,27,28];
-    data.winterization = { currentSeason:'w2526', seasons:{ w2526:{
-      name:'Winter 2025/26', archived:false,
-      sections:{
+    const isOwner = localStorage.getItem(EMAIL_KEY) === 'fpugliano@gmail.com';
+    const mk = (text) => ({id:uid(), text, asterisk:false, checked:false, group:null});
+    let sections;
+    if (isOwner) {
+      const BOB_PRE = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,21,22,23,24,25,26,27,28];
+      sections = {
         winterize:  {items: buildWinterSectionItems('winterize',  [])},
         needs:      {items: buildWinterSectionItems('needs',      [0,1,2])},
         backOnBoard:{items: buildWinterSectionItems('backOnBoard', BOB_PRE)}
-      }
+      };
+    } else {
+      sections = {
+        winterize:  {items: [mk('Remove sails'),        mk('Change engine oil'),    mk('Flush raw water system')]},
+        needs:      {items: [mk('Engine oil'),           mk('Fuel filters'),         mk('Impeller kit')]},
+        backOnBoard:{items: [mk('Connect house batteries'), mk('Hoist main and jib'), mk('Watermaker flush')]}
+      };
+    }
+    data.winterization = { currentSeason:'w2526', seasons:{ w2526:{
+      name:'Winter 2025/26', archived:false, sections
     }}};
   }
   // Migrate old format (season.checked arrays → season.sections item objects)
