@@ -1474,7 +1474,8 @@ const MAINT_TASKS = [
   { id:'mt_sailoil',  task:'Sail drive gear oil',                intHrs:150,  intDays:null, intLabel:'Every 150h' },
   { id:'mt_ffuel',    task:'Fuel filters (primary & secondary)', intHrs:250,  intDays:null, intLabel:'Every 250h' },
   { id:'mt_impeller', task:'Impeller',                           intHrs:250,  intDays:null, intLabel:'Every 250h' },
-  { id:'mt_belts',    task:'Belts',                              intHrs:250,  intDays:null, intLabel:'Every 250h' },
+  { id:'mt_belts_ins', task:'Inspect & adjust belt tension',      intHrs:250,  intDays:null, intLabel:'Every 250h' },
+  { id:'mt_belts_rep', task:'Replace belts',                      intHrs:1000, intDays:null, intLabel:'Every 1000h' },
   { id:'mt_coolant',  task:'Yanmar coolant',                     intHrs:null, intDays:365,  intLabel:'Every 12 months' },
   { id:'mt_hex',      task:'Heat exchanger service',             intHrs:1000, intDays:null, intLabel:'Every 1000h' },
   { id:'mt_valve',    task:'Valve clearance',                    intHrs:1000, intDays:null, intLabel:'Every 1000h' },
@@ -1488,7 +1489,8 @@ function maintTaskKeywords(taskId) {
     mt_sailoil:  ['sail drive oil','saildrive oil','gear oil','saildrive','sail drive'],
     mt_ffuel:    ['fuel filter'],
     mt_impeller: ['impeller'],
-    mt_belts:    ['belt','alternator belt'],
+    mt_belts_ins: ['inspect belt','adjust belt','belt tension','belt inspect','belt adjust'],
+    mt_belts_rep: ['replace belt','belt replace','new belt'],
     mt_coolant:  ['coolant','antifreeze','fresh water coolant'],
     mt_hex:      ['heat exchanger'],
     mt_valve:    ['valve clearance','valve'],
@@ -2255,6 +2257,18 @@ function migrateData() {
     if (n !== p.category) { p.category = n; dirty = true; }
   });
   if (migrateToSingleLog()) dirty = true;
+  // Seed belt history if not already present
+  if (!data.maintenance) data.maintenance = { engines:{}, sched:{}, log:[] };
+  if (!data.maintenance.log) data.maintenance.log = [];
+  const hasBeltEntry = data.maintenance.log.some(e => e.id === 'seed_belt_920');
+  if (!hasBeltEntry) {
+    data.maintenance.log.push(
+      { id:'seed_belt_920', date:'2021-07-01', hours:'920', task:'Inspect & adjust belt tension', cost:'', notes:'Mallorca', engines:['port','starboard'] },
+      { id:'seed_belt_rep_920', date:'2021-07-01', hours:'920', task:'Replace belts', cost:'', notes:'Mallorca', engines:['port','starboard'] }
+    );
+    data.maintenance.log.sort((a,b) => b.date.localeCompare(a.date) || (parseFloat(b.hours)||0)-(parseFloat(a.hours)||0));
+    dirty = true;
+  }
   if (dirty) save();
 }
 
