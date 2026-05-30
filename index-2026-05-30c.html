@@ -788,11 +788,6 @@ function renderSetup() {
         </div>
       </div>
       <button class="setup-go" onclick="completeSetup()">Set Up My Boat →</button>
-      <button onclick="renderLoginScreen()"
-        style="width:100%;margin-top:14px;border:none;background:none;font-family:var(--font);
-          font-size:15px;color:var(--label3);cursor:pointer;padding:10px">
-        ← Back to login
-      </button>
     </div>`;
 }
 
@@ -2026,11 +2021,7 @@ function renderLockScreen() {
       <button class="setup-go" id="unlock-btn" onclick="attemptUnlock()" ${locked?'disabled':''}>
         ${locked ? 'Locked…' : 'Unlock'}
       </button>
-      <button onclick="renderLoginScreen()"
-        style="width:100%;margin-top:14px;border:none;background:none;font-family:var(--font);
-          font-size:14px;color:var(--label3);cursor:pointer;padding:8px;text-align:center">
-        Use a different account
-      </button>
+
     </div>`;
   if (locked) startLockCountdown(at);
   else if (!locked) setTimeout(() => document.getElementById('pw-unlock')?.focus(), 100);
@@ -2133,104 +2124,44 @@ function lockApp() {
 //  LANDING SCREEN — shown when localStorage is empty
 // ═══════════════════════════════════════════════════════════
 
-function renderLoginScreen() {
+function renderLandingScreen() {
   const ov = document.getElementById('setupOv');
   ov.classList.remove('hidden');
-  document.getElementById('app').classList.add('hidden');
-  const savedEmail = localStorage.getItem(EMAIL_KEY) || '';
   ov.innerHTML = `
     <div class="setup-inner">
-      <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px;font-weight:800">⚓</div>'}</div>
+      <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px">⚓</div>'}</div>
       <div class="setup-h">Boat Manager</div>
-      <label class="setup-lbl">Email</label>
-      <input class="setup-inp" id="login-email" type="email" placeholder="your@email.com"
-        value="${esc(savedEmail)}"
-        onkeydown="if(event.key==='Enter')document.getElementById('login-pw').focus()">
-      <label class="setup-lbl">Password</label>
-      <input class="setup-inp" type="password" id="login-pw" placeholder="Password"
-        onkeydown="if(event.key==='Enter')attemptLogin()">
-      <div id="login-err" style="color:var(--red);font-size:13px;min-height:20px;
-        margin-bottom:8px;text-align:center"></div>
-      <button class="setup-go" id="login-btn" onclick="attemptLogin()">Login</button>
-      <button onclick="startNewSetupFromLogin()"
-        style="width:100%;margin-top:16px;border:none;background:none;font-family:var(--font);
-          font-size:15px;color:var(--blue);cursor:pointer;padding:10px;text-align:center">
-        New user? Set up your boat →
+      <div class="setup-sub">Set up your boat, or restore on a new device.</div>
+
+      <button onclick="showExistingBoatFlow()"
+        style="width:100%;border:1.5px solid var(--blue);border-radius:12px;padding:13px 16px;
+          font-family:var(--font);font-size:15px;font-weight:600;background:var(--surface);
+          color:var(--blue);cursor:pointer;margin-bottom:6px">
+        ☁️ I have an existing boat
       </button>
+      <div style="font-size:12px;color:var(--label3);text-align:center;margin-bottom:16px;line-height:1.5">
+        Sign in with your email and password to restore your data.
+      </div>
+
+      <div style="text-align:center;font-size:13px;color:var(--label3);margin:4px 0 16px">— or —</div>
+
+      <button onclick="startNewSetup()"
+        style="width:100%;border:1.5px solid var(--sep);border-radius:12px;padding:13px 16px;
+          font-family:var(--font);font-size:15px;font-weight:600;background:var(--surface);
+          color:var(--label2);cursor:pointer">
+        New setup
+      </button>
+      <div style="font-size:12px;color:var(--label3);text-align:center;margin-top:8px;line-height:1.5">
+        Only tap this if this is a <b>brand new installation</b>.<br>
+        All data starts from scratch.
+      </div>
     </div>`;
-  setTimeout(() => {
-    if (savedEmail) document.getElementById('login-pw')?.focus();
-    else document.getElementById('login-email')?.focus();
-  }, 80);
 }
 
-async function attemptLogin() {
-  const email = document.getElementById('login-email')?.value.trim().toLowerCase();
-  const pw    = document.getElementById('login-pw')?.value;
-  const err   = document.getElementById('login-err');
-  const btn   = document.getElementById('login-btn');
-  if (!email || !email.includes('@')) { if(err) err.textContent = 'Enter a valid email'; return; }
-  if (!pw) { if(err) err.textContent = 'Enter your password'; return; }
-  if (btn) { btn.textContent = 'Signing in…'; btn.disabled = true; }
-  if (err) err.textContent = '';
-
-  const storedEmail = localStorage.getItem(EMAIL_KEY);
-  const hasSalt     = !!localStorage.getItem(SALT_KEY);
-  const hasVerify   = !!localStorage.getItem(VERIFY_KEY);
-
-  // Fast path: same device, same email — try local decrypt
-  if (storedEmail === email && hasSalt && hasVerify) {
-    try {
-      const salt = await getOrCreateSalt();
-      const key  = await deriveKey(pw, salt);
-      await aesDecrypt(key, localStorage.getItem(VERIFY_KEY));
-      cryptoKey = key;
-      await load();
-      startActivityTracking();
-      document.getElementById('setupOv').classList.add('hidden');
-      document.getElementById('app').classList.remove('hidden');
-      renderApp();
-      pushToCloud();
-      return;
-    } catch(localErr) { /* fall through to cloud */ }
-  }
-
-  // Cloud path: new device, different email, or corrupted local data
-  try {
-    const cloud = await fetchFromCloud(email);
-    const salt  = b64ToU8(cloud.salt);
-    const key   = await deriveKey(pw, salt);
-    await aesDecrypt(key, cloud.verify);
-    localStorage.setItem(EMAIL_KEY,  email);
-    localStorage.setItem(SALT_KEY,   cloud.salt);
-    localStorage.setItem(VERIFY_KEY, cloud.verify);
-    localStorage.setItem(ENC_KEY,    cloud.data);
-    localStorage.removeItem(ATTEMPTS_KEY);
-    cryptoKey = key;
-    await load();
-    startActivityTracking();
-    document.getElementById('setupOv').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
-    renderApp();
-    setSyncStatus('synced');
-  } catch(e) {
-    const msg = e.message.includes('404')
-      ? 'No account found. Use "Set up your boat" below to register.'
-      : 'Wrong email or password.';
-    if (err) err.textContent = msg;
-    if (btn) { btn.textContent = 'Login'; btn.disabled = false; }
-  }
-}
-
-function startNewSetupFromLogin() {
-  const email = document.getElementById('login-email')?.value.trim().toLowerCase() || '';
-  startNewSetup(email);
-}
-
-function startNewSetup(prefillEmail = '') {
+function startNewSetup() {
+  // Seed defaults and go into boat setup flow
   data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS));
   if (typeof OROBORO_DATA !== 'undefined') deepMerge(data, OROBORO_DATA);
-  if (prefillEmail) data.meta.email = prefillEmail;
   renderSetup();
 }
 
@@ -2363,6 +2294,62 @@ async function fetchFromCloud(email) {
   return j;
 }
 
+function showExistingBoatFlow() {
+  const ov = document.getElementById('setupOv');
+  ov.innerHTML = `
+    <div class="setup-inner">
+      <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px;font-weight:800">⚓</div>'}</div>
+      <div class="setup-h">Sign In</div>
+      <div class="setup-sub">Enter your email and password to restore your boat data.</div>
+      <label class="setup-lbl">Email</label>
+      <input class="setup-inp" id="restore-email" type="email" placeholder="your@email.com" autofocus>
+      <label class="setup-lbl">Password</label>
+      <input class="setup-inp" type="password" id="restore-pw" placeholder="Your password"
+        onkeydown="if(event.key==='Enter')doRestoreFromCloud()">
+      <div id="restore-err" style="color:var(--red);font-size:13px;min-height:20px;margin-bottom:12px;text-align:center"></div>
+      <button class="setup-go" id="restore-btn" onclick="doRestoreFromCloud()">Sign In →</button>
+      <button onclick="renderLandingScreen()"
+        style="width:100%;margin-top:14px;border:none;background:none;font-family:var(--font);
+          font-size:15px;color:var(--label3);cursor:pointer;padding:10px">
+        ← Back
+      </button>
+    </div>`;
+}
+
+async function doRestoreFromCloud() {
+  const email = document.getElementById('restore-email')?.value.trim().toLowerCase();
+  const pw    = document.getElementById('restore-pw')?.value;
+  const err   = document.getElementById('restore-err');
+  const btn   = document.getElementById('restore-btn');
+  if (!email || !email.includes('@')) { if(err) err.textContent = 'Enter a valid email'; return; }
+  if (!pw) { if(err) err.textContent = 'Enter your password'; return; }
+  if (btn) { btn.textContent = 'Signing in…'; btn.disabled = true; }
+  if (err) err.textContent = '';
+  try {
+    const cloud = await fetchFromCloud(email);
+    const salt  = b64ToU8(cloud.salt);
+    const key   = await deriveKey(pw, salt);
+    await aesDecrypt(key, cloud.verify); // throws if password wrong
+    localStorage.setItem(SALT_KEY,   cloud.salt);
+    localStorage.setItem(VERIFY_KEY, cloud.verify);
+    localStorage.setItem(ENC_KEY,    cloud.data);
+    localStorage.setItem(EMAIL_KEY,  email);
+    localStorage.removeItem(ATTEMPTS_KEY);
+    cryptoKey = key;
+    const found = await load();
+    if (!found) { data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS)); }
+    startActivityTracking();
+    document.getElementById('setupOv').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    renderApp();
+    setSyncStatus('synced');
+  } catch(e) {
+    const msg = e.message.includes('404') ? 'No account found for this email'
+              : 'Wrong password — check your email and password';
+    if (err) err.textContent = msg;
+    if (btn) { btn.textContent = 'Sign In →'; btn.disabled = false; }
+  }
+}
 
 function renderSettings() {
   const email = localStorage.getItem(EMAIL_KEY) || '—';
@@ -2402,10 +2389,26 @@ function renderSettings() {
 async function init() {
   const hasSalt   = !!localStorage.getItem(SALT_KEY);
   const hasVerify = !!localStorage.getItem(VERIFY_KEY);
+  const email     = localStorage.getItem(EMAIL_KEY);
+
   if (hasSalt && hasVerify) {
-    renderLockScreen();   // returning user same device — just password
+    // Returning user on this device — show lock screen
+    renderLockScreen();
+  } else if (email) {
+    // Email known but local data gone — auto-restore from cloud
+    try {
+      const cloud = await fetchFromCloud(email);
+      localStorage.setItem(SALT_KEY,   cloud.salt);
+      localStorage.setItem(VERIFY_KEY, cloud.verify);
+      localStorage.setItem(ENC_KEY,    cloud.data);
+      localStorage.removeItem(ATTEMPTS_KEY);
+      renderLockScreen();
+      showToast('Data restored from cloud — enter your password');
+    } catch(e) {
+      renderLandingScreen();
+    }
   } else {
-    renderLoginScreen();  // new device or cleared data — email + password
+    renderLandingScreen();
   }
 }
 
