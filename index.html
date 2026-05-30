@@ -908,17 +908,23 @@ function showTab(tab) {
 
 function renderActiveTab() {
   const mc = document.getElementById('mainContent'); if (!mc) return;
-  switch(ui.tab) {
-    case 'documents': mc.innerHTML = renderDocuments(); break;
-    case 'crew':      mc.innerHTML = renderCrew(); break;
-    case 'photos':    mc.innerHTML = renderPhotos(); break;
-    case 'shipyard':  mc.innerHTML = renderShipyard(); break;
-    case 'maint':     mc.innerHTML = renderMaintenance(); break;
-    case 'upgrades':  mc.innerHTML = renderUpgrades(); break;
-    case 'parts':     mc.innerHTML = renderParts(); break;
-    case 'systems':   mc.innerHTML = renderSystems(); break;
-    case 'winter':    mc.innerHTML = renderWinterization(); break;
-    case 'settings':  mc.innerHTML = renderSettings(); break;
+  try {
+    switch(ui.tab) {
+      case 'documents': mc.innerHTML = renderDocuments(); break;
+      case 'crew':      mc.innerHTML = renderCrew(); break;
+      case 'photos':    mc.innerHTML = renderPhotos(); break;
+      case 'shipyard':  mc.innerHTML = renderShipyard(); break;
+      case 'maint':     mc.innerHTML = renderMaintenance(); break;
+      case 'upgrades':  mc.innerHTML = renderUpgrades(); break;
+      case 'parts':     mc.innerHTML = renderParts(); break;
+      case 'systems':   mc.innerHTML = renderSystems(); break;
+      case 'winter':    mc.innerHTML = renderWinterization(); break;
+      case 'settings':  mc.innerHTML = renderSettings(); break;
+    }
+  } catch(e) {
+    console.error('renderActiveTab error in tab "' + ui.tab + '":', e);
+    ui.tab = 'documents';
+    try { mc.innerHTML = renderDocuments(); } catch(e2) { console.error('renderDocuments fallback failed:', e2); }
   }
 }
 
