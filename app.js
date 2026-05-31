@@ -1122,6 +1122,11 @@ function shortDate(dateStr) {
   return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()] + ' ' + String(d.getFullYear()).slice(2);
 }
 
+function fmtCost(v) {
+  const n = parseFloat(String(v||'').replace(/[€$£,\s]/g,''));
+  return isNaN(n) ? '—' : '€' + n.toLocaleString('en', {minimumFractionDigits:0, maximumFractionDigits:0});
+}
+
 function renderShipyard() {
   if (!data.shipyard) data.shipyard = {current:{}, quotes:[], history:[]};
   console.log('[shipyard debug] data.shipyard:', JSON.stringify(data.shipyard));
@@ -1162,10 +1167,10 @@ function renderShipyard() {
       ${fr('Location','shipyard.current.location',s.location)}
       ${fr('Start date','shipyard.current.startDate',s.startDate,'date')}
       ${fr('End date','shipyard.current.endDate',s.endDate,'date')}
-      ${fr('Cost quoted','shipyard.current.actualCost',s.actualCost)}
-      ${fr('Deposit paid','shipyard.current.depositPaid',s.depositPaid)}
-      ${fr('Balance due','shipyard.current.balanceDue',s.balanceDue)}
-      <div class="fr"><div class="fl">Total paid</div><div class="fv">${(()=>{const d=parseFloat((s.depositPaid||'').replace(/[^0-9.]/g,''));const b=parseFloat((s.balanceDue||'').replace(/[^0-9.]/g,''));return(!isNaN(d)&&!isNaN(b))?'€'+(d+b).toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2}):'—';})()}</div></div>
+      ${fr('Cost quoted','shipyard.current.actualCost',s.actualCost?fmtCost(s.actualCost):'')}
+      ${fr('Deposit paid','shipyard.current.depositPaid',s.depositPaid?fmtCost(s.depositPaid):'')}
+      ${fr('Balance due','shipyard.current.balanceDue',s.balanceDue?fmtCost(s.balanceDue):'')}
+      <div class="fr"><div class="fl">Total paid</div><div class="fv">${(()=>{const d=parseFloat((s.depositPaid||'').replace(/[€$£,\s]/g,''));const b=parseFloat((s.balanceDue||'').replace(/[€$£,\s]/g,''));return(!isNaN(d)&&!isNaN(b))?fmtCost(d+b):'—';})()}</div></div>
       ${frArea('Notes','shipyard.current.notes',s.notes)}
     </div></div>`;
 
@@ -1181,7 +1186,7 @@ function renderShipyard() {
         <div style="font-size:12px;color:var(--label3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(q.location||'')}</div>
       </div>
       <div style="flex:1;min-width:0;font-size:12px;color:var(--label3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(q.notes||'')}</div>
-      <div style="font-size:14px;font-weight:600;flex-shrink:0">${esc(q.price||'')}</div>
+      <div style="font-size:14px;font-weight:600;flex-shrink:0">${fmtCost(q.price)}</div>
       <div style="flex-shrink:0;display:flex;align-items:center;gap:4px">
         <button onclick="selectQuote(${i})" style="${q.selected
           ? 'background:var(--green);color:#fff;border:none;border-radius:10px;padding:3px 10px;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer'
@@ -1207,15 +1212,15 @@ function renderShipyard() {
     });
 
   const histRows = histSorted.length ? histSorted.map(({h,i}) => {
-    const dateRange = [h.start, h.end].filter(Boolean).map(shortDate).join('–') || '—';
-    const costNum = parseFloat((h.cost||'').replace(/[€$£,\s]/g,''));
-    const costStr = !isNaN(costNum) ? '€' + costNum.toLocaleString() : (h.cost||'');
+    const yrRaw = h.year||''; const yrM = yrRaw.match(/^(\d{4})[-\/](\d{2,4})$/);
+    const yr = yrM ? yrM[1]+'/'+yrM[2].slice(-2) : yrRaw;
+    const dateRange = [h.start, h.end].filter(Boolean).map(shortDate).join('–');
     return `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--sep);overflow:hidden">
-      <div style="font-size:12px;font-weight:700;flex-shrink:0;width:52px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(h.year||'')}</div>
+      <div style="font-size:12px;font-weight:700;flex-shrink:0;width:60px;white-space:nowrap">${esc(yr)}</div>
       <div style="font-size:13px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${esc(h.location||h.name||'')}</div>
       <div style="font-size:11px;color:var(--label3);flex-shrink:0;white-space:nowrap">${esc(dateRange)}</div>
       <div style="font-size:11px;color:var(--label3);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(h.notes||'')}</div>
-      <div style="font-size:12px;font-weight:600;flex-shrink:0;white-space:nowrap">${esc(costStr)}</div>
+      <div style="font-size:12px;font-weight:600;flex-shrink:0;white-space:nowrap">${fmtCost(h.cost)}</div>
       <button onclick="editShipyardHistory(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✏️</button>
       <button onclick="removeShipyardHistory(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✕</button>
     </div>`;
