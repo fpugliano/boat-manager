@@ -3970,7 +3970,7 @@ function renderSettings() {
         <div class="fv" style="font-size:12px;color:var(--label3)">Import a previously exported encrypted backup file</div>
       </div>
       <div class="btn-row">
-        <button class="btn btn-p btn-sm" onclick="document.getElementById('importFile').click()">⬆ Restore from Backup</button>
+        <button class="btn btn-p btn-sm" onclick="document.getElementById('backupFile').click()">⬆ Restore from Backup</button>
       </div>
     </div>
     <div class="sec-hd">Import Data</div>
