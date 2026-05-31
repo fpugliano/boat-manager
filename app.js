@@ -4166,6 +4166,8 @@ async function pullFromCloud() {
   try {
     const cloud = await fetchFromCloud(email);
     const decrypted = JSON.parse(await aesDecrypt(cryptoKey, cloud.data));
+    console.log('[pullFromCloud] decrypted keys:', Object.keys(decrypted));
+    console.log('[pullFromCloud] shipyard:', JSON.stringify(decrypted.shipyard));
     data = decrypted;
     localStorage.setItem(ENC_KEY,  cloud.data);
     localStorage.setItem(HINT_KEY, cloud.hint || '');
