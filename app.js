@@ -1666,7 +1666,7 @@ function renderSchengen() {
     </div>` : '';
   const statusCard = hasData ? `
     <div style="margin:0 12px 10px;background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;overflow:hidden">
-      <div style="display:grid;grid-template-columns:1fr 1fr;min-height:0">
+      <div style="display:grid;grid-template-columns:1fr 1fr;min-width:0;width:100%">
         ${sd.persons.map((p,i)=>renderSchengenPersonStatus(p,i)).join('')}
       </div>
     </div>` : '';
@@ -1695,9 +1695,9 @@ function renderSchengenPersonStatus(p, idx) {
   const passportBtns = (p.passports||[]).map((pp, pi) => {
     const label = [pp.flag, pp.country ? pp.country.slice(0,3) : ''].filter(Boolean).join(' ') || '?';
     const active = pi === activePassIdx;
-    return `<button onclick="setSchengenPassport(${idx},${pi})" style="background:${active?'var(--blue)':'var(--surface2)'};color:${active?'#fff':'var(--label)'};border:1.5px solid ${active?'var(--blue)':'var(--sep)'};border-radius:8px;padding:4px 7px;font-size:12px;cursor:pointer;line-height:1.4;font-family:var(--font)">${label}</button>`;
+    return `<button onclick="setSchengenPassport(${idx},${pi})" style="background:${active?'var(--blue)':'var(--surface2)'};color:${active?'#fff':'var(--label)'};border:1.5px solid ${active?'var(--blue)':'var(--sep)'};border-radius:8px;padding:3px 6px;font-size:11px;cursor:pointer;line-height:1.4;font-family:var(--font);white-space:nowrap">${label}</button>`;
   }).join('');
-  return `<div style="padding:14px 10px;${borderRight}">
+  return `<div style="padding:14px 10px;min-width:0;overflow:hidden;${borderRight}">
     <div style="font-size:13px;font-weight:700;margin-bottom:6px">${esc(p.name||'—')}</div>
     <div style="margin-bottom:8px"><span style="background:${inStatus?'var(--green)':'var(--sep)'};color:${inStatus?'#fff':'var(--label2)'};font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">${inStatus?'In Schengen':'Outside'}</span></div>
     ${isEU ? `<div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:10px">🇪🇺 EU Passport · No limit</div>` : `
@@ -1900,9 +1900,11 @@ function saveSchengenEdit() {
 
 function prefillSchengenData() {
   if (localStorage.getItem(EMAIL_KEY) !== '[EMAIL-REMOVED]@gmail.com') return false;
-  // Skip if data looks correct: Francesco has name AND has at least one EU=false passport
+  // Re-seed unless: Francesco's Italy passport has flag+eu=true AND US passport has eu=false
   const fp = data.schengen?.persons?.[0];
-  if (fp?.name && fp?.passports?.some(pp => pp.eu === false)) return false;
+  const italyOk = fp?.passports?.some(pp => pp.flag === '🇮🇹' && pp.eu === true);
+  const usOk    = fp?.passports?.some(pp => pp.flag === '🇺🇸' && pp.eu === false);
+  if (fp?.name && italyOk && usOk) return false;
   data.schengen = { persons: [
     { name:'Francesco', activePassport:0,
       passports:[{flag:'🇺🇸',country:'US',eu:false},{flag:'🇮🇹',country:'Italy',eu:true},{flag:'🇯🇵',country:'Japan',eu:false}],
