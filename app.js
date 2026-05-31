@@ -1868,73 +1868,106 @@ function schengenPassSelChange(i, pi) {
   if (otherDiv) otherDiv.style.display = sel?.value === 'other' ? 'flex' : 'none';
 }
 
+let _schPi = [0, 0];
+
+function schPassportRow(i, pi, pp) {
+  const selKey = SCHENGEN_FLAG_TO_KEY[pp.flag] || 'other';
+  const isOther = selKey === 'other';
+  const opts = SCHENGEN_PASSPORT_OPTS.map(o =>
+    `<option value="${o.key}" ${o.key===selKey?'selected':''}>${o.flag?o.flag+' ':''}${o.country}</option>`
+  ).join('');
+  return `<div id="sch-prow-${i}-${pi}" style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <select id="sch-psel-${i}-${pi}" class="fi" style="flex:1;font-size:13px;border-radius:20px;padding:6px 10px;background:var(--surface2)" onchange="schengenPassSelChange(${i},${pi})">${opts}</select>
+      <button onclick="schRemovePassport(${i},${pi})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:15px;padding:0 4px;flex-shrink:0;font-family:var(--font)">✕</button>
+    </div>
+    <div id="sch-pother-${i}-${pi}" style="display:${isOther?'flex':'none'};align-items:center;gap:8px;margin-bottom:6px;padding-left:8px">
+      <input class="fi" id="sch-potherval-${i}-${pi}" style="flex:1;font-size:13px" placeholder="Country name" value="${isOther?esc(pp.country||''):''}">
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--label3);white-space:nowrap;cursor:pointer">
+        <input type="checkbox" id="sch-peu-${i}-${pi}" ${pp.eu===true&&isOther?'checked':''}> EU
+      </label>
+    </div>`;
+}
+
+function schEditName(i) {
+  document.getElementById(`sch-namerow-${i}`).style.display = 'none';
+  const ed = document.getElementById(`sch-nameedit-${i}`);
+  ed.style.display = 'flex';
+  setTimeout(() => document.getElementById(`sch-nameinput-${i}`)?.focus(), 30);
+}
+
+function schConfirmName(i) {
+  const val = (document.getElementById(`sch-nameinput-${i}`)?.value || '').trim();
+  document.getElementById(`sch-namedisplay-${i}`).textContent = val || `Person ${i+1}`;
+  document.getElementById(`sch-nameedit-${i}`).style.display = 'none';
+  document.getElementById(`sch-namerow-${i}`).style.display = 'flex';
+}
+
+function schAddPassport(personIdx) {
+  const container = document.getElementById(`sch-passports-${personIdx}`);
+  if (!container) return;
+  const pi = _schPi[personIdx]++;
+  const temp = document.createElement('div');
+  temp.innerHTML = schPassportRow(personIdx, pi, {flag:'🇺🇸', country:'United States', eu:false}).trim();
+  while (temp.firstChild) container.appendChild(temp.firstChild);
+}
+
+function schRemovePassport(i, pi) {
+  const row = document.getElementById(`sch-prow-${i}-${pi}`);
+  const other = document.getElementById(`sch-pother-${i}-${pi}`);
+  if (row)   { row.style.display = 'none';   row.dataset.deleted = '1'; }
+  if (other)   other.style.display = 'none';
+}
+
 function showSchengenEdit() {
   const sd = getSchengenData();
+  _schPi = sd.persons.map(p => (p.passports||[]).length);
   const personsHtml = sd.persons.map((p,i) => {
-    const passHtml = (p.passports||[]).map((pp,pi) => {
-      const selKey = SCHENGEN_FLAG_TO_KEY[pp.flag] || 'other';
-      const isOther = selKey === 'other';
-      const opts = SCHENGEN_PASSPORT_OPTS.map(o =>
-        `<option value="${o.key}" ${o.key===selKey?'selected':''}>${o.flag?o.flag+' ':''}${o.country}</option>`
-      ).join('');
-      return `
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-          <select class="fi" id="sch-psel-${i}-${pi}" style="flex:1;font-size:13px" onchange="schengenPassSelChange(${i},${pi})">${opts}</select>
-          <button onclick="removeSchengenPassport(${i},${pi})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:15px;padding:0 4px;font-family:var(--font);flex-shrink:0">✕</button>
-        </div>
-        <div id="sch-pother-${i}-${pi}" style="display:${isOther?'flex':'none'};align-items:center;gap:8px;margin-bottom:6px;padding-left:8px">
-          <input class="fi" id="sch-potherval-${i}-${pi}" style="flex:1;font-size:13px" placeholder="Country name" value="${isOther?esc(pp.country||''):''}">
-          <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--label3);white-space:nowrap;cursor:pointer">
-            <input type="checkbox" id="sch-peu-${i}-${pi}" ${pp.eu===true&&isOther?'checked':''}> EU
-          </label>
-        </div>`;
-    }).join('');
+    const passHtml = (p.passports||[]).map((pp,pi) => schPassportRow(i,pi,pp)).join('');
     return `
-      <div class="mi-label">Person ${i+1} Name</div>
-      <input class="mi" id="sch-name-${i}" value="${esc(p.name||'')}">
-      <div class="mi-label" style="margin-top:10px">Passports</div>
-      ${passHtml}
-      <button onclick="addSchengenPassport(${i})" style="font-size:13px;color:var(--blue);background:none;border:none;cursor:pointer;padding:4px 0;font-family:var(--font)">+ Add passport</button>
-      ${i<sd.persons.length-1?'<hr style="border:none;border-top:1px solid var(--sep);margin:14px 0">':''}`;
+      <div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:16px;margin-bottom:12px;overflow:hidden">
+        <div id="sch-namerow-${i}" style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span id="sch-namedisplay-${i}" style="font-size:16px;font-weight:700;flex:1;color:var(--label)">${esc(p.name||'Person '+(i+1))}</span>
+          <button onclick="schEditName(${i})" style="background:none;border:none;cursor:pointer;font-size:15px;color:var(--label3);padding:2px 4px;font-family:var(--font)">✏️</button>
+        </div>
+        <div id="sch-nameedit-${i}" style="display:none;align-items:center;gap:8px;margin-bottom:12px">
+          <input id="sch-nameinput-${i}" class="fi" style="flex:1;font-size:15px;font-weight:600" value="${esc(p.name||'')}" placeholder="Person name">
+          <button onclick="schConfirmName(${i})" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--green);padding:2px 4px;font-family:var(--font);font-weight:700">✓</button>
+        </div>
+        <div style="font-size:12px;color:var(--label3);margin-bottom:8px">Passports <span style="font-style:italic">(tap to change)</span></div>
+        <div id="sch-passports-${i}">${passHtml}</div>
+        <button onclick="schAddPassport(${i})" style="font-size:13px;color:var(--blue);background:none;border:none;cursor:pointer;padding:4px 0;font-family:var(--font)">+ Add passport</button>
+      </div>`;
   }).join('');
   showModal('Edit Travellers', `
     ${personsHtml}
-    <div class="modal-btns" style="margin-top:14px">
+    <div class="modal-btns" style="margin-top:4px">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="saveSchengenEdit()">Save</button>
     </div>`);
 }
 
-function addSchengenPassport(personIdx) {
-  const sd = getSchengenData();
-  const p = sd.persons[personIdx]; if (!p) return;
-  if (!p.passports) p.passports = [];
-  p.passports.push({flag:'🇺🇸', country:'United States', eu:false});
-  save(); hideModal(); showSchengenEdit();
-}
-
-function removeSchengenPassport(personIdx, passIdx) {
-  const sd = getSchengenData();
-  const p = sd.persons[personIdx]; if (!p) return;
-  p.passports.splice(passIdx, 1);
-  if ((p.activePassport||0) >= p.passports.length) p.activePassport = 0;
-  save(); hideModal(); showSchengenEdit();
-}
-
 function saveSchengenEdit() {
   const sd = getSchengenData();
   sd.persons.forEach((p,i) => {
-    p.name = document.getElementById(`sch-name-${i}`)?.value.trim()||'';
-    (p.passports||[]).forEach((pp,pi) => {
-      const sel = document.getElementById(`sch-psel-${i}-${pi}`)?.value||'other';
+    const nameInput   = document.getElementById(`sch-nameinput-${i}`);
+    const nameDisplay = document.getElementById(`sch-namedisplay-${i}`);
+    p.name = (nameInput?.value || nameDisplay?.textContent || '').trim();
+    const newPassports = [];
+    const total = _schPi[i];
+    for (let pi = 0; pi < total; pi++) {
+      const row = document.getElementById(`sch-prow-${i}-${pi}`);
+      if (!row || row.dataset.deleted === '1') continue;
+      const sel = document.getElementById(`sch-psel-${i}-${pi}`)?.value || 'other';
+      let pp;
       if (sel === 'other') {
-        pp.flag    = '';
-        pp.country = document.getElementById(`sch-potherval-${i}-${pi}`)?.value.trim()||'';
-        pp.eu      = document.getElementById(`sch-peu-${i}-${pi}`)?.checked||false;
+        pp = {flag:'', country:document.getElementById(`sch-potherval-${i}-${pi}`)?.value.trim()||'', eu:document.getElementById(`sch-peu-${i}-${pi}`)?.checked||false};
       } else {
-        Object.assign(pp, SCHENGEN_PASSPORT_MAP[sel]||{flag:'', country:'', eu:false});
+        pp = {...(SCHENGEN_PASSPORT_MAP[sel]||{flag:'', country:'', eu:false})};
       }
-    });
+      newPassports.push(pp);
+    }
+    p.passports = newPassports;
+    if ((p.activePassport||0) >= p.passports.length) p.activePassport = 0;
   });
   save(); hideModal(); schengenRerender();
 }
