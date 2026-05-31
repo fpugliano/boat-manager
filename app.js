@@ -1114,64 +1114,100 @@ function viewPhoto(i, section) {
 //  SECTION 4 — SHIPYARD
 // ═══════════════════════════════════════════════════════════
 
+function shortDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()] + ' ' + String(d.getFullYear()).slice(2);
+}
+
 function renderShipyard() {
-  const s = data.shipyard?.current || {};
-  const STATUS = ['Confirmed','Provisional','Quote Only'];
-  return `
-    <div class="sec-hd">Current / Upcoming Season</div>
-    <div class="card"><div class="card-body">
-      ${fr('Shipyard Name','shipyard.current.name',s.name)}
-      ${fr('Location','shipyard.current.location',s.location)}
-      ${fr('Contact','shipyard.current.contact',s.contact)}
-      ${fr('Website','shipyard.current.website',s.website)}
-      ${fr('Start Date','shipyard.current.startDate',s.startDate,'date')}
-      ${fr('End Date','shipyard.current.endDate',s.endDate,'date')}
-      ${fr('Estimated Cost','shipyard.current.estimatedCost',s.estimatedCost)}
-      ${fr('Actual Cost Paid','shipyard.current.actualCost',s.actualCost)}
-      ${frSelect('Status','shipyard.current.status',s.status||'Provisional',STATUS)}
-      ${fr('Deposit Paid','shipyard.current.depositPaid',s.depositPaid)}
-      ${fr('Balance Due','shipyard.current.balanceDue',s.balanceDue)}
-    </div></div>
-    ${frArea('Notes','shipyard.current.notes',s.notes).replace('<div class="fr"','<div class="card"><div class="card-body"><div class="fr"').replace('</div>','</div></div></div>')}
+  if (!data.shipyard) data.shipyard = {current:{}, quotes:[], history:[]};
+  const s = data.shipyard.current || {};
 
-    <div class="sec-hd">Quote Comparison</div>
-    <div class="card">
-      <div class="card-hd">Quotes <button class="card-hd-btn" onclick="showAddQuote()">+ Add</button></div>
-      <div style="overflow-x:auto">
-        <table class="tbl"><thead><tr><th>Shipyard</th><th>Location</th><th>Price</th><th>Notes</th><th></th></tr></thead>
-        <tbody>${(data.shipyard?.quotes||[]).map((q,i)=>`
-          <tr style="${q.selected?'background:rgba(52,199,89,.08)':''}">
-            <td><b>${esc(q.name)}</b></td><td>${esc(q.location)}</td>
-            <td>${esc(q.price)}</td><td>${esc(q.notes)}</td>
-            <td style="white-space:nowrap">
-              <button class="btn btn-s btn-xs" onclick="selectQuote(${i})" style="${q.selected?'background:var(--green);color:#fff;border-color:var(--green)':''}">
-                ${q.selected?'✓ Selected':'Select'}
-              </button>
-              <button class="btn btn-d btn-xs" onclick="removeQuote(${i})">✕</button>
-            </td>
-          </tr>`).join('') || '<tr><td colspan="5" style="color:var(--label3);padding:12px">No quotes yet</td></tr>'}
-        </tbody></table>
-      </div>
+  // Season label from start date
+  const yr = s.startDate ? new Date(s.startDate+'T00:00:00').getFullYear() : null;
+  const seasonLabel = yr ? `${yr}/${yr+1}` : '';
+
+  // ── Card 1: Current season ────────────────────────────────
+  const card1 = `
+    <div class="sec-hd" style="display:flex;align-items:center;justify-content:space-between">
+      Current season
+      ${seasonLabel ? `<span style="font-size:12px;font-weight:400;color:var(--label3)">${esc(seasonLabel)}</span>` : ''}
     </div>
+    <div class="card"><div class="card-body">
+      ${fr('Shipyard','shipyard.current.name',s.name)}
+      ${fr('Location','shipyard.current.location',s.location)}
+      ${fr('Start date','shipyard.current.startDate',s.startDate,'date')}
+      ${fr('End date','shipyard.current.endDate',s.endDate,'date')}
+      ${fr('Cost paid','shipyard.current.actualCost',s.actualCost)}
+      ${fr('Deposit paid','shipyard.current.depositPaid',s.depositPaid)}
+      ${fr('Balance due','shipyard.current.balanceDue',s.balanceDue)}
+      ${frArea('Notes','shipyard.current.notes',s.notes)}
+    </div></div>`;
 
-    <div class="sec-hd">History</div>
-    <div class="card">
-      <div class="card-hd">Past Seasons <button class="card-hd-btn" onclick="showAddShipyardHistory()">+ Add</button></div>
-      <div style="overflow-x:auto">
-        <table class="tbl"><thead><tr><th>Year</th><th>Shipyard</th><th>Start</th><th>End</th><th>Cost</th><th>Notes</th><th></th></tr></thead>
-        <tbody>${(data.shipyard?.history||[]).map((h,i)=>`
-          <tr><td>${esc(h.year)}</td><td>${esc(h.name)}</td><td>${esc(h.start)}</td>
-          <td>${esc(h.end)}</td><td>${esc(h.cost)}</td><td>${esc(h.notes)}</td>
-          <td><button class="btn btn-d btn-xs" onclick="removeShipyardHistory(${i})">✕</button></td></tr>`
-        ).join('') || '<tr><td colspan="7" style="color:var(--label3);padding:12px">No history yet</td></tr>'}
-        </tbody></table>
+  // ── Card 2: Quote comparison ──────────────────────────────
+  const sorted = (data.shipyard.quotes||[])
+    .map((q,i) => ({q, i}))
+    .sort((a,b) => (parseFloat((a.q.price||'').replace(/[^0-9.]/g,''))||0) - (parseFloat((b.q.price||'').replace(/[^0-9.]/g,''))||0));
+
+  const quoteRows = sorted.length ? sorted.map(({q,i}) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--sep)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600">${esc(q.name||'')}</div>
+        <div style="font-size:12px;color:var(--label3)">${esc(q.location||'')}</div>
+      </div>
+      <div style="font-size:14px;font-weight:600;flex-shrink:0">${esc(q.price||'')}</div>
+      <div style="flex-shrink:0;display:flex;align-items:center;gap:4px">
+        ${q.selected
+          ? `<span style="background:var(--green);color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:10px">✓ Selected</span>`
+          : `<button onclick="selectQuote(${i})" style="background:var(--surface2);border:1.5px solid var(--sep);border-radius:10px;padding:3px 10px;font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label2)">Select</button>`}
+        <button onclick="editQuote(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3)">✏️</button>
+        <button onclick="removeQuote(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3)">✕</button>
+      </div>
+    </div>`).join('') : `<div style="padding:18px 14px;color:var(--label3);font-size:13px">No quotes yet — tap + Add quote</div>`;
+
+  const card2 = `
+    <div class="sec-hd" style="display:flex;align-items:center;justify-content:space-between">
+      Quote comparison
+      <button onclick="showAddQuote()" style="background:var(--surface);border:1.5px solid var(--sep);border-radius:16px;padding:4px 12px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">+ Add quote</button>
+    </div>
+    <div class="card">${quoteRows}</div>`;
+
+  // ── Card 3: Past seasons ──────────────────────────────────
+  const histSorted = (data.shipyard.history||[])
+    .map((h,i) => ({h, i}))
+    .sort((a,b) => {
+      if (a.h.start && b.h.start) return b.h.start.localeCompare(a.h.start);
+      return (b.h.year||'').localeCompare(a.h.year||'');
+    });
+
+  const histRows = histSorted.length ? histSorted.map(({h,i}) => {
+    const dateRange = [h.start, h.end].filter(Boolean).map(shortDate).join(' – ') || '—';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--sep)">
+      <div style="font-size:12px;font-weight:700;flex-shrink:0;min-width:34px">${esc(h.year||'')}</div>
+      <div style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.name||'')}</div>
+      <div style="font-size:11px;color:var(--label3);flex-shrink:0;white-space:nowrap">${esc(dateRange)}</div>
+      <div style="font-size:12px;font-weight:600;flex-shrink:0;white-space:nowrap">${esc(h.cost||'')}</div>
+      <div style="flex-shrink:0;display:flex;gap:2px">
+        <button onclick="editShipyardHistory(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3)">✏️</button>
+        <button onclick="removeShipyardHistory(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3)">✕</button>
       </div>
     </div>`;
+  }).join('') : `<div style="padding:18px 14px;color:var(--label3);font-size:13px">No past seasons yet</div>`;
+
+  const card3 = `
+    <div class="sec-hd" style="display:flex;align-items:center;justify-content:space-between">
+      Past seasons
+      <button onclick="showAddShipyardHistory()" style="background:var(--surface);border:1.5px solid var(--sep);border-radius:16px;padding:4px 12px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">+ Add</button>
+    </div>
+    <div class="card">${histRows}</div>`;
+
+  return card1 + card2 + card3;
 }
 
 function showAddQuote() {
   showModal('Add Quote', `
-    <div class="mi-label">Shipyard Name</div><input class="mi" id="m-sn" placeholder="Name">
+    <div class="mi-label">Shipyard Name</div><input class="mi" id="m-sn" placeholder="Name" autofocus>
     <div class="mi-label">Location</div><input class="mi" id="m-sl" placeholder="City, Country">
     <div class="mi-label">Price</div><input class="mi" id="m-sp" placeholder="€ 0,000">
     <div class="mi-label">Notes</div><input class="mi" id="m-snotes" placeholder="Optional">
@@ -1191,18 +1227,49 @@ function saveQuote() {
   });
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderShipyard();
 }
+function editQuote(i) {
+  const q = data.shipyard?.quotes?.[i]; if (!q) return;
+  showModal('Edit Quote', `
+    <div class="mi-label">Shipyard Name</div><input class="mi" id="m-sn" value="${esc(q.name||'')}" autofocus>
+    <div class="mi-label">Location</div><input class="mi" id="m-sl" value="${esc(q.location||'')}">
+    <div class="mi-label">Price</div><input class="mi" id="m-sp" value="${esc(q.price||'')}">
+    <div class="mi-label">Notes</div><input class="mi" id="m-snotes" value="${esc(q.notes||'')}">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveEditQuote(${i})">Save</button>
+    </div>`);
+}
+function saveEditQuote(i) {
+  const q = data.shipyard?.quotes?.[i]; if (!q) return;
+  q.name     = document.getElementById('m-sn').value;
+  q.location = document.getElementById('m-sl').value;
+  q.price    = document.getElementById('m-sp').value;
+  q.notes    = document.getElementById('m-snotes').value;
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderShipyard();
+}
 function selectQuote(i) {
-  data.shipyard.quotes.forEach((q,j) => q.selected = (j===i ? !q.selected : false));
+  if (!data.shipyard?.quotes?.[i]) return;
+  const wasSelected = data.shipyard.quotes[i].selected;
+  data.shipyard.quotes.forEach((q,j) => q.selected = (j===i ? !wasSelected : false));
+  if (!wasSelected) {
+    const q = data.shipyard.quotes[i];
+    if (!data.shipyard.current) data.shipyard.current = {};
+    if (q.name)     data.shipyard.current.name     = q.name;
+    if (q.location) data.shipyard.current.location = q.location;
+    if (q.price)    data.shipyard.current.actualCost = q.price;
+  }
   save(); document.getElementById('mainContent').innerHTML = renderShipyard();
 }
 function removeQuote(i) {
+  if (!confirm('Remove this quote?')) return;
   data.shipyard.quotes.splice(i,1); save();
   document.getElementById('mainContent').innerHTML = renderShipyard();
 }
 function showAddShipyardHistory() {
   showModal('Add Past Season', `
-    <div class="mi-label">Year</div><input class="mi" id="m-yr" placeholder="2024">
+    <div class="mi-label">Year</div><input class="mi" id="m-yr" placeholder="e.g. 2024" autofocus>
     <div class="mi-label">Shipyard</div><input class="mi" id="m-sy" placeholder="Name">
+    <div class="mi-label">Location</div><input class="mi" id="m-sloc" placeholder="City, Country">
     <div class="mi-label">Start Date</div><input class="mi" id="m-sd" type="date">
     <div class="mi-label">End Date</div><input class="mi" id="m-ed" type="date">
     <div class="mi-label">Cost Paid</div><input class="mi" id="m-cp" placeholder="€ 0,000">
@@ -1217,6 +1284,7 @@ function saveShipyardHistory() {
   data.shipyard.history.push({
     id:uid(), year:document.getElementById('m-yr').value,
     name:document.getElementById('m-sy').value,
+    location:document.getElementById('m-sloc')?.value||'',
     start:document.getElementById('m-sd').value,
     end:document.getElementById('m-ed').value,
     cost:document.getElementById('m-cp').value,
@@ -1224,7 +1292,34 @@ function saveShipyardHistory() {
   });
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderShipyard();
 }
+function editShipyardHistory(i) {
+  const h = data.shipyard?.history?.[i]; if (!h) return;
+  showModal('Edit Past Season', `
+    <div class="mi-label">Year</div><input class="mi" id="m-yr" value="${esc(h.year||'')}" autofocus>
+    <div class="mi-label">Shipyard</div><input class="mi" id="m-sy" value="${esc(h.name||'')}">
+    <div class="mi-label">Location</div><input class="mi" id="m-sloc" value="${esc(h.location||'')}">
+    <div class="mi-label">Start Date</div><input class="mi" id="m-sd" type="date" value="${esc(h.start||'')}">
+    <div class="mi-label">End Date</div><input class="mi" id="m-ed" type="date" value="${esc(h.end||'')}">
+    <div class="mi-label">Cost Paid</div><input class="mi" id="m-cp" value="${esc(h.cost||'')}">
+    <div class="mi-label">Notes</div><input class="mi" id="m-hn" value="${esc(h.notes||'')}">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveEditShipyardHistory(${i})">Save</button>
+    </div>`);
+}
+function saveEditShipyardHistory(i) {
+  const h = data.shipyard?.history?.[i]; if (!h) return;
+  h.year     = document.getElementById('m-yr').value;
+  h.name     = document.getElementById('m-sy').value;
+  h.location = document.getElementById('m-sloc')?.value||'';
+  h.start    = document.getElementById('m-sd').value;
+  h.end      = document.getElementById('m-ed').value;
+  h.cost     = document.getElementById('m-cp').value;
+  h.notes    = document.getElementById('m-hn').value;
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderShipyard();
+}
 function removeShipyardHistory(i) {
+  if (!confirm('Remove this season?')) return;
   data.shipyard.history.splice(i,1); save();
   document.getElementById('mainContent').innerHTML = renderShipyard();
 }
