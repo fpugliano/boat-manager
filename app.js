@@ -1644,7 +1644,6 @@ function isCurrentlyInSchengen(log) {
 function schengenRerender() { document.getElementById('mainContent').innerHTML = renderSchengen(); }
 
 function renderSchengen() {
-  if (!ui.schengenLogTab) ui.schengenLogTab = 0;
   const sd = getSchengenData();
   const hasData = sd.persons.some(p=>p.name);
   const warnings = [];
@@ -1726,28 +1725,40 @@ function renderSchengenPersonStatus(p, idx) {
   </div>`;
 }
 
-function renderSchengenLog(sd) {
-  const idx = ui.schengenLogTab||0;
-  const p = sd.persons[idx];
+function renderSchengenPersonLog(p, idx) {
   const sorted = [...(p?.log||[])].sort((a,b)=>b.date.localeCompare(a.date));
-  const tabs = sd.persons.map((pp,i)=>`
-    <div onclick="ui.schengenLogTab=${i};schengenRerender()" style="padding:8px 16px;font-size:13px;font-weight:${i===idx?'700':'400'};color:${i===idx?'var(--blue)':'var(--label3)'};border-bottom:2px solid ${i===idx?'var(--blue)':'transparent'};cursor:pointer">${esc(pp.name||'Person '+(i+1))}</div>`).join('');
-  const rows = sorted.map(e=>{
+  const borderRight = idx === 0 ? 'border-right:1px solid var(--sep);' : '';
+  const rows = sorted.map(e => {
     const typeColor = e.type==='in' ? 'var(--green)' : 'var(--label2)';
-    const typeLabel = e.type==='in' ? 'Check In' : 'Check Out';
-    const passFlag = e.passport ? ` ${e.passport}` : '';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--sep)">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;color:${typeColor}">${typeLabel}${passFlag}</div>
-        <div style="font-size:12px;color:var(--label3)">${esc(e.date)} · ${esc(e.location||'')}</div>
+    const typeLabel = e.type==='in' ? '↓ In' : '↑ Out';
+    const passFlag = e.passport ? `${e.passport} ` : '';
+    return `<div style="padding:8px 10px;border-bottom:1px solid var(--sep)">
+      <div style="display:flex;align-items:flex-start;gap:4px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:${typeColor}">${typeLabel} ${passFlag}</div>
+          <div style="font-size:11px;color:var(--label3);line-height:1.3">${esc(e.date)}</div>
+          <div style="font-size:11px;color:var(--label3);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.location||'')}</div>
+        </div>
+        <div style="display:flex;gap:0;flex-shrink:0">
+          <button onclick="showSchengenEditEntry(${idx},'${e.id}')" style="background:none;border:none;padding:3px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✏️</button>
+          <button onclick="deleteSchengenEntry(${idx},'${e.id}')" style="background:none;border:none;padding:3px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✕</button>
+        </div>
       </div>
-      <button onclick="showSchengenEditEntry(${idx},'${e.id}')" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3)">✏️</button>
-      <button onclick="deleteSchengenEntry(${idx},'${e.id}')" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3)">✕</button>
     </div>`;
-  }).join('')||`<div style="padding:20px;text-align:center;color:var(--label3);font-size:14px">No entries yet</div>`;
-  return `<div style="margin:0 12px 16px;background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;overflow:hidden">
-    <div style="display:flex;border-bottom:1px solid var(--sep)">${tabs}</div>
+  }).join('') || `<div style="padding:14px 10px;text-align:center;color:var(--label3);font-size:12px">No entries</div>`;
+  return `<div style="min-width:0;overflow:hidden;${borderRight}">
+    <div style="padding:10px 10px 6px;font-size:12px;font-weight:700;color:var(--label);border-bottom:1px solid var(--sep)">${esc(p.name||'Person '+(idx+1))}</div>
     ${rows}
+    <div style="padding:8px 10px">
+      <button onclick="showSchengenCheckIn(${idx})" style="font-size:11px;color:var(--blue);background:none;border:none;cursor:pointer;font-family:var(--font);padding:0">+ Add entry</button>
+    </div>
+  </div>`;
+}
+
+function renderSchengenLog(sd) {
+  const cols = sd.persons.map((p,i) => renderSchengenPersonLog(p,i)).join('');
+  return `<div style="margin:0 12px 16px;background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;overflow:hidden">
+    <div style="display:grid;grid-template-columns:1fr 1fr;min-width:0;width:100%">${cols}</div>
   </div>`;
 }
 
