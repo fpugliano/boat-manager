@@ -4178,7 +4178,7 @@ async function pullFromCloud() {
 }
 
 function forceResync() {
-  showModal('Force Re-sync from Cloud', `
+  showModal('Reset local data & re-sync', `
     <div style="font-size:14px;color:var(--label2);line-height:1.5;margin-bottom:16px">This will clear local data and reload from cloud.<br>You will need to enter your PIN again.</div>
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
@@ -4291,7 +4291,13 @@ function renderSettings() {
       </div>
       <div class="btn-row">
         <button class="btn btn-s btn-sm" onclick="syncNow()">↕ Sync Now</button>
-        <button class="btn btn-s btn-sm" onclick="forceResync()" style="color:var(--red)">↺ Force Re-sync from Cloud</button>
+      </div>
+      <div class="fr" style="border-top:1px solid var(--sep)">
+        <div class="fl">Reset &amp; re-sync</div>
+        <div class="fv" style="font-size:12px;color:var(--label3)">Use this if your data looks outdated on this device.</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-s btn-sm" onclick="forceResync()" style="color:var(--red)">↺ Reset local data &amp; re-sync</button>
       </div>
     </div>
     <div class="sec-hd">Backup &amp; Restore</div>
