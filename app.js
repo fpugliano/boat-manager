@@ -2222,7 +2222,9 @@ function renderUpgrades() {
   let grandTotal = 0;
   wd.seasons.forEach(s => s.items.forEach(it => { grandTotal += parseFloat(it.cost)||0; }));
 
-  const cards = wd.seasons.slice().reverse().map(s => renderUpgradeSeason(s)).join('');
+  const reversedSeasons = wd.seasons.slice().reverse();
+  const firstId = reversedSeasons[0]?.id;
+  const cards = reversedSeasons.map(s => renderUpgradeSeason(s, s.id === firstId)).join('');
   const summary = grandTotal > 0 ? `<div style="margin:4px 12px 16px;padding:12px 16px;background:var(--surface);border:1.5px solid var(--sep);border-radius:12px;font-size:13px;color:var(--label3)">All seasons total: <b style="color:var(--label)">€${grandTotal.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2})}</b></div>` : '';
   const exMsg = !isOwner ? `<div style="margin:0 12px 12px;font-size:12px;color:var(--label3);font-style:italic">Replace these examples with your own upgrades and repairs</div>` : '';
 
@@ -2233,12 +2235,12 @@ function renderUpgrades() {
   ${exMsg}${cards}${summary}`;
 }
 
-function renderUpgradeSeason(s) {
+function renderUpgradeSeason(s, isFirst = false) {
   const done = s.items.filter(x=>x.checked).length, total = s.items.length;
   const complete = total > 0 && done === total;
   const pct = total ? Math.round(done/total*100) : 0;
-  // open state: complete seasons default closed, in-progress default open
-  const open = ui.upgOpen[s.id] !== undefined ? ui.upgOpen[s.id] : !complete;
+  // most recent season always open by default; others: open if in-progress, closed if complete
+  const open = ui.upgOpen[s.id] !== undefined ? ui.upgOpen[s.id] : (isFirst || !complete);
   const badge = complete ? `<span style="background:var(--green);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:6px">✓ Complete</span>` : '';
   const hdr = `<div onclick="ui.upgOpen['${s.id}']=!${open};upgRerender()"
     style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;user-select:none;-webkit-user-select:none">
