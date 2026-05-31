@@ -1148,6 +1148,7 @@ function renderShipyard() {
     save();
   }
   const s = data.shipyard.current || {};
+  console.log('[shipyard render] current.name:', data.shipyard?.current?.name, 'history count:', data.shipyard?.history?.length);
   const isOwner = localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL;
   const exMsg = !isOwner && (data.shipyard.history?.length || data.shipyard.quotes?.length)
     ? `<div style="margin:8px 12px;font-size:12px;color:var(--label3);font-style:italic">These are examples — replace with your own data</div>` : '';
