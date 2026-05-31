@@ -3386,7 +3386,7 @@ function renderLockScreen() {
   const email  = localStorage.getItem(EMAIL_KEY);
   ov.innerHTML = `
     <div class="setup-inner" style="padding-top:calc(env(safe-area-inset-top) + 20px)">
-      <div class="setup-logo"><img src="oroboro-logo-15.jpg" alt="Oroboro" style="max-width:200px;height:auto;border-radius:8px;display:block;margin:0 auto"></div>
+      <div class="setup-logo"><img src="oroboro-logo-15.jpg" alt="Oroboro" style="max-width:220px;height:auto;display:block;margin:0 auto 24px;mix-blend-mode:multiply;"></div>
       <div style="font-size:48px;text-align:center;margin-bottom:10px">🔒</div>
       <div class="setup-h" style="text-align:center">Enter PIN</div>
       <div class="setup-sub" style="text-align:center">${email ? esc(email) : ''}</div>
@@ -3545,7 +3545,7 @@ function renderLoginScreen() {
   document.getElementById('app').classList.add('hidden');
   ov.innerHTML = `
     <div class="setup-inner" style="padding-top:calc(env(safe-area-inset-top) + 20px)">
-      <div class="setup-logo"><img src="oroboro-logo-15.jpg" alt="Oroboro" style="max-width:200px;height:auto;border-radius:8px;display:block;margin:0 auto"></div>
+      <div class="setup-logo"><img src="oroboro-logo-15.jpg" alt="Oroboro" style="max-width:220px;height:auto;display:block;margin:0 auto 24px;mix-blend-mode:multiply;"></div>
       <div class="setup-h">Boat Manager</div>
       <label class="setup-lbl">Email</label>
       <input class="setup-inp" id="login-email" type="email" placeholder="your@email.com"
