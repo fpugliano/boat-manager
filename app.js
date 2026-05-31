@@ -1810,6 +1810,11 @@ function schengenRerender() { document.getElementById('mainContent').innerHTML =
 function renderSchengen() {
   const sd = getSchengenData();
   const hasData = sd.persons.some(p=>p.name);
+  const isOwner = localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL;
+  const exampleBanner = (!isOwner && hasData) ? `
+    <div style="margin:0 12px 8px;padding:8px 12px;background:var(--surface2);border-radius:10px;font-size:12px;color:var(--label3);font-style:italic">
+      These are example travellers — tap ⚙ Edit travellers to set up your own
+    </div>` : '';
   const warnings = [];
   sd.persons.forEach(p => {
     if (!p.name) return;
@@ -1839,7 +1844,7 @@ function renderSchengen() {
       <div style="font-size:17px;font-weight:700">🛂 Schengen</div>
       <button onclick="showSchengenEdit()" style="background:var(--surface);border:1.5px solid var(--sep);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;font-family:var(--font);color:var(--label);cursor:pointer">⚙ Edit travellers</button>
     </div>
-    ${warningBanner}${emptyMsg}${statusCard}${logCard}
+    ${warningBanner}${exampleBanner}${emptyMsg}${statusCard}${logCard}
   </div>`;
 }
 
@@ -2168,30 +2173,61 @@ function prefillShipyardData() {
 }
 
 function prefillSchengenData() {
-  if (localStorage.getItem(EMAIL_KEY) !== OWNER_EMAIL) return false;
-  const fp = data.schengen?.persons?.[0];
-  const euOk = fp?.passports?.some(pp => pp.flag === '🇪🇺' && pp.eu === true);
-  const usOk = fp?.passports?.some(pp => pp.flag === '🇺🇸' && pp.eu === false);
-  if (fp?.name && euOk && usOk) return false;
+  const email = localStorage.getItem(EMAIL_KEY);
+  if (email === OWNER_EMAIL) {
+    // Owner: seed Francesco + Yuka with real data
+    const fp = data.schengen?.persons?.[0];
+    const euOk = fp?.passports?.some(pp => pp.flag === '🇪🇺' && pp.eu === true);
+    const usOk = fp?.passports?.some(pp => pp.flag === '🇺🇸' && pp.eu === false);
+    if (fp?.name && euOk && usOk) return false;
+    data.schengen = { persons: [
+      { name:'Francesco', activePassport:0,
+        passports:[
+          {flag:'🇺🇸', country:'United States',  eu:false},
+          {flag:'🇪🇺', country:'European Union', eu:true},
+          {flag:'🇯🇵', country:'Japan',          eu:false}
+        ],
+        log:[
+          {id:uid(), type:'in',  date:'2025-10-15', passport:'🇺🇸', location:'Greece (Kilada)'},
+          {id:uid(), type:'out', date:'2026-01-26', passport:'',    location:'Turkey (Didim)'},
+          {id:uid(), type:'in',  date:'2026-04-24', passport:'🇺🇸', location:'Greece (Syros)'}
+        ]
+      },
+      { name:'Yuka', activePassport:0,
+        passports:[
+          {flag:'🇺🇸', country:'United States', eu:false},
+          {flag:'🇯🇵', country:'Japan',         eu:false}
+        ],
+        log:[]
+      }
+    ]};
+    return true;
+  }
+  // Non-owner: seed example travellers if empty
+  if (data.schengen?.persons?.some(p => p.name)) return false;
   data.schengen = { persons: [
-    { name:'Francesco', activePassport:0,
-      passports:[
-        {flag:'🇺🇸', country:'United States',  eu:false},
-        {flag:'🇪🇺', country:'European Union', eu:true},
-        {flag:'🇯🇵', country:'Japan',          eu:false}
-      ],
-      log:[
-        {id:uid(), type:'in',  date:'2025-10-15', passport:'🇺🇸', location:'Greece (Kilada)'},
-        {id:uid(), type:'out', date:'2026-01-26', passport:'',    location:'Turkey (Didim)'},
-        {id:uid(), type:'in',  date:'2026-04-24', passport:'🇺🇸', location:'Greece (Syros)'}
-      ]
-    },
-    { name:'Yuka', activePassport:0,
+    { name:'Alex Smith', activePassport:0,
       passports:[
         {flag:'🇺🇸', country:'United States', eu:false},
-        {flag:'🇯🇵', country:'Japan',         eu:false}
+        {flag:'🇦🇺', country:'Australia',     eu:false}
       ],
-      log:[]
+      log:[
+        {id:uid(), type:'in',  date:'2026-03-15', passport:'🇺🇸', location:'Greece (Athens)'},
+        {id:uid(), type:'out', date:'2026-05-20', passport:'',    location:'Turkey (Bodrum)'},
+        {id:uid(), type:'in',  date:'2025-10-01', passport:'🇺🇸', location:'Spain (Barcelona)'},
+        {id:uid(), type:'out', date:'2025-12-10', passport:'',    location:'UK'}
+      ]
+    },
+    { name:'Maria Santos', activePassport:0,
+      passports:[
+        {flag:'🇬🇧', country:'United Kingdom', eu:false}
+      ],
+      log:[
+        {id:uid(), type:'in',  date:'2026-04-01', passport:'🇬🇧', location:'France (Marseille)'},
+        {id:uid(), type:'out', date:'2026-05-15', passport:'',    location:'Morocco'},
+        {id:uid(), type:'in',  date:'2025-09-15', passport:'🇬🇧', location:'Italy (Palermo)'},
+        {id:uid(), type:'out', date:'2025-11-20', passport:'',    location:'Tunisia'}
+      ]
     }
   ]};
   return true;
