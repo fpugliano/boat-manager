@@ -3787,13 +3787,13 @@ function loadBackupFile(input) {
           Enter the PIN from the account that <b>created</b> this backup to decrypt it.
         </div>
         <div style="font-size:12px;color:var(--label3);margin-bottom:12px">Your own PIN and account credentials will not be changed.</div>
-        <div class="mi-label">Backup PIN</div>
-        <input class="mi" type="number" id="bkp-pw" placeholder="4-digit PIN" maxlength="4" pattern="[0-9]*" inputmode="numeric" autofocus>
-        <div id="bkp-err" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:8px"></div>
+        <div style="text-align:center;margin:8px 0 4px">${pinBoxesHTML('bkp', 'applyBackupData')}</div>
+        <div id="bkp-err" style="color:var(--red);font-size:13px;min-height:20px;margin:4px 0 8px;text-align:center"></div>
         <div class="modal-btns">
           <button class="btn btn-s" onclick="hideModal()">Cancel</button>
           <button class="btn btn-p" id="bkp-btn" onclick="applyBackupData()">Restore</button>
         </div>`);
+      setTimeout(() => document.getElementById('bkp0')?.focus(), 80);
     } catch {
       showToast('Could not read backup file', true);
     }
@@ -3803,10 +3803,10 @@ function loadBackupFile(input) {
 }
 
 async function applyBackupData() {
-  const pin   = (document.getElementById('bkp-pw')?.value || '').trim();
+  const pin   = getPin('bkp');
   const errEl = document.getElementById('bkp-err');
   const btn   = document.getElementById('bkp-btn');
-  if (!pin) { if (errEl) errEl.textContent = 'Enter the backup PIN'; return; }
+  if (pin.length !== 4) { if (errEl) errEl.textContent = 'Enter the 4-digit backup PIN'; return; }
   if (!_pendingBackup) { if (errEl) errEl.textContent = 'No backup loaded — please try again'; return; }
   if (errEl) errEl.textContent = '';
   if (btn) { btn.textContent = 'Restoring…'; btn.disabled = true; }
