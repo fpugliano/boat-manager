@@ -1153,10 +1153,11 @@ function renderShipyard() {
 
   const quoteRows = sorted.length ? sorted.map(({q,i}) => `
     <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--sep)">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:600">${esc(q.name||'')}</div>
-        <div style="font-size:12px;color:var(--label3)">${esc(q.location||'')}</div>
+      <div style="flex-shrink:0;min-width:0;max-width:35%">
+        <div style="font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(q.name||'')}</div>
+        <div style="font-size:12px;color:var(--label3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(q.location||'')}</div>
       </div>
+      <div style="flex:1;min-width:0;font-size:12px;color:var(--label3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(q.notes||'')}</div>
       <div style="font-size:14px;font-weight:600;flex-shrink:0">${esc(q.price||'')}</div>
       <div style="flex-shrink:0;display:flex;align-items:center;gap:4px">
         <button onclick="selectQuote(${i})" style="${q.selected
