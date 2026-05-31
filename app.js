@@ -1124,6 +1124,8 @@ function shortDate(dateStr) {
 
 function renderShipyard() {
   if (!data.shipyard) data.shipyard = {current:{}, quotes:[], history:[]};
+  console.log('[shipyard debug] data.shipyard:', JSON.stringify(data.shipyard));
+  console.log('[shipyard debug] data keys:', JSON.stringify(Object.keys(data)));
   // Migrate flat structure (pre-redesign) to nested data.shipyard.current
   if (data.shipyard.name && !Object.keys(data.shipyard.current || {}).length) {
     data.shipyard.current = {
