@@ -294,16 +294,16 @@ function handleImport(input) {
     try {
       const fileJson = JSON.parse(e.target.result);
       // Ask for the password used to encrypt this export
-      showModal('Import — Enter Password', `
+      showModal('Restore Backup', `
         <div style="font-size:14px;color:var(--label2);margin-bottom:14px">
           Enter the 4-digit PIN from the account that created this backup.
         </div>
         <div class="mi-label">PIN</div>
-        <input class="mi" type="tel" id="imp-pw" placeholder="4-digit PIN" maxlength="4" autofocus>
+        <input class="mi" type="number" id="imp-pw" placeholder="4-digit PIN" maxlength="4" pattern="[0-9]*" inputmode="numeric" autofocus>
         <div id="imp-err" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:8px"></div>
         <div class="modal-btns">
           <button class="btn btn-s" onclick="hideModal()">Cancel</button>
-          <button class="btn btn-p" onclick="doImport(${JSON.stringify(JSON.stringify(fileJson))})">Import</button>
+          <button class="btn btn-p" id="imp-btn" onclick="doImport(${JSON.stringify(JSON.stringify(fileJson))})">Restore</button>
         </div>`);
     } catch { showToast('Import failed — invalid file', true); }
     input.value = '';
@@ -312,27 +312,67 @@ function handleImport(input) {
 }
 
 async function doImport(fileJsonStr) {
-  const pw = document.getElementById('imp-pw')?.value;
+  const pin   = (document.getElementById('imp-pw')?.value || '').trim();
   const errEl = document.getElementById('imp-err');
-  if (!pw) { if(errEl) errEl.textContent='Password required'; return; }
+  const btn   = document.getElementById('imp-btn');
+  if (!pin) { if (errEl) errEl.textContent = 'Enter your 4-digit PIN'; return; }
+  if (errEl) errEl.textContent = '';
+  if (btn) { btn.textContent = 'Importing…'; btn.disabled = true; }
+
   try {
     const fileJson = JSON.parse(fileJsonStr);
-    // Re-derive key using the embedded salt from the export
-    const inner   = JSON.parse(await aesDecrypt(cryptoKey, JSON.stringify(fileJson)));
-    const imp     = inner.payload;
-    deepMerge(data, imp);
+
+    // ── Full backup format: { format, salt, verify, data } ──────────
+    if (fileJson.format === 'oroboro-boat-backup-v1') {
+      if (!fileJson.salt || !fileJson.verify || !fileJson.data) throw new Error('corrupted');
+      const salt = b64ToU8(fileJson.salt);
+      const key  = await deriveKey(pin, salt);
+      // Verify PIN before attempting decrypt
+      try { await aesDecrypt(key, fileJson.verify); }
+      catch {
+        if (errEl) errEl.textContent = 'Wrong PIN — this backup was created with a different PIN';
+        if (btn) { btn.textContent = 'Restore'; btn.disabled = false; }
+        return;
+      }
+      let decrypted;
+      try { decrypted = JSON.parse(await aesDecrypt(key, fileJson.data)); }
+      catch { throw new Error('corrupted'); }
+      // Restore credentials
+      localStorage.setItem(SALT_KEY,   fileJson.salt);
+      localStorage.setItem(VERIFY_KEY, fileJson.verify);
+      if (decrypted.meta?.email) localStorage.setItem(EMAIL_KEY, decrypted.meta.email);
+      cryptoKey = key;
+      data = decrypted;
+      localStorage.setItem('bm_just_imported', Date.now());
+      await save();
+      await pushToCloud();
+      migrateData();
+      startActivityTracking();
+      hideModal();
+      document.getElementById('setupOv').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+      renderApp();
+      showToast('Backup restored successfully');
+      return;
+    }
+
+    // ── Section export format: { iv, data } ─────────────────────────
+    const salt = await getOrCreateSalt();
+    const key  = await deriveKey(pin, salt);
+    let inner;
+    try { inner = JSON.parse(await aesDecrypt(key, JSON.stringify(fileJson))); }
+    catch { throw new Error('wrong_pin'); }
+    if (!inner?.payload) throw new Error('corrupted');
+    deepMerge(data, inner.payload);
     await save();
     hideModal(); renderApp(); showToast('Data imported successfully');
+
   } catch(e) {
-    // Maybe a different password — try re-deriving from export salt
-    try {
-      const fileJson = JSON.parse(fileJsonStr);
-      const tmpSalt  = b64ToU8(JSON.parse(atob(fileJson.data.split('').slice(0,0).join(''))));
-      // Fallback: just try current key
-      throw e;
-    } catch {
-      if (errEl) errEl.textContent = 'Wrong password or corrupted file';
-    }
+    const msg = e.message === 'corrupted'
+      ? 'Backup file appears to be corrupted'
+      : 'Wrong PIN — this backup was created with a different PIN';
+    if (errEl) errEl.textContent = msg;
+    if (btn) { btn.textContent = 'Restore'; btn.disabled = false; }
   }
 }
 
