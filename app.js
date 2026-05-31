@@ -552,7 +552,7 @@ function renderSetup(setupEmail = '') {
       <div style="display:flex;align-items:flex-start;gap:10px;margin:18px 0 12px;font-size:14px;color:var(--label2);line-height:1.4">
         <input type="checkbox" id="s-consent" onchange="document.getElementById('s-go').disabled=!this.checked" style="margin-top:3px;flex-shrink:0;cursor:pointer;width:18px;height:18px">
         <div style="line-height:1.5">
-          <label for="s-consent" style="cursor:pointer">I have read and agree to the </label><button onclick="showPrivacyPolicy()" style="background:none;border:none;color:var(--blue);font-family:var(--font);font-size:14px;cursor:pointer;padding:0;text-decoration:underline;vertical-align:baseline">Privacy Policy</button>
+          <label for="s-consent" style="cursor:pointer">I have read and agree to the </label><button onclick="event.stopPropagation();showPrivacyPolicy()" style="background:none;border:none;color:var(--blue);font-family:var(--font);font-size:14px;cursor:pointer;padding:0;text-decoration:underline;vertical-align:baseline">Privacy Policy</button>
         </div>
       </div>
       <button class="setup-go" id="s-go" onclick="completeSetup()" disabled>Set Up My Boat →</button>
