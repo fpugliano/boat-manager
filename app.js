@@ -462,7 +462,7 @@ function renderAlertBar() {
 //  SETUP SCREEN
 // ═══════════════════════════════════════════════════════════
 
-function renderSetup() {
+function renderSetup(setupEmail = '') {
   const ov = document.getElementById('setupOv');
   ov.classList.remove('hidden');
   const hull = data.meta?.hullType || 'catamaran';
@@ -476,7 +476,7 @@ function renderSetup() {
       <label class="setup-lbl">Owner Name</label>
       <input class="setup-inp" id="s-owner" placeholder="e.g. John Smith" value="${esc(data.meta?.ownerName||'')}">
       <label class="setup-lbl">Email</label>
-      <input class="setup-inp" id="s-email" type="email" placeholder="your@email.com" value="${esc(data.meta?.email||'')}">
+      <input class="setup-inp" id="s-email" type="email" placeholder="your@email.com" value="${esc(setupEmail)}">
       <label class="setup-lbl">Flag / Nationality</label>
       <input class="setup-inp" id="s-flag" placeholder="e.g. USA" value="${esc(data.meta?.flag||'')}">
       <label class="setup-lbl" style="margin-bottom:10px">Hull Type</label>
@@ -3657,8 +3657,8 @@ function startNewSetupFromLogin() {
 function startNewSetup(prefillEmail = '') {
   data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS));
   if (typeof OROBORO_DATA !== 'undefined' && prefillEmail === '[EMAIL-REMOVED]@gmail.com') deepMerge(data, OROBORO_DATA);
-  if (prefillEmail) data.meta.email = prefillEmail;
-  renderSetup();
+  data.meta.email = '';
+  renderSetup(prefillEmail);
 }
 
 // ═══════════════════════════════════════════════════════════
