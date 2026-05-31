@@ -4187,9 +4187,12 @@ async function pullFromCloud() {
 }
 
 function forceResync() {
-  if (!confirm('This will clear local data and reload from cloud. You will need to enter your PIN again.')) return;
-  localStorage.removeItem(ENC_KEY);
-  location.reload();
+  showModal('Force Re-sync from Cloud', `
+    <div style="font-size:14px;color:var(--label2);line-height:1.5;margin-bottom:16px">This will clear local data and reload from cloud.<br>You will need to enter your PIN again.</div>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" style="background:var(--red)" onclick="hideModal();localStorage.removeItem('bm_enc');location.reload()">Clear &amp; Reload</button>
+    </div>`);
 }
 
 async function syncNow() {
