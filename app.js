@@ -532,7 +532,11 @@ function renderSetup(setupEmail = '') {
           <div class="hull-sub">Port + Starboard</div>
         </div>
       </div>
-      <button class="setup-go" onclick="completeSetup()">Set Up My Boat →</button>
+      <label style="display:flex;align-items:flex-start;gap:10px;margin:18px 0 12px;cursor:pointer;font-size:14px;color:var(--label2);line-height:1.4">
+        <input type="checkbox" id="s-consent" onchange="document.getElementById('s-go').disabled=!this.checked" style="margin-top:2px;flex-shrink:0">
+        <span>I have read and agree to the <button onclick="showPrivacyPolicy()" style="background:none;border:none;color:var(--blue);font-family:var(--font);font-size:14px;cursor:pointer;padding:0;text-decoration:underline">Privacy Policy</button></span>
+      </label>
+      <button class="setup-go" id="s-go" onclick="completeSetup()" disabled>Set Up My Boat →</button>
       <button onclick="renderLoginScreen()"
         style="width:100%;margin-top:14px;border:none;background:none;font-family:var(--font);
           font-size:15px;color:var(--label3);cursor:pointer;padding:10px">
@@ -3991,6 +3995,56 @@ async function syncNow() {
   if (ui.tab === 'settings') document.getElementById('mainContent').innerHTML = renderSettings();
 }
 
+function showPrivacyPolicy() {
+  showModal('Privacy Policy', `
+    <div style="font-size:13px;color:var(--label2);line-height:1.6;max-height:60vh;overflow-y:auto;padding-right:4px">
+      <div style="font-size:15px;font-weight:700;color:var(--label);margin-bottom:4px">Privacy Policy — Oroboro Boat Manager</div>
+      <div style="font-size:11px;color:var(--label3);margin-bottom:14px">Last updated: May 31, 2026</div>
+
+      <b>What this app is</b><br>
+      Oroboro Boat Manager is a personal boat management tool for sailors. It is not a commercial service open to the general public.<br><br>
+
+      <b>What data we collect</b><br>
+      Your email address (stored as an irreversible hash — we cannot read it), boat and vessel information, maintenance logs, documents and other data you enter manually. No location data, no tracking, no analytics, no advertising.<br><br>
+
+      <b>How data is stored</b><br>
+      All data is encrypted on your device using AES-256 before being transmitted. The encryption key is derived from your PIN and never leaves your device — not even the app developer can read your data. Encrypted data is stored on Cloudflare global infrastructure which may include servers outside the European Union. Since all data is end-to-end encrypted and unreadable without your PIN, this storage location does not affect the confidentiality of your information.<br><br>
+
+      <b>Who can access your data</b><br>
+      Only you with your PIN. Nobody else — not the app developer, not Cloudflare.<br><br>
+
+      <b>Your rights under GDPR</b><br>
+      • Right to access: your data is always accessible to you<br>
+      • Right to deletion: delete your account and all data permanently from Settings<br>
+      • Right to portability: export your data as JSON from Settings at any time<br><br>
+
+      <b>Data breach</b><br>
+      In the unlikely event of a security breach we will notify affected users within 72 hours.<br><br>
+
+      <b>Contact:</b> [EMAIL-REMOVED]@gmail.com
+    </div>
+    <div class="modal-btns" style="margin-top:12px">
+      <button class="btn btn-p" onclick="hideModal()">Close</button>
+    </div>`);
+}
+
+async function deleteAccount() {
+  const confirmed = confirm('This will permanently delete all your data from the cloud and log you out.\n\nThis cannot be undone. Are you sure?');
+  if (!confirmed) return;
+  try {
+    const email = localStorage.getItem(EMAIL_KEY);
+    if (email && cryptoKey) {
+      const key = await emailToKey(email);
+      await fetch(`${STORAGE_WORKER_URL}/api/data/${key}`, { method: 'DELETE' });
+    }
+  } catch(e) { console.warn('Delete account cloud error:', e); }
+  [SALT_KEY, VERIFY_KEY, ENC_KEY, HINT_KEY, EMAIL_KEY, ATTEMPTS_KEY, LAST_SYNC_KEY, BACKUP_TS].forEach(k => localStorage.removeItem(k));
+  cryptoKey = null; data = {};
+  stopAutoSync();
+  showToast('Account deleted successfully');
+  setTimeout(() => renderLoginScreen(), 1200);
+}
+
 function logOut() {
   if (!confirm('This will log you out and you may lose access to your data if you forget your PIN.\n\nAre you sure?')) return;
   [SALT_KEY, VERIFY_KEY, ENC_KEY, HINT_KEY].forEach(k => localStorage.removeItem(k));
@@ -4064,6 +4118,12 @@ function renderSettings() {
       <div class="btn-row">
         <button class="btn btn-d btn-sm" onclick="logOut()">Log out / Switch account</button>
       </div>
+      <div class="btn-row" style="border-top:1px solid var(--sep);padding-top:10px;margin-top:4px">
+        <button class="btn btn-d btn-sm" onclick="deleteAccount()">🗑 Delete My Account</button>
+      </div>
+    </div>
+    <div style="text-align:center;padding:16px 0 8px">
+      <button onclick="showPrivacyPolicy()" style="background:none;border:none;color:var(--label3);font-family:var(--font);font-size:13px;cursor:pointer;text-decoration:underline">Privacy Policy</button>
     </div>`;
 }
 
