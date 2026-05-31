@@ -1129,8 +1129,6 @@ function fmtCost(v) {
 
 function renderShipyard() {
   if (!data.shipyard) data.shipyard = {current:{}, quotes:[], history:[]};
-  console.log('[shipyard debug] data.shipyard:', JSON.stringify(data.shipyard));
-  console.log('[shipyard debug] data keys:', JSON.stringify(Object.keys(data)));
   // Migrate flat structure (pre-redesign) to nested data.shipyard.current
   if (data.shipyard.name && !Object.keys(data.shipyard.current || {}).length) {
     data.shipyard.current = {
@@ -1148,7 +1146,6 @@ function renderShipyard() {
     save();
   }
   const s = data.shipyard.current || {};
-  console.log('[shipyard render] current.name:', data.shipyard?.current?.name, 'history count:', data.shipyard?.history?.length);
   const isOwner = localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL;
   const exMsg = !isOwner && (data.shipyard.history?.length || data.shipyard.quotes?.length)
     ? `<div style="margin:8px 12px;font-size:12px;color:var(--label3);font-style:italic">These are examples — replace with your own data</div>` : '';
@@ -1234,12 +1231,7 @@ function renderShipyard() {
     </div>
     <div class="card">${histRows}</div>`;
 
-  const emailVal = localStorage.getItem('bm_email') || 'NONE';
-  const saltVal = localStorage.getItem('bm_salt') ? 'SET' : 'MISSING';
-  const encVal = localStorage.getItem('bm_enc') ? localStorage.getItem('bm_enc').length : 'MISSING';
-  const saltPreview = localStorage.getItem('bm_salt')?.substring(0,8) || 'NONE';
-  const debugBanner = `<div style="background:#ff0;color:#000;padding:8px;font-size:11px;font-family:monospace;">DEBUG: name=${data.shipyard?.current?.name||'EMPTY'} history=${data.shipyard?.history?.length||0} email=${emailVal} salt=${saltVal} enc_len=${encVal} salt_preview=${saltPreview}</div>`;
-  return debugBanner + exMsg + card1 + card2 + card3;
+  return exMsg + card1 + card2 + card3;
 }
 
 function showAddQuote() {
@@ -4172,8 +4164,6 @@ async function pullFromCloud() {
   try {
     const cloud = await fetchFromCloud(email);
     const decrypted = JSON.parse(await aesDecrypt(cryptoKey, cloud.data));
-    console.log('[pullFromCloud] decrypted keys:', Object.keys(decrypted));
-    console.log('[pullFromCloud] shipyard:', JSON.stringify(decrypted.shipyard));
     data = decrypted;
     localStorage.setItem(ENC_KEY,  cloud.data);
     localStorage.setItem(HINT_KEY, cloud.hint || '');
