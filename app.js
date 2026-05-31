@@ -132,16 +132,33 @@ function normCat(c){ if(!c) return c; if(c==='Port Engine'||c==='Starboard Engin
 function fmtSchedDate(d){ if(!d) return ''; return d.slice(5)+'/'+d.slice(2,4); } // "2026-05-30" → "05-30/26"
 let _lastSchedUndo = null;
 
+function parseISODate(str) {
+  if (!str) return null;
+  const m = String(str).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  return new Date(+m[1], +m[2]-1, +m[3]);
+}
+function fmtDateEU(isoStr) {
+  const d = parseISODate(isoStr);
+  if (!d || isNaN(d)) return isoStr || '';
+  return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+}
+function fmtDateUS(isoStr) {
+  const d = parseISODate(isoStr);
+  if (!d || isNaN(d)) return isoStr || '';
+  return String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0') + '/' + d.getFullYear();
+}
+
 function daysUntil(dateStr) {
   if (!dateStr) return 9999;
-  const d = new Date(dateStr); const now = new Date();
-  now.setHours(0,0,0,0); d.setHours(0,0,0,0);
+  const d = parseISODate(dateStr) || new Date(dateStr);
+  const now = new Date(); now.setHours(0,0,0,0); d.setHours(0,0,0,0);
   return Math.round((d - now) / 86400000);
 }
 
 function fmtDate(dateStr) {
   if (!dateStr) return '';
-  const d = new Date(dateStr);
+  const d = parseISODate(dateStr) || new Date(dateStr);
   if (isNaN(d)) return dateStr;
   return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
 }
@@ -174,7 +191,7 @@ function calcSchengen(log) {
   const win = new Date(now); win.setDate(win.getDate()-180); win.setHours(0,0,0,0);
   let days = 0;
   (log||[]).forEach(e => {
-    const entry = new Date(e.entryDate); const exit = e.exitDate ? new Date(e.exitDate) : now;
+    const entry = parseISODate(e.entryDate); const exit = e.exitDate ? parseISODate(e.exitDate) : now;
     const s = entry < win ? win : entry;
     const end = exit > now ? now : exit;
     if (s <= end) days += Math.ceil((end-s)/86400000)+1;
@@ -953,9 +970,9 @@ function renderCrewCard(p, i) {
             <table class="tbl"><thead><tr><th>Entry</th><th>Exit</th><th>Country</th><th>Days</th><th></th></tr></thead>
             <tbody>${(p.schengenLog||[]).map((e,j)=>`
               <tr>
-                <td>${esc(e.entryDate)}</td><td>${esc(e.exitDate||'—')}</td>
+                <td>${esc(fmtDateUS(e.entryDate))}</td><td>${e.exitDate?esc(fmtDateUS(e.exitDate)):'—'}</td>
                 <td>${esc(e.country)}</td>
-                <td>${e.exitDate?Math.ceil((new Date(e.exitDate)-new Date(e.entryDate))/86400000)+1:'ongoing'}</td>
+                <td>${e.exitDate?Math.ceil((parseISODate(e.exitDate)-parseISODate(e.entryDate))/86400000)+1:'ongoing'}</td>
                 <td><button class="btn btn-d btn-xs" onclick="removeSchengen(${i},${j})">✕</button></td>
               </tr>`).join('') || '<tr><td colspan="5" style="color:var(--label3);padding:12px">No entries</td></tr>'}
             </tbody></table>
@@ -1425,7 +1442,7 @@ function calcMaintStatus(task, eid) {
   const entry    = lastMaintEntry(task.id, eid);
   if (task.intDays) {
     if (!entry) return { color:'red', label:'Never done' };
-    const daysLeft = Math.ceil((new Date(entry.date).getTime() + task.intDays*86400000 - Date.now()) / 86400000);
+    const daysLeft = Math.ceil(((parseISODate(entry.date)||new Date(entry.date)).getTime() + task.intDays*86400000 - Date.now()) / 86400000);
     const color = daysLeft <= 0 ? 'red' : daysLeft <= task.intDays*0.25 ? 'orange' : 'green';
     return { color, label: daysLeft <= 0 ? `${Math.abs(daysLeft)}d overdue` : `${daysLeft}d left` };
   }
@@ -1805,9 +1822,9 @@ function calcSchengenDays(log) {
   const sorted = [...(log||[])].sort((a,b)=>a.date.localeCompare(b.date));
   let days = 0, inDate = null;
   for (const e of sorted) {
-    if (e.type==='in') { inDate = new Date(e.date); }
+    if (e.type==='in') { inDate = parseISODate(e.date); }
     else if (e.type==='out' && inDate) {
-      const out = new Date(e.date);
+      const out = parseISODate(e.date);
       const s = inDate < windowStart ? windowStart : inDate;
       const end = out > today ? today : out;
       if (s <= end) days += Math.round((end-s)/86400000)+1;
@@ -3299,7 +3316,7 @@ function renderTLStamps(log, archived) {
       <td style="white-space:nowrap"><button class="btn btn-p btn-xs" onclick="saveTLStampEdit('${s.id}')">Save</button> <button class="btn btn-s btn-xs" onclick="ui.tlEditStampId=null;document.getElementById('mainContent').innerHTML=renderDocuments()">✕</button></td></tr>`;
     const typeCls = s.type==='Arrival'?'b-green':s.type==='Departure'?'b-red':'b-orange';
     const acts = archived ? '' : `<button onclick="startTLStampEdit('${s.id}')" style="background:none;border:none;padding:4px;cursor:pointer;font-size:13px;color:var(--label3)">✏️</button><button onclick="deleteTLStamp('${s.id}')" style="background:none;border:none;padding:4px;cursor:pointer;font-size:13px;color:var(--label3)">✕</button>`;
-    return `<tr><td style="white-space:nowrap;font-size:13px">${esc(s.date)}</td><td style="font-size:13px">${esc(s.port)}</td>
+    return `<tr><td style="white-space:nowrap;font-size:13px">${esc(fmtDateEU(s.date))}</td><td style="font-size:13px">${esc(s.port)}</td>
       <td><span class="badge ${typeCls}" style="font-size:10px">${esc(s.type)}</span></td>
       <td style="font-size:12px;color:var(--label2)">${esc(s.authority||'')}</td>
       <td style="font-size:12px;color:var(--label2)">${esc(s.notes||'')}</td>
