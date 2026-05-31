@@ -1213,6 +1213,8 @@ function showAddQuote() {
     <div class="mi-label">Shipyard Name</div><input class="mi" id="m-sn" placeholder="Name" autofocus>
     <div class="mi-label">Location</div><input class="mi" id="m-sl" placeholder="City, Country">
     <div class="mi-label">Cost quoted</div><input class="mi" id="m-sp" placeholder="€ 0,000">
+    <div class="mi-label">Start date</div><input class="mi" id="m-qsd" type="date">
+    <div class="mi-label">End date</div><input class="mi" id="m-qed" type="date">
     <div class="mi-label">Notes</div><input class="mi" id="m-snotes" placeholder="Optional">
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
@@ -1226,6 +1228,8 @@ function saveQuote() {
     id:uid(), name:document.getElementById('m-sn').value,
     location:document.getElementById('m-sl').value,
     price:document.getElementById('m-sp').value,
+    startDate:document.getElementById('m-qsd').value,
+    endDate:document.getElementById('m-qed').value,
     notes:document.getElementById('m-snotes').value, selected:false
   });
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderShipyard();
@@ -1236,6 +1240,8 @@ function editQuote(i) {
     <div class="mi-label">Shipyard Name</div><input class="mi" id="m-sn" value="${esc(q.name||'')}" autofocus>
     <div class="mi-label">Location</div><input class="mi" id="m-sl" value="${esc(q.location||'')}">
     <div class="mi-label">Cost quoted</div><input class="mi" id="m-sp" value="${esc(q.price||'')}">
+    <div class="mi-label">Start date</div><input class="mi" id="m-qsd" type="date" value="${esc(q.startDate||'')}">
+    <div class="mi-label">End date</div><input class="mi" id="m-qed" type="date" value="${esc(q.endDate||'')}">
     <div class="mi-label">Notes</div><input class="mi" id="m-snotes" value="${esc(q.notes||'')}">
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
@@ -1244,10 +1250,12 @@ function editQuote(i) {
 }
 function saveEditQuote(i) {
   const q = data.shipyard?.quotes?.[i]; if (!q) return;
-  q.name     = document.getElementById('m-sn').value;
-  q.location = document.getElementById('m-sl').value;
-  q.price    = document.getElementById('m-sp').value;
-  q.notes    = document.getElementById('m-snotes').value;
+  q.name      = document.getElementById('m-sn').value;
+  q.location  = document.getElementById('m-sl').value;
+  q.price     = document.getElementById('m-sp').value;
+  q.startDate = document.getElementById('m-qsd').value;
+  q.endDate   = document.getElementById('m-qed').value;
+  q.notes     = document.getElementById('m-snotes').value;
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderShipyard();
 }
 function selectQuote(i) {
@@ -1257,13 +1265,17 @@ function selectQuote(i) {
   data.shipyard.quotes.forEach((qq,j) => qq.selected = (j===i ? !wasSelected : false));
   if (!data.shipyard.current) data.shipyard.current = {};
   if (!wasSelected) {
-    if (q.name)     data.shipyard.current.name       = q.name;
-    if (q.location) data.shipyard.current.location   = q.location;
-    if (q.price)    data.shipyard.current.actualCost  = q.price;
+    if (q.name)      data.shipyard.current.name       = q.name;
+    if (q.location)  data.shipyard.current.location   = q.location;
+    if (q.price)     data.shipyard.current.actualCost = q.price;
+    if (q.startDate) data.shipyard.current.startDate  = q.startDate;
+    if (q.endDate)   data.shipyard.current.endDate    = q.endDate;
   } else {
-    if (data.shipyard.current.name       === q.name)     data.shipyard.current.name       = '';
-    if (data.shipyard.current.location   === q.location) data.shipyard.current.location   = '';
-    if (data.shipyard.current.actualCost === q.price)    data.shipyard.current.actualCost  = '';
+    if (data.shipyard.current.name       === q.name)      data.shipyard.current.name       = '';
+    if (data.shipyard.current.location   === q.location)  data.shipyard.current.location   = '';
+    if (data.shipyard.current.actualCost === q.price)     data.shipyard.current.actualCost = '';
+    if (data.shipyard.current.startDate  === q.startDate) data.shipyard.current.startDate  = '';
+    if (data.shipyard.current.endDate    === q.endDate)   data.shipyard.current.endDate    = '';
   }
   save(); document.getElementById('mainContent').innerHTML = renderShipyard();
 }
