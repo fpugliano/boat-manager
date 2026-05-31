@@ -1666,8 +1666,8 @@ function renderSchengen() {
     </div>` : '';
   const statusCard = hasData ? `
     <div style="margin:0 12px 10px;background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;overflow:hidden">
-      <div style="display:grid;grid-template-columns:1fr 1fr">
-        ${sd.persons.map((p,i)=>renderSchengenPersonStatus(p,i)).join('<div style="width:1px;background:var(--sep)"></div>')}
+      <div style="display:grid;grid-template-columns:1fr 1fr;min-height:0">
+        ${sd.persons.map((p,i)=>renderSchengenPersonStatus(p,i)).join('')}
       </div>
     </div>` : '';
   const logCard = hasData ? renderSchengenLog(sd) : '';
@@ -1681,42 +1681,47 @@ function renderSchengen() {
 }
 
 function renderSchengenPersonStatus(p, idx) {
-  const activePass = p.passports?.[p.activePassport||0];
-  const isEU = activePass?.eu;
+  const activePassIdx = p.activePassport || 0;
+  const activePass = p.passports?.[activePassIdx];
+  const isEU = activePass?.eu === true;
   const {days} = calcSchengenDays(p.log);
-  const remaining = Math.max(0, 90-days);
+  const remaining = Math.max(0, 90 - days);
   const inStatus = isCurrentlyInSchengen(p.log);
   const circleColor = remaining > 30 ? 'var(--green)' : remaining > 10 ? 'var(--orange)' : 'var(--red)';
-  const exitBy = new Date(); exitBy.setDate(exitBy.getDate()+remaining);
-  const exitByStr = exitBy.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  const exitBy = new Date(); exitBy.setDate(exitBy.getDate() + remaining);
+  const exitByStr = exitBy.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
   const exitByColor = remaining < 30 ? 'var(--red)' : 'var(--green)';
-  const passportBtns = (p.passports||[]).map((pp,pi)=>`
-    <button onclick="setSchengenPassport(${idx},${pi})" style="background:${pi===(p.activePassport||0)?'var(--blue)':'var(--surface2)'};border:1.5px solid ${pi===(p.activePassport||0)?'var(--blue)':'var(--sep)'};border-radius:8px;padding:4px 8px;font-size:16px;cursor:pointer;line-height:1">${pp.flag}</button>`).join('');
-  return `<div style="padding:14px 12px">
-    <div style="font-size:14px;font-weight:700;margin-bottom:6px">${esc(p.name||'—')}</div>
-    <div style="margin-bottom:8px"><span style="background:${inStatus?'var(--green)':'var(--sep)'};color:${inStatus?'#fff':'var(--label2)'};font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">${inStatus?'In Schengen':'Outside'}</span></div>
-    ${isEU ? `<div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:10px">🇪🇺 EU Passport · No limit</div>` : `
-      <div style="display:flex;justify-content:center;margin-bottom:10px">
-        <div style="width:64px;height:64px;border-radius:50%;border:4px solid ${circleColor};display:flex;flex-direction:column;align-items:center;justify-content:center">
-          <div style="font-size:18px;font-weight:800;color:${circleColor};line-height:1">${remaining}</div>
+  const borderRight = idx === 0 ? 'border-right:1px solid var(--sep);' : '';
+  const passportBtns = (p.passports||[]).map((pp, pi) => {
+    const label = [pp.flag, pp.country ? pp.country.slice(0,3) : ''].filter(Boolean).join(' ') || '?';
+    const active = pi === activePassIdx;
+    return `<button onclick="setSchengenPassport(${idx},${pi})" style="background:${active?'var(--blue)':'var(--surface2)'};color:${active?'#fff':'var(--label)'};border:1.5px solid ${active?'var(--blue)':'var(--sep)'};border-radius:8px;padding:4px 7px;font-size:12px;cursor:pointer;line-height:1.4;font-family:var(--font)">${label}</button>`;
+  }).join('');
+  return `<div style="padding:14px 10px;${borderRight}">
+    <div style="font-size:13px;font-weight:700;margin-bottom:6px">${esc(p.name||'—')}</div>
+    <div style="margin-bottom:8px"><span style="background:${inStatus?'var(--green)':'var(--sep)'};color:${inStatus?'#fff':'var(--label2)'};font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">${inStatus?'In Schengen':'Outside'}</span></div>
+    ${isEU ? `<div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:10px">🇪🇺 EU Passport · No limit</div>` : `
+      <div style="display:flex;justify-content:center;margin-bottom:8px">
+        <div style="width:60px;height:60px;border-radius:50%;border:4px solid ${circleColor};display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <div style="font-size:17px;font-weight:800;color:${circleColor};line-height:1">${remaining}</div>
           <div style="font-size:9px;color:var(--label3);line-height:1.2">days left</div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
-        <div style="background:var(--surface2);border-radius:8px;padding:6px;text-align:center">
-          <div style="font-size:15px;font-weight:700">${days}</div>
-          <div style="font-size:10px;color:var(--label3)">Days Used</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px">
+        <div style="background:var(--surface2);border-radius:8px;padding:5px;text-align:center">
+          <div style="font-size:14px;font-weight:700">${days}</div>
+          <div style="font-size:9px;color:var(--label3)">Used</div>
         </div>
-        <div style="background:var(--surface2);border-radius:8px;padding:6px;text-align:center">
-          <div style="font-size:15px;font-weight:700;color:${circleColor}">${remaining}</div>
-          <div style="font-size:10px;color:var(--label3)">Days Left</div>
+        <div style="background:var(--surface2);border-radius:8px;padding:5px;text-align:center">
+          <div style="font-size:14px;font-weight:700;color:${circleColor}">${remaining}</div>
+          <div style="font-size:9px;color:var(--label3)">Left</div>
         </div>
       </div>
-      <div style="font-size:11px;color:var(--label3);margin-bottom:8px;text-align:center">Exit by <span style="color:${exitByColor};font-weight:600">${exitByStr}</span></div>`}
-    <div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap">${passportBtns}</div>
-    <div style="display:flex;gap:6px">
-      <button onclick="showSchengenCheckIn(${idx})" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 4px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">Check In</button>
-      <button onclick="showSchengenCheckOut(${idx})" style="flex:1;background:var(--surface2);color:var(--label);border:1.5px solid var(--sep);border-radius:8px;padding:7px 4px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">Check Out</button>
+      <div style="font-size:10px;color:var(--label3);margin-bottom:8px;text-align:center">Exit by <span style="color:${exitByColor};font-weight:600">${exitByStr}</span></div>`}
+    <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap">${passportBtns}</div>
+    <div style="display:flex;gap:5px">
+      <button onclick="showSchengenCheckIn(${idx})" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 2px;font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer">Check In</button>
+      <button onclick="showSchengenCheckOut(${idx})" style="flex:1;background:var(--surface2);color:var(--label);border:1.5px solid var(--sep);border-radius:8px;padding:7px 2px;font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer">Check Out</button>
     </div>
   </div>`;
 }
@@ -1756,9 +1761,10 @@ function setSchengenPassport(personIdx, passportIdx) {
 function showSchengenCheckIn(personIdx) {
   const sd = getSchengenData();
   const p = sd.persons[personIdx];
-  const passOpts = (p.passports||[]).map((pp,i)=>`<option value="${i}" ${i===(p.activePassport||0)?'selected':''}>${pp.flag} ${esc(pp.country)}</option>`).join('');
-  showModal('Check In to Schengen', `
-    <div class="mi-label">Date</div><input class="mi" id="sch-date" type="date" value="${new Date().toISOString().slice(0,10)}">
+  const activeIdx = p.activePassport || 0;
+  const passOpts = (p.passports||[]).map((pp,i)=>`<option value="${i}" ${i===activeIdx?'selected':''}>${[pp.flag, pp.country].filter(Boolean).join(' ') || 'Passport '+(i+1)}</option>`).join('');
+  showModal(`Check In — ${esc(p.name||'Person '+(personIdx+1))}`, `
+    <div class="mi-label">Date</div><input class="mi" id="sch-date" type="date" value="${new Date().toISOString().slice(0,10)}" autofocus>
     <div class="mi-label">Passport</div><select class="mi" id="sch-pass">${passOpts}</select>
     <div class="mi-label">Location / Country</div><input class="mi" id="sch-loc" placeholder="e.g. Greece (Athens)">
     <div class="modal-btns">
@@ -1781,8 +1787,10 @@ function saveSchengenCheckIn(personIdx) {
 }
 
 function showSchengenCheckOut(personIdx) {
-  showModal('Check Out of Schengen', `
-    <div class="mi-label">Date</div><input class="mi" id="sch-date" type="date" value="${new Date().toISOString().slice(0,10)}">
+  const sd = getSchengenData();
+  const p = sd.persons[personIdx];
+  showModal(`Check Out — ${esc(p?.name||'Person '+(personIdx+1))}`, `
+    <div class="mi-label">Date</div><input class="mi" id="sch-date" type="date" value="${new Date().toISOString().slice(0,10)}" autofocus>
     <div class="mi-label">Destination</div><input class="mi" id="sch-loc" placeholder="e.g. Turkey (Istanbul)">
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
@@ -1837,13 +1845,13 @@ function showSchengenEdit() {
   const sd = getSchengenData();
   const personsHtml = sd.persons.map((p,i) => {
     const passHtml = (p.passports||[]).map((pp,pi)=>`
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <input class="fi" style="width:44px;font-size:16px;text-align:center" value="${esc(pp.flag)}" id="sch-pflag-${i}-${pi}" placeholder="🏳️">
-        <input class="fi" style="flex:1;font-size:13px" value="${esc(pp.country)}" id="sch-pcountry-${i}-${pi}" placeholder="Country">
-        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--label3);white-space:nowrap">
-          <input type="checkbox" id="sch-peu-${i}-${pi}" ${pp.eu?'checked':''}> EU
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <input class="fi" style="width:46px;font-size:16px;text-align:center" value="${esc(pp.flag||'')}" id="sch-pflag-${i}-${pi}" placeholder="🏳️">
+        <input class="fi" style="flex:1;font-size:13px" value="${esc(pp.country||'')}" id="sch-pcountry-${i}-${pi}" placeholder="Country (e.g. US)">
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--label3);white-space:nowrap;cursor:pointer">
+          <input type="checkbox" id="sch-peu-${i}-${pi}" ${pp.eu===true?'checked':''}> EU passport
         </label>
-        <button onclick="removeSchengenPassport(${i},${pi})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0 4px;font-family:var(--font)">✕</button>
+        <button onclick="removeSchengenPassport(${i},${pi})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:15px;padding:0 4px;font-family:var(--font)">✕</button>
       </div>`).join('');
     return `
       <div class="mi-label">Person ${i+1} Name</div>
@@ -1892,7 +1900,9 @@ function saveSchengenEdit() {
 
 function prefillSchengenData() {
   if (localStorage.getItem(EMAIL_KEY) !== '[EMAIL-REMOVED]@gmail.com') return false;
-  if (data.schengen?.persons?.some(p=>p.name)) return false;
+  // Skip if data looks correct: Francesco has name AND has at least one EU=false passport
+  const fp = data.schengen?.persons?.[0];
+  if (fp?.name && fp?.passports?.some(pp => pp.eu === false)) return false;
   data.schengen = { persons: [
     { name:'Francesco', activePassport:0,
       passports:[{flag:'🇺🇸',country:'US',eu:false},{flag:'🇮🇹',country:'Italy',eu:true},{flag:'🇯🇵',country:'Japan',eu:false}],
