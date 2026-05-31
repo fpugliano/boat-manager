@@ -1124,6 +1124,22 @@ function shortDate(dateStr) {
 
 function renderShipyard() {
   if (!data.shipyard) data.shipyard = {current:{}, quotes:[], history:[]};
+  // Migrate flat structure (pre-redesign) to nested data.shipyard.current
+  if (data.shipyard.name && !Object.keys(data.shipyard.current || {}).length) {
+    data.shipyard.current = {
+      name:         data.shipyard.name,
+      location:     data.shipyard.location,
+      startDate:    data.shipyard.startDate,
+      endDate:      data.shipyard.endDate,
+      actualCost:   data.shipyard.actualCost || data.shipyard.cost,
+      depositPaid:  data.shipyard.depositPaid,
+      balanceDue:   data.shipyard.balanceDue,
+      notes:        data.shipyard.notes,
+    };
+    ['name','location','startDate','endDate','actualCost','cost','depositPaid','balanceDue','notes']
+      .forEach(k => delete data.shipyard[k]);
+    save();
+  }
   const s = data.shipyard.current || {};
   const isOwner = localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL;
   const exMsg = !isOwner && (data.shipyard.history?.length || data.shipyard.quotes?.length)
