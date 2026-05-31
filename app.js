@@ -2025,7 +2025,7 @@ function saveSchengenEdit() {
 }
 
 function prefillSchengenData() {
-  if (localStorage.getItem(EMAIL_KEY) !== '[EMAIL-REMOVED]@gmail.com') return false;
+  if (localStorage.getItem(EMAIL_KEY) !== OWNER_EMAIL) return false;
   const fp = data.schengen?.persons?.[0];
   const euOk = fp?.passports?.some(pp => pp.flag === '🇪🇺' && pp.eu === true);
   const usOk = fp?.passports?.some(pp => pp.flag === '🇺🇸' && pp.eu === false);
@@ -2211,7 +2211,7 @@ function saveEditedPart(idx) {
 // ═══════════════════════════════════════════════════════════
 
 function getUpgradesData() {
-  const isOwner = localStorage.getItem(EMAIL_KEY) === '[EMAIL-REMOVED]@gmail.com';
+  const isOwner = localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL;
   if (!data.upgrades || !data.upgrades.seasons || (isOwner && data.upgrades.seasons.length < 5)) {
     const mk = (text, cost, done) => ({id:uid(), text, cost:cost||'', checked:!!done});
     if (isOwner) {
@@ -2293,7 +2293,7 @@ function renderUpgrades() {
   if (!ui.upgAddItem) ui.upgAddItem = null;
   if (!ui.upgConfirmDel) ui.upgConfirmDel = null;
   const wd = getUpgradesData();
-  const isOwner = localStorage.getItem(EMAIL_KEY) === '[EMAIL-REMOVED]@gmail.com';
+  const isOwner = localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL;
 
   // Grand total across all seasons
   let grandTotal = 0;
@@ -2477,7 +2477,7 @@ function prefillUpgradesData() {
     getUpgradesData();
     return true;
   }
-  if (localStorage.getItem(EMAIL_KEY) !== '[EMAIL-REMOVED]@gmail.com') return false;
+  if (localStorage.getItem(EMAIL_KEY) !== OWNER_EMAIL) return false;
   if (data.upgrades?.version >= UPGRADES_DATA_VERSION) return false;
   delete data.upgrades;
   getUpgradesData();
@@ -2653,7 +2653,7 @@ function buildWinterSectionItems(sid, preChecked) {
 
 function getWinterData() {
   if (!data.winterization) {
-    const isOwner = localStorage.getItem(EMAIL_KEY) === '[EMAIL-REMOVED]@gmail.com';
+    const isOwner = localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL;
     const mk = (text) => ({id:uid(), text, asterisk:false, checked:false, group:null});
     let sections;
     if (isOwner) {
@@ -3209,7 +3209,7 @@ function archiveTransitLog() {
 }
 
 function prefillCustomsOwnerData() {
-  if (localStorage.getItem(EMAIL_KEY) !== '[EMAIL-REMOVED]@gmail.com') return false;
+  if (localStorage.getItem(EMAIL_KEY) !== OWNER_EMAIL) return false;
   if (!data.documents?.customs) return false;
   const C = data.documents.customs;
   let dirty = false;
@@ -3230,7 +3230,7 @@ function prefillCustomsOwnerData() {
 }
 
 function prefillTransitLog() {
-  if (localStorage.getItem(EMAIL_KEY) !== '[EMAIL-REMOVED]@gmail.com') return false;
+  if (localStorage.getItem(EMAIL_KEY) !== OWNER_EMAIL) return false;
   const wd = getTLData();
   const log = wd.logs[wd.currentLog];
   if (!log || log.archived || log.docNumber) return false;
@@ -3247,7 +3247,7 @@ function prefillTransitLog() {
   f('loa','11.9m');                    f('yearBuilt','2018');
   f('yearFirstReg','2018');            f('ownerName','[NAME-REMOVED]');
   f('holderName','[NAME-REMOVED]'); f('address','[ADDRESS-REMOVED]');
-  f('telephone','0');                  f('email','[EMAIL-REMOVED]@gmail.com');
+  f('telephone','0');                  f('email',OWNER_EMAIL);
   f('afm','[AFM-REMOVED]');          f('idNumber','30');
   if (!log.stamps.length) {
     log.stamps = [
@@ -3764,7 +3764,7 @@ function startNewSetupFromLogin() {
 
 function startNewSetup(prefillEmail = '') {
   data = JSON.parse(JSON.stringify(EMPTY_DEFAULTS));
-  if (typeof OROBORO_DATA !== 'undefined' && prefillEmail === '[EMAIL-REMOVED]@gmail.com') deepMerge(data, OROBORO_DATA);
+  if (typeof OROBORO_DATA !== 'undefined' && prefillEmail === OWNER_EMAIL) deepMerge(data, OROBORO_DATA);
   data.meta.email = '';
   renderSetup(prefillEmail);
 }
