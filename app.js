@@ -18,8 +18,9 @@ const LAST_SYNC_KEY = 'bm_last_sync';
 
 // ── Crypto runtime state (memory only — never persisted) ───────
 let cryptoKey    = null;   // CryptoKey object; null = locked
-let lastActivity = 0;
-let lockTimer    = null;
+let lastActivity   = 0;
+let lockTimer      = null;
+let _autoSyncTimer = null;
 const LOCK_MS    = 5 * 60 * 1000;  // auto-lock after 5 min idle
 const MAX_FAILS  = 5;              // attempts before lockout
 const LOCKOUT_MS = 30 * 1000;      // lockout duration
@@ -3311,6 +3312,31 @@ async function attemptUnlock() {
 
 function resetActivity() { lastActivity = Date.now(); }
 
+async function silentPull() {
+  if (!cryptoKey) return;
+  const pulled = await pullFromCloud();
+  if (pulled) { migrateData(); renderApp(); }
+}
+
+async function onVisibilityChange() {
+  if (document.visibilityState !== 'visible' || !cryptoKey) return;
+  const rawTs = localStorage.getItem(LAST_SYNC_KEY);
+  if (rawTs && Date.now() - new Date(rawTs).getTime() < 60000) return;
+  await silentPull();
+}
+
+function startAutoSync() {
+  if (_autoSyncTimer) clearInterval(_autoSyncTimer);
+  _autoSyncTimer = setInterval(silentPull, 3 * 60 * 1000);
+  document.removeEventListener('visibilitychange', onVisibilityChange);
+  document.addEventListener('visibilitychange', onVisibilityChange);
+}
+
+function stopAutoSync() {
+  if (_autoSyncTimer) { clearInterval(_autoSyncTimer); _autoSyncTimer = null; }
+  document.removeEventListener('visibilitychange', onVisibilityChange);
+}
+
 function startActivityTracking() {
   lastActivity = Date.now();
   document.addEventListener('click',      resetActivity, true);
@@ -3320,11 +3346,13 @@ function startActivityTracking() {
   lockTimer = setInterval(() => {
     if (Date.now() - lastActivity > LOCK_MS) lockApp();
   }, 15000);
+  startAutoSync();
 }
 
 function lockApp() {
   cryptoKey = null; data = {};
   if (lockTimer) { clearInterval(lockTimer); lockTimer = null; }
+  stopAutoSync();
   document.removeEventListener('click',      resetActivity, true);
   document.removeEventListener('keydown',    resetActivity, true);
   document.removeEventListener('touchstart', resetActivity, true);
@@ -3752,12 +3780,22 @@ function logOut() {
   renderLoginScreen();
 }
 
+function timeAgo(isoStr) {
+  if (!isoStr) return 'Never';
+  const secs = Math.round((Date.now() - new Date(isoStr).getTime()) / 1000);
+  if (secs < 10)   return 'Just now';
+  if (secs < 60)   return `${secs}s ago`;
+  if (secs < 3600) return `${Math.floor(secs/60)} min ago`;
+  if (secs < 86400) return `${Math.floor(secs/3600)} hr ago`;
+  return new Date(isoStr).toLocaleDateString();
+}
+
 function renderSettings() {
   const email = localStorage.getItem(EMAIL_KEY) || '—';
   const syncColors = {synced:'var(--green)',syncing:'var(--orange)',offline:'var(--red)',idle:'var(--label3)'};
   const syncLabels = {synced:'Synced ✓',syncing:'Syncing…',offline:'Offline / error',idle:'Not synced yet'};
   const rawTs = localStorage.getItem(LAST_SYNC_KEY);
-  const lastSync = rawTs ? new Date(rawTs).toLocaleString() : 'Never';
+  const lastSync = timeAgo(rawTs);
   return `
     <div class="sec-hd">Cloud Sync</div>
     <div class="card">
