@@ -415,6 +415,14 @@ function handleJsonImport(input) {
       // Merge everything else (documents, crew, transitLog, spareParts, etc.)
       const rest = Object.assign({}, json);
       delete rest.maintenance;
+      // Append systems without replacing — avoid duplicates by id
+      if (Array.isArray(rest.systems)) {
+        const existing = data.systems || [];
+        const existingIds = new Set(existing.map(s => s.id).filter(Boolean));
+        const newItems = rest.systems.filter(s => !s.id || !existingIds.has(s.id));
+        data.systems = [...existing, ...newItems];
+        delete rest.systems;
+      }
       if (Object.keys(rest).length > 0) deepMerge(data, rest);
 
       await save();
