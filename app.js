@@ -296,10 +296,10 @@ function handleImport(input) {
       // Ask for the password used to encrypt this export
       showModal('Import — Enter Password', `
         <div style="font-size:14px;color:var(--label2);margin-bottom:14px">
-          Enter the password that was used when this backup was exported.
+          Enter the 4-digit PIN from the account that created this backup.
         </div>
-        <div class="mi-label">Password</div>
-        <input class="mi" type="password" id="imp-pw" placeholder="Export password" autofocus>
+        <div class="mi-label">PIN</div>
+        <input class="mi" type="tel" id="imp-pw" placeholder="4-digit PIN" maxlength="4" autofocus>
         <div id="imp-err" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:8px"></div>
         <div class="modal-btns">
           <button class="btn btn-s" onclick="hideModal()">Cancel</button>
