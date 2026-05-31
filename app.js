@@ -1234,7 +1234,10 @@ function renderShipyard() {
     </div>
     <div class="card">${histRows}</div>`;
 
-  const debugBanner = `<div style="background:#ff0;color:#000;padding:8px;font-size:11px;font-family:monospace;">DEBUG: name=${data.shipyard?.current?.name||'EMPTY'} history=${data.shipyard?.history?.length||0} keys=${Object.keys(data.shipyard||{}).join(',')}</div>`;
+  const emailVal = localStorage.getItem('bm_email') || 'NONE';
+  const saltVal = localStorage.getItem('bm_salt') ? 'SET' : 'MISSING';
+  const encVal = localStorage.getItem('bm_enc') ? localStorage.getItem('bm_enc').length : 'MISSING';
+  const debugBanner = `<div style="background:#ff0;color:#000;padding:8px;font-size:11px;font-family:monospace;">DEBUG: name=${data.shipyard?.current?.name||'EMPTY'} history=${data.shipyard?.history?.length||0} email=${emailVal} salt=${saltVal} enc_len=${encVal}</div>`;
   return debugBanner + exMsg + card1 + card2 + card3;
 }
 
