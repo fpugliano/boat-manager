@@ -384,7 +384,7 @@ function handleJsonImport(input) {
     try {
       const json = JSON.parse(e.target.result);
       if (typeof json !== 'object' || Array.isArray(json) || json === null) throw new Error('Expected a JSON object');
-      const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2'];
+      const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2','shipyard'];
       if (!KNOWN.some(k => k in json)) throw new Error('No recognised fields found (expected: documents, crew, maintenance, transitLog, etc.)');
 
       // Handle maintenance separately — flat import format (engineHours, log[])
