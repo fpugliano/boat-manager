@@ -1159,9 +1159,9 @@ function renderShipyard() {
       </div>
       <div style="font-size:14px;font-weight:600;flex-shrink:0">${esc(q.price||'')}</div>
       <div style="flex-shrink:0;display:flex;align-items:center;gap:4px">
-        ${q.selected
-          ? `<span style="background:var(--green);color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:10px">✓ Selected</span>`
-          : `<button onclick="selectQuote(${i})" style="background:var(--surface2);border:1.5px solid var(--sep);border-radius:10px;padding:3px 10px;font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label2)">Select</button>`}
+        <button onclick="selectQuote(${i})" style="${q.selected
+          ? 'background:var(--green);color:#fff;border:none;border-radius:10px;padding:3px 10px;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer'
+          : 'background:var(--surface2);color:var(--label2);border:1.5px solid var(--sep);border-radius:10px;padding:3px 10px;font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer'}">${q.selected ? '✓ Selected' : 'Select'}</button>
         <button onclick="editQuote(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3)">✏️</button>
         <button onclick="removeQuote(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3)">✕</button>
       </div>
