@@ -609,7 +609,7 @@ function renderApp() {
   app.innerHTML = `
     <div class="hdr">
       <div class="hdr-content">
-        ${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:24px">⚓</div>'}
+        ${logoSrc ? `<img src="${logoSrc}" alt="Oroboro" style="mix-blend-mode:screen">` : '<div style="font-size:24px">⚓</div>'}
         <div class="hdr-sub">Boat Manager — ${esc(data.meta.boatName||'My Boat')}</div>
         <span id="sync-dot" class="sync-dot" onclick="pushToCloud()" title="Not synced">●</span>
         <button onclick="lockApp()" title="Lock app" style="position:absolute;right:14px;top:50%;
