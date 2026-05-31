@@ -1841,22 +1841,58 @@ function deleteSchengenEntry(personIdx, entryId) {
   save(); schengenRerender();
 }
 
+const SCHENGEN_PASSPORT_OPTS = [
+  {key:'eu', flag:'🇪🇺', country:'European Union', eu:true},
+  {key:'us', flag:'🇺🇸', country:'United States',  eu:false},
+  {key:'jp', flag:'🇯🇵', country:'Japan',          eu:false},
+  {key:'gb', flag:'🇬🇧', country:'United Kingdom', eu:false},
+  {key:'au', flag:'🇦🇺', country:'Australia',      eu:false},
+  {key:'nz', flag:'🇳🇿', country:'New Zealand',    eu:false},
+  {key:'ca', flag:'🇨🇦', country:'Canada',         eu:false},
+  {key:'other', flag:'', country:'Other (type manually)', eu:false},
+];
+const SCHENGEN_FLAG_TO_KEY = {'🇪🇺':'eu','🇺🇸':'us','🇯🇵':'jp','🇬🇧':'gb','🇦🇺':'au','🇳🇿':'nz','🇨🇦':'ca'};
+const SCHENGEN_PASSPORT_MAP = {
+  eu:  {flag:'🇪🇺', country:'European Union', eu:true},
+  us:  {flag:'🇺🇸', country:'United States',  eu:false},
+  jp:  {flag:'🇯🇵', country:'Japan',          eu:false},
+  gb:  {flag:'🇬🇧', country:'United Kingdom', eu:false},
+  au:  {flag:'🇦🇺', country:'Australia',      eu:false},
+  nz:  {flag:'🇳🇿', country:'New Zealand',    eu:false},
+  ca:  {flag:'🇨🇦', country:'Canada',         eu:false},
+};
+
+function schengenPassSelChange(i, pi) {
+  const sel = document.getElementById(`sch-psel-${i}-${pi}`);
+  const otherDiv = document.getElementById(`sch-pother-${i}-${pi}`);
+  if (otherDiv) otherDiv.style.display = sel?.value === 'other' ? 'flex' : 'none';
+}
+
 function showSchengenEdit() {
   const sd = getSchengenData();
   const personsHtml = sd.persons.map((p,i) => {
-    const passHtml = (p.passports||[]).map((pp,pi)=>`
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-        <input class="fi" style="width:46px;font-size:16px;text-align:center" value="${esc(pp.flag||'')}" id="sch-pflag-${i}-${pi}" placeholder="🏳️">
-        <input class="fi" style="flex:1;font-size:13px" value="${esc(pp.country||'')}" id="sch-pcountry-${i}-${pi}" placeholder="Country (e.g. US)">
-        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--label3);white-space:nowrap;cursor:pointer">
-          <input type="checkbox" id="sch-peu-${i}-${pi}" ${pp.eu===true?'checked':''}> EU passport
-        </label>
-        <button onclick="removeSchengenPassport(${i},${pi})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:15px;padding:0 4px;font-family:var(--font)">✕</button>
-      </div>`).join('');
+    const passHtml = (p.passports||[]).map((pp,pi) => {
+      const selKey = SCHENGEN_FLAG_TO_KEY[pp.flag] || 'other';
+      const isOther = selKey === 'other';
+      const opts = SCHENGEN_PASSPORT_OPTS.map(o =>
+        `<option value="${o.key}" ${o.key===selKey?'selected':''}>${o.flag?o.flag+' ':''}${o.country}</option>`
+      ).join('');
+      return `
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <select class="fi" id="sch-psel-${i}-${pi}" style="flex:1;font-size:13px" onchange="schengenPassSelChange(${i},${pi})">${opts}</select>
+          <button onclick="removeSchengenPassport(${i},${pi})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:15px;padding:0 4px;font-family:var(--font);flex-shrink:0">✕</button>
+        </div>
+        <div id="sch-pother-${i}-${pi}" style="display:${isOther?'flex':'none'};align-items:center;gap:8px;margin-bottom:6px;padding-left:8px">
+          <input class="fi" id="sch-potherval-${i}-${pi}" style="flex:1;font-size:13px" placeholder="Country name" value="${isOther?esc(pp.country||''):''}">
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--label3);white-space:nowrap;cursor:pointer">
+            <input type="checkbox" id="sch-peu-${i}-${pi}" ${pp.eu===true&&isOther?'checked':''}> EU
+          </label>
+        </div>`;
+    }).join('');
     return `
       <div class="mi-label">Person ${i+1} Name</div>
       <input class="mi" id="sch-name-${i}" value="${esc(p.name||'')}">
-      <div class="mi-label" style="margin-top:8px">Passports</div>
+      <div class="mi-label" style="margin-top:10px">Passports</div>
       ${passHtml}
       <button onclick="addSchengenPassport(${i})" style="font-size:13px;color:var(--blue);background:none;border:none;cursor:pointer;padding:4px 0;font-family:var(--font)">+ Add passport</button>
       ${i<sd.persons.length-1?'<hr style="border:none;border-top:1px solid var(--sep);margin:14px 0">':''}`;
@@ -1873,7 +1909,7 @@ function addSchengenPassport(personIdx) {
   const sd = getSchengenData();
   const p = sd.persons[personIdx]; if (!p) return;
   if (!p.passports) p.passports = [];
-  p.passports.push({flag:'🏳️', country:'', eu:false});
+  p.passports.push({flag:'🇺🇸', country:'United States', eu:false});
   save(); hideModal(); showSchengenEdit();
 }
 
@@ -1890,9 +1926,14 @@ function saveSchengenEdit() {
   sd.persons.forEach((p,i) => {
     p.name = document.getElementById(`sch-name-${i}`)?.value.trim()||'';
     (p.passports||[]).forEach((pp,pi) => {
-      pp.flag    = document.getElementById(`sch-pflag-${i}-${pi}`)?.value.trim()||'🏳️';
-      pp.country = document.getElementById(`sch-pcountry-${i}-${pi}`)?.value.trim()||'';
-      pp.eu      = document.getElementById(`sch-peu-${i}-${pi}`)?.checked||false;
+      const sel = document.getElementById(`sch-psel-${i}-${pi}`)?.value||'other';
+      if (sel === 'other') {
+        pp.flag    = '';
+        pp.country = document.getElementById(`sch-potherval-${i}-${pi}`)?.value.trim()||'';
+        pp.eu      = document.getElementById(`sch-peu-${i}-${pi}`)?.checked||false;
+      } else {
+        Object.assign(pp, SCHENGEN_PASSPORT_MAP[sel]||{flag:'', country:'', eu:false});
+      }
     });
   });
   save(); hideModal(); schengenRerender();
@@ -1900,14 +1941,17 @@ function saveSchengenEdit() {
 
 function prefillSchengenData() {
   if (localStorage.getItem(EMAIL_KEY) !== '[EMAIL-REMOVED]@gmail.com') return false;
-  // Re-seed unless: Francesco's Italy passport has flag+eu=true AND US passport has eu=false
   const fp = data.schengen?.persons?.[0];
-  const italyOk = fp?.passports?.some(pp => pp.flag === '🇮🇹' && pp.eu === true);
-  const usOk    = fp?.passports?.some(pp => pp.flag === '🇺🇸' && pp.eu === false);
-  if (fp?.name && italyOk && usOk) return false;
+  const euOk = fp?.passports?.some(pp => pp.flag === '🇪🇺' && pp.eu === true);
+  const usOk = fp?.passports?.some(pp => pp.flag === '🇺🇸' && pp.eu === false);
+  if (fp?.name && euOk && usOk) return false;
   data.schengen = { persons: [
     { name:'Francesco', activePassport:0,
-      passports:[{flag:'🇺🇸',country:'US',eu:false},{flag:'🇮🇹',country:'Italy',eu:true},{flag:'🇯🇵',country:'Japan',eu:false}],
+      passports:[
+        {flag:'🇺🇸', country:'United States',  eu:false},
+        {flag:'🇪🇺', country:'European Union', eu:true},
+        {flag:'🇯🇵', country:'Japan',          eu:false}
+      ],
       log:[
         {id:uid(), type:'in',  date:'2025-10-15', passport:'🇺🇸', location:'Greece (Kilada)'},
         {id:uid(), type:'out', date:'2026-01-26', passport:'',    location:'Turkey (Didim)'},
@@ -1915,7 +1959,10 @@ function prefillSchengenData() {
       ]
     },
     { name:'Yuka', activePassport:0,
-      passports:[{flag:'🇺🇸',country:'US',eu:false},{flag:'🇯🇵',country:'Japan',eu:false}],
+      passports:[
+        {flag:'🇺🇸', country:'United States', eu:false},
+        {flag:'🇯🇵', country:'Japan',         eu:false}
+      ],
       log:[]
     }
   ]};
