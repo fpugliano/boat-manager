@@ -1207,18 +1207,17 @@ function renderShipyard() {
     });
 
   const histRows = histSorted.length ? histSorted.map(({h,i}) => {
-    const dateRange = [h.start, h.end].filter(Boolean).map(shortDate).join(' – ') || '—';
-    return `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--sep)">
-      <div style="font-size:12px;font-weight:700;flex-shrink:0;min-width:34px">${esc(h.year||'')}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.location||h.name||'')}</div>
-        <div style="font-size:11px;color:var(--label3);white-space:nowrap">${esc(dateRange)}${h.notes?` · <span style="color:var(--label3)">${esc(h.notes.slice(0,30)+(h.notes.length>30?'…':''))}</span>`:''}</div>
-      </div>
-      <div style="font-size:12px;font-weight:600;flex-shrink:0;white-space:nowrap">${esc(h.cost||'')}</div>
-      <div style="flex-shrink:0;display:flex;gap:2px">
-        <button onclick="editShipyardHistory(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3)">✏️</button>
-        <button onclick="removeShipyardHistory(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3)">✕</button>
-      </div>
+    const dateRange = [h.start, h.end].filter(Boolean).map(shortDate).join('–') || '—';
+    const costNum = parseFloat((h.cost||'').replace(/[€$£,\s]/g,''));
+    const costStr = !isNaN(costNum) ? '€' + costNum.toLocaleString() : (h.cost||'');
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--sep);overflow:hidden">
+      <div style="font-size:12px;font-weight:700;flex-shrink:0;width:52px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(h.year||'')}</div>
+      <div style="font-size:13px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${esc(h.location||h.name||'')}</div>
+      <div style="font-size:11px;color:var(--label3);flex-shrink:0;white-space:nowrap">${esc(dateRange)}</div>
+      <div style="font-size:11px;color:var(--label3);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(h.notes||'')}</div>
+      <div style="font-size:12px;font-weight:600;flex-shrink:0;white-space:nowrap">${esc(costStr)}</div>
+      <button onclick="editShipyardHistory(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✏️</button>
+      <button onclick="removeShipyardHistory(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✕</button>
     </div>`;
   }).join('') : `<div style="padding:18px 14px;color:var(--label3);font-size:13px">No past seasons yet</div>`;
 
@@ -2178,7 +2177,7 @@ function prefillShipyardData() {
   if (!data.shipyard) data.shipyard = {};
   data.shipyard.history = [
     {id:uid(), year:'2023/2024', name:'Marina del Rey Boatyard', location:'Los Angeles', start:'2023-10-01', end:'2024-04-01', cost:'€3,200', notes:'Antifouling and hull inspection'},
-    {id:uid(), year:'2022/2023', name:'Palma Boat Services',     location:'Palma',       start:'2022-10-01', end:'2023-03-01', cost:'€4,800', notes:'Full haul out and keel repaint'},
+    {id:uid(), year:'2022/2023', name:'Palma Boat Services',     location:'Mallorca',    start:'2022-10-01', end:'2023-03-01', cost:'€4,800', notes:'Full haul out and keel repaint'},
     {id:uid(), year:'2021/2022', name:'Porto Montenegro Yard',   location:'Montenegro',  start:'2021-11-01', end:'2022-04-01', cost:'€5,500', notes:'Engine service and osmosis treatment'},
   ];
   data.shipyard.quotes = [
