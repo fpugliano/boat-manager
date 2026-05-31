@@ -4173,7 +4173,8 @@ async function pullFromCloud() {
     setSyncStatus('synced');
     return true;
   } catch(e) {
-    console.warn('pullFromCloud failed:', e.message);
+    console.error('[pullFromCloud ERROR]', e.name, e.message, e.stack?.split('\n')[1]);
+    showToast('Sync failed: ' + e.message, true);
     return false;
   }
 }
