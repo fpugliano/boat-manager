@@ -2118,11 +2118,35 @@ function removePart(i) {
   document.getElementById('mainContent').innerHTML = renderParts();
 }
 
+const PART_CATEGORIES = ['Yanmar Engine','Saildrive','Water Maker','Oils & Fluids','Outboard','Plumbing'];
+
+function partCatSelChange() {
+  const sel  = document.getElementById('m-pc-sel')?.value;
+  const wrap = document.getElementById('m-pc-custom-wrap');
+  if (wrap) wrap.style.display = sel === 'Custom' ? 'block' : 'none';
+}
+
+function getPartCategory() {
+  const sel = document.getElementById('m-pc-sel')?.value;
+  if (sel === 'Custom') return (document.getElementById('m-pc')?.value || '').trim();
+  return sel || '';
+}
+
 function _partModalFields(p) {
+  const cur      = p.category || '';
+  const isCustom = cur !== '' && !PART_CATEGORIES.includes(cur);
+  const selVal   = isCustom ? 'Custom' : (cur || PART_CATEGORIES[0]);
+  const opts     = PART_CATEGORIES.map(c =>
+    `<option value="${c}" ${c===selVal?'selected':''}>${c}</option>`
+  ).join('') + `<option value="Custom" ${selVal==='Custom'?'selected':''}>Custom…</option>`;
   return `
     <div class="mi-label">Description</div><input class="mi" id="m-pd" placeholder="Part description" value="${esc(p.desc||'')}">
     <div class="mi-label">Part Number</div><input class="mi" id="m-ppn" placeholder="Optional" value="${esc(p.pn||'')}">
-    <div class="mi-label">Category</div><input class="mi" id="m-pc" placeholder="e.g. Inboard" value="${esc(p.category||'')}">
+    <div class="mi-label">Category</div>
+    <select class="mi" id="m-pc-sel" onchange="partCatSelChange()">${opts}</select>
+    <div id="m-pc-custom-wrap" style="display:${isCustom?'block':'none'};margin-top:6px">
+      <input class="mi" id="m-pc" placeholder="Category name" value="${esc(isCustom?cur:'')}">
+    </div>
     <div class="mi-label">Quantity</div><input class="mi" id="m-pq" type="number" value="${p.qty??1}" min="0">
     <div class="mi-label">Min Quantity</div><input class="mi" id="m-pmq" type="number" value="${p.minQuantity??1}" min="0">
     <div class="mi-label">Unit Price (€)</div><input class="mi" id="m-pp2" type="number" value="${p.unitPrice??0}" min="0" step="0.01">
@@ -2144,7 +2168,7 @@ function savePart() {
     id:uid(),
     desc:document.getElementById('m-pd').value,
     pn:document.getElementById('m-ppn').value,
-    category:document.getElementById('m-pc').value,
+    category:getPartCategory(),
     qty:parseInt(document.getElementById('m-pq').value)||0,
     minQuantity:parseInt(document.getElementById('m-pmq').value)||0,
     unitPrice:parseFloat(document.getElementById('m-pp2').value)||0,
@@ -2167,7 +2191,7 @@ function saveEditedPart(idx) {
   Object.assign(data.spareParts[idx], {
     desc:document.getElementById('m-pd').value,
     pn:document.getElementById('m-ppn').value,
-    category:document.getElementById('m-pc').value,
+    category:getPartCategory(),
     qty:parseInt(document.getElementById('m-pq').value)||0,
     minQuantity:parseInt(document.getElementById('m-pmq').value)||0,
     unitPrice:parseFloat(document.getElementById('m-pp2').value)||0,
