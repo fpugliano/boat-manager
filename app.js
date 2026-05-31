@@ -532,10 +532,10 @@ function renderSetup(setupEmail = '') {
           <div class="hull-sub">Port + Starboard</div>
         </div>
       </div>
-      <label style="display:flex;align-items:flex-start;gap:10px;margin:18px 0 12px;cursor:pointer;font-size:14px;color:var(--label2);line-height:1.4">
-        <input type="checkbox" id="s-consent" onchange="document.getElementById('s-go').disabled=!this.checked" style="margin-top:2px;flex-shrink:0">
-        <span>I have read and agree to the <button onclick="showPrivacyPolicy()" style="background:none;border:none;color:var(--blue);font-family:var(--font);font-size:14px;cursor:pointer;padding:0;text-decoration:underline">Privacy Policy</button></span>
-      </label>
+      <div style="display:flex;align-items:flex-start;gap:10px;margin:18px 0 12px;font-size:14px;color:var(--label2);line-height:1.4">
+        <input type="checkbox" id="s-consent" onchange="document.getElementById('s-go').disabled=!this.checked" style="margin-top:3px;flex-shrink:0;cursor:pointer;width:18px;height:18px">
+        <label for="s-consent" style="cursor:pointer">I have read and agree to the <button onclick="event.stopPropagation();event.preventDefault();showPrivacyPolicy()" style="background:none;border:none;color:var(--blue);font-family:var(--font);font-size:14px;cursor:pointer;padding:0;text-decoration:underline">Privacy Policy</button></label>
+      </div>
       <button class="setup-go" id="s-go" onclick="completeSetup()" disabled>Set Up My Boat →</button>
       <button onclick="renderLoginScreen()"
         style="width:100%;margin-top:14px;border:none;background:none;font-family:var(--font);
