@@ -1920,6 +1920,7 @@ function schengenPassSelChange(i, pi) {
 }
 
 let _schPi = [0, 0];
+let _pendingBackup = null;
 
 function schPassportRow(i, pi, pp) {
   const selKey = SCHENGEN_FLAG_TO_KEY[pp.flag] || 'other';
@@ -3780,6 +3781,7 @@ function loadBackupFile(input) {
       if (!backup.salt || !backup.verify || !backup.data) {
         showToast('Backup file is incomplete', true); input.value = ''; return;
       }
+      _pendingBackup = backup;
       showModal('Restore Backup', `
         <div style="font-size:14px;color:var(--label2);margin-bottom:6px">
           Enter the PIN from the account that <b>created</b> this backup to decrypt it.
@@ -3790,7 +3792,7 @@ function loadBackupFile(input) {
         <div id="bkp-err" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:8px"></div>
         <div class="modal-btns">
           <button class="btn btn-s" onclick="hideModal()">Cancel</button>
-          <button class="btn btn-p" id="bkp-btn" onclick="applyBackupData(${JSON.stringify(JSON.stringify(backup))})">Restore</button>
+          <button class="btn btn-p" id="bkp-btn" onclick="applyBackupData()">Restore</button>
         </div>`);
     } catch {
       showToast('Could not read backup file', true);
@@ -3800,15 +3802,16 @@ function loadBackupFile(input) {
   reader.readAsText(file);
 }
 
-async function applyBackupData(backupStr) {
+async function applyBackupData() {
   const pin   = (document.getElementById('bkp-pw')?.value || '').trim();
   const errEl = document.getElementById('bkp-err');
   const btn   = document.getElementById('bkp-btn');
   if (!pin) { if (errEl) errEl.textContent = 'Enter the backup PIN'; return; }
+  if (!_pendingBackup) { if (errEl) errEl.textContent = 'No backup loaded — please try again'; return; }
   if (errEl) errEl.textContent = '';
   if (btn) { btn.textContent = 'Restoring…'; btn.disabled = true; }
   try {
-    const backup = JSON.parse(backupStr);
+    const backup = _pendingBackup;
     const salt   = b64ToU8(backup.salt);
     const key    = await deriveKey(pin, salt);
     try { await aesDecrypt(key, backup.verify); }
@@ -3830,6 +3833,7 @@ async function applyBackupData(backupStr) {
     data.meta.setupComplete = keepSetup    ?? data.meta?.setupComplete;
     localStorage.setItem('bm_just_imported', Date.now());
     await save();
+    _pendingBackup = null;
     hideModal();
     if (cryptoKey) {
       migrateData(); renderApp();
