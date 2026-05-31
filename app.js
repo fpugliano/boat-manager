@@ -3431,14 +3431,13 @@ function renderLoginScreen() {
   const ov = document.getElementById('setupOv');
   ov.classList.remove('hidden');
   document.getElementById('app').classList.add('hidden');
-  const savedEmail = localStorage.getItem(EMAIL_KEY) || '';
   ov.innerHTML = `
     <div class="setup-inner">
       <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px;font-weight:800">⚓</div>'}</div>
       <div class="setup-h">Boat Manager</div>
       <label class="setup-lbl">Email</label>
       <input class="setup-inp" id="login-email" type="email" placeholder="your@email.com"
-        value="${esc(savedEmail)}"
+        value=""
         onkeydown="if(event.key==='Enter')document.getElementById('l0').focus()">
       <label class="setup-lbl" style="text-align:center;display:block;margin-bottom:4px;margin-top:16px">PIN</label>
       ${pinBoxesHTML('l', 'attemptLogin')}
@@ -3458,10 +3457,7 @@ function renderLoginScreen() {
         </button>
       </div>
     </div>`;
-  setTimeout(() => {
-    if (savedEmail) document.getElementById('l0')?.focus();
-    else document.getElementById('login-email')?.focus();
-  }, 80);
+  setTimeout(() => document.getElementById('login-email')?.focus(), 80);
 }
 
 async function attemptLogin() {
