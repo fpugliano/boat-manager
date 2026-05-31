@@ -1890,18 +1890,20 @@ function renderUpgradeItem(s, item, idx) {
     </div>`;
   }
   // Normal row
+  const complete = s.items.length > 0 && s.items.every(x => x.checked);
   const costTxt = item.cost ? ` <span style="color:var(--label3);font-size:12px">· €${item.cost}</span>` : '';
   const chkStyle = item.checked
     ? 'background:var(--green);border-color:var(--green)'
     : 'background:var(--surface);border:2px solid var(--sep)';
   const chkMark = item.checked ? '<svg width="11" height="9" viewBox="0 0 11 9"><polyline points="1,4.5 4,7.5 10,1" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '';
-  const txtStyle = item.checked ? 'text-decoration:line-through;color:var(--label3)' : '';
+  const chkClick = complete ? '' : `onclick="toggleUpgradeItem('${sid}','${iid}')"`;
+  const chkCursor = complete ? 'cursor:default' : 'cursor:pointer';
   return `<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--sep)">
-    <div onclick="toggleUpgradeItem('${sid}','${iid}')"
-      style="width:22px;height:22px;border-radius:6px;${chkStyle};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s">
+    <div ${chkClick}
+      style="width:22px;height:22px;border-radius:6px;${chkStyle};flex-shrink:0;display:flex;align-items:center;justify-content:center;${chkCursor};transition:all .15s">
       ${chkMark}
     </div>
-    <div style="flex:1;font-size:14px;line-height:1.4;${txtStyle};cursor:pointer" onclick="toggleUpgradeItem('${sid}','${iid}')">${esc(item.text)}${costTxt}</div>
+    <div style="flex:1;font-size:14px;line-height:1.4;${chkCursor}"${complete ? '' : ` onclick="toggleUpgradeItem('${sid}','${iid}')"`}>${esc(item.text)}${costTxt}</div>
     <div style="display:flex;gap:2px;flex-shrink:0">
       <button onclick="ui.upgEdit={iid:'${iid}'};upgRerender();setTimeout(()=>document.getElementById('ueit')?.focus(),40)"
         style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);border-radius:4px;line-height:1">✏️</button>
