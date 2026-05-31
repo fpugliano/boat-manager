@@ -1234,7 +1234,8 @@ function renderShipyard() {
     </div>
     <div class="card">${histRows}</div>`;
 
-  return exMsg + card1 + card2 + card3;
+  const debugBanner = `<div style="background:#ff0;color:#000;padding:8px;font-size:11px;font-family:monospace;">DEBUG: name=${data.shipyard?.current?.name||'EMPTY'} history=${data.shipyard?.history?.length||0} keys=${Object.keys(data.shipyard||{}).join(',')}</div>`;
+  return debugBanner + exMsg + card1 + card2 + card3;
 }
 
 function showAddQuote() {
