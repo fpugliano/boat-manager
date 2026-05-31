@@ -69,7 +69,8 @@ const EMPTY_DEFAULTS = {
     {id:'ex_s1', cat:'Battery Storage', category:'Battery Storage', make:'Victron', model:'Lithium Battery A', serialNumber:'', location:'engine room port',       installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', notes:'12V', photos:[]},
     {id:'ex_s2', cat:'Battery Storage', category:'Battery Storage', make:'Victron', model:'Lithium Battery B', serialNumber:'', location:'engine room centre',     installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', notes:'12V', photos:[]},
     {id:'ex_s3', cat:'Battery Storage', category:'Battery Storage', make:'Victron', model:'Lithium Battery C', serialNumber:'', location:'engine room starboard',  installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', notes:'12V', photos:[]},
-  ]
+  ],
+  schengen: null
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -532,6 +533,7 @@ const TABS = [
   {id:'shipyard',  icon:'⚓', label:'Shipyard'},
   {id:'maint',     icon:'🔧', label:'Maintenance'},
   {id:'upgrades',  icon:'🔧', label:'Upgrades & Repairs'},
+  {id:'schengen',  icon:'🛂', label:'Schengen'},
   {id:'parts',     icon:'🔩', label:'Spare Parts'},
   {id:'systems',   icon:'🔌', label:'Systems'},
   {id:'winter',    icon:'❄️', label:'Winterize'},
@@ -579,6 +581,7 @@ function renderActiveTab() {
       case 'shipyard':  mc.innerHTML = renderShipyard(); break;
       case 'maint':     mc.innerHTML = renderMaintenance(); break;
       case 'upgrades':  mc.innerHTML = renderUpgrades(); break;
+      case 'schengen':  mc.innerHTML = renderSchengen(); break;
       case 'parts':     mc.innerHTML = renderParts(); break;
       case 'systems':   mc.innerHTML = renderSystems(); break;
       case 'winter':    mc.innerHTML = renderWinterization(); break;
@@ -1596,6 +1599,315 @@ function saveEditMaintEntry(i) {
 // ═══════════════════════════════════════════════════════════
 //  SECTION 6 — SPARE PARTS
 // ═══════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════
+//  SCHENGEN TRACKER
+// ═══════════════════════════════════════════════════════════
+
+function getSchengenData() {
+  if (!data.schengen) {
+    data.schengen = { persons: [
+      {name:'', passports:[{flag:'🇺🇸', country:'US', eu:false}], activePassport:0, log:[]},
+      {name:'', passports:[{flag:'🇺🇸', country:'US', eu:false}], activePassport:0, log:[]}
+    ]};
+  }
+  return data.schengen;
+}
+
+function calcSchengenDays(log) {
+  const today = new Date(); today.setHours(23,59,59,999);
+  const windowStart = new Date(today); windowStart.setDate(windowStart.getDate()-179); windowStart.setHours(0,0,0,0);
+  const sorted = [...(log||[])].sort((a,b)=>a.date.localeCompare(b.date));
+  let days = 0, inDate = null;
+  for (const e of sorted) {
+    if (e.type==='in') { inDate = new Date(e.date); }
+    else if (e.type==='out' && inDate) {
+      const out = new Date(e.date);
+      const s = inDate < windowStart ? windowStart : inDate;
+      const end = out > today ? today : out;
+      if (s <= end) days += Math.round((end-s)/86400000)+1;
+      inDate = null;
+    }
+  }
+  if (inDate) { const s = inDate < windowStart ? windowStart : inDate; days += Math.round((today-s)/86400000)+1; }
+  return { days, inSchengen: inDate !== null };
+}
+
+function isCurrentlyInSchengen(log) {
+  const sorted = [...(log||[])].sort((a,b)=>a.date.localeCompare(b.date));
+  let inside = false;
+  for (const e of sorted) { if (e.type==='in') inside=true; else if (e.type==='out') inside=false; }
+  return inside;
+}
+
+function schengenRerender() { document.getElementById('mainContent').innerHTML = renderSchengen(); }
+
+function renderSchengen() {
+  if (!ui.schengenLogTab) ui.schengenLogTab = 0;
+  const sd = getSchengenData();
+  const hasData = sd.persons.some(p=>p.name);
+  const warnings = [];
+  sd.persons.forEach(p => {
+    if (!p.name) return;
+    const eu = p.passports?.[p.activePassport||0]?.eu;
+    if (eu) return;
+    const {days} = calcSchengenDays(p.log);
+    const rem = 90-days;
+    if (rem < 20) warnings.push(`${p.name}: ${rem} days remaining`);
+  });
+  const warningBanner = warnings.length ? `
+    <div style="margin:0 12px 10px;padding:10px 14px;background:rgba(255,59,48,.1);border:1.5px solid var(--red);border-radius:10px;font-size:13px;color:var(--red);font-weight:600">
+      ⚠️ ${warnings.join(' · ')}
+    </div>` : '';
+  const emptyMsg = !hasData ? `
+    <div style="margin:20px 12px;padding:16px;background:var(--surface);border:1.5px solid var(--sep);border-radius:12px;text-align:center;color:var(--label3);font-size:14px">
+      Tap ⚙ Edit travellers to set up
+    </div>` : '';
+  const statusCard = hasData ? `
+    <div style="margin:0 12px 10px;background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;overflow:hidden">
+      <div style="display:grid;grid-template-columns:1fr 1fr">
+        ${sd.persons.map((p,i)=>renderSchengenPersonStatus(p,i)).join('<div style="width:1px;background:var(--sep)"></div>')}
+      </div>
+    </div>` : '';
+  const logCard = hasData ? renderSchengenLog(sd) : '';
+  return `<div style="background:#f2f2f7;min-height:100%;padding-bottom:80px">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 12px 8px">
+      <div style="font-size:17px;font-weight:700">🛂 Schengen</div>
+      <button onclick="showSchengenEdit()" style="background:var(--surface);border:1.5px solid var(--sep);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;font-family:var(--font);color:var(--label);cursor:pointer">⚙ Edit travellers</button>
+    </div>
+    ${warningBanner}${emptyMsg}${statusCard}${logCard}
+  </div>`;
+}
+
+function renderSchengenPersonStatus(p, idx) {
+  const activePass = p.passports?.[p.activePassport||0];
+  const isEU = activePass?.eu;
+  const {days} = calcSchengenDays(p.log);
+  const remaining = Math.max(0, 90-days);
+  const inStatus = isCurrentlyInSchengen(p.log);
+  const circleColor = remaining > 30 ? 'var(--green)' : remaining > 10 ? 'var(--orange)' : 'var(--red)';
+  const exitBy = new Date(); exitBy.setDate(exitBy.getDate()+remaining);
+  const exitByStr = exitBy.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  const exitByColor = remaining < 30 ? 'var(--red)' : 'var(--green)';
+  const passportBtns = (p.passports||[]).map((pp,pi)=>`
+    <button onclick="setSchengenPassport(${idx},${pi})" style="background:${pi===(p.activePassport||0)?'var(--blue)':'var(--surface2)'};border:1.5px solid ${pi===(p.activePassport||0)?'var(--blue)':'var(--sep)'};border-radius:8px;padding:4px 8px;font-size:16px;cursor:pointer;line-height:1">${pp.flag}</button>`).join('');
+  return `<div style="padding:14px 12px">
+    <div style="font-size:14px;font-weight:700;margin-bottom:6px">${esc(p.name||'—')}</div>
+    <div style="margin-bottom:8px"><span style="background:${inStatus?'var(--green)':'var(--sep)'};color:${inStatus?'#fff':'var(--label2)'};font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">${inStatus?'In Schengen':'Outside'}</span></div>
+    ${isEU ? `<div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:10px">🇪🇺 EU Passport · No limit</div>` : `
+      <div style="display:flex;justify-content:center;margin-bottom:10px">
+        <div style="width:64px;height:64px;border-radius:50%;border:4px solid ${circleColor};display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <div style="font-size:18px;font-weight:800;color:${circleColor};line-height:1">${remaining}</div>
+          <div style="font-size:9px;color:var(--label3);line-height:1.2">days left</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+        <div style="background:var(--surface2);border-radius:8px;padding:6px;text-align:center">
+          <div style="font-size:15px;font-weight:700">${days}</div>
+          <div style="font-size:10px;color:var(--label3)">Days Used</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:8px;padding:6px;text-align:center">
+          <div style="font-size:15px;font-weight:700;color:${circleColor}">${remaining}</div>
+          <div style="font-size:10px;color:var(--label3)">Days Left</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--label3);margin-bottom:8px;text-align:center">Exit by <span style="color:${exitByColor};font-weight:600">${exitByStr}</span></div>`}
+    <div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap">${passportBtns}</div>
+    <div style="display:flex;gap:6px">
+      <button onclick="showSchengenCheckIn(${idx})" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 4px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">Check In</button>
+      <button onclick="showSchengenCheckOut(${idx})" style="flex:1;background:var(--surface2);color:var(--label);border:1.5px solid var(--sep);border-radius:8px;padding:7px 4px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">Check Out</button>
+    </div>
+  </div>`;
+}
+
+function renderSchengenLog(sd) {
+  const idx = ui.schengenLogTab||0;
+  const p = sd.persons[idx];
+  const sorted = [...(p?.log||[])].sort((a,b)=>b.date.localeCompare(a.date));
+  const tabs = sd.persons.map((pp,i)=>`
+    <div onclick="ui.schengenLogTab=${i};schengenRerender()" style="padding:8px 16px;font-size:13px;font-weight:${i===idx?'700':'400'};color:${i===idx?'var(--blue)':'var(--label3)'};border-bottom:2px solid ${i===idx?'var(--blue)':'transparent'};cursor:pointer">${esc(pp.name||'Person '+(i+1))}</div>`).join('');
+  const rows = sorted.map(e=>{
+    const typeColor = e.type==='in' ? 'var(--green)' : 'var(--label2)';
+    const typeLabel = e.type==='in' ? 'Check In' : 'Check Out';
+    const passFlag = e.passport ? ` ${e.passport}` : '';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--sep)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:${typeColor}">${typeLabel}${passFlag}</div>
+        <div style="font-size:12px;color:var(--label3)">${esc(e.date)} · ${esc(e.location||'')}</div>
+      </div>
+      <button onclick="showSchengenEditEntry(${idx},'${e.id}')" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3)">✏️</button>
+      <button onclick="deleteSchengenEntry(${idx},'${e.id}')" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3)">✕</button>
+    </div>`;
+  }).join('')||`<div style="padding:20px;text-align:center;color:var(--label3);font-size:14px">No entries yet</div>`;
+  return `<div style="margin:0 12px 16px;background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;overflow:hidden">
+    <div style="display:flex;border-bottom:1px solid var(--sep)">${tabs}</div>
+    ${rows}
+  </div>`;
+}
+
+function setSchengenPassport(personIdx, passportIdx) {
+  const sd = getSchengenData();
+  if (!sd.persons[personIdx]) return;
+  sd.persons[personIdx].activePassport = passportIdx;
+  save(); schengenRerender();
+}
+
+function showSchengenCheckIn(personIdx) {
+  const sd = getSchengenData();
+  const p = sd.persons[personIdx];
+  const passOpts = (p.passports||[]).map((pp,i)=>`<option value="${i}" ${i===(p.activePassport||0)?'selected':''}>${pp.flag} ${esc(pp.country)}</option>`).join('');
+  showModal('Check In to Schengen', `
+    <div class="mi-label">Date</div><input class="mi" id="sch-date" type="date" value="${new Date().toISOString().slice(0,10)}">
+    <div class="mi-label">Passport</div><select class="mi" id="sch-pass">${passOpts}</select>
+    <div class="mi-label">Location / Country</div><input class="mi" id="sch-loc" placeholder="e.g. Greece (Athens)">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveSchengenCheckIn(${personIdx})">Check In</button>
+    </div>`);
+}
+
+function saveSchengenCheckIn(personIdx) {
+  const sd = getSchengenData();
+  const p = sd.persons[personIdx]; if (!p) return;
+  const date = document.getElementById('sch-date')?.value;
+  if (!date) { showToast('Enter a date', true); return; }
+  const passIdx = parseInt(document.getElementById('sch-pass')?.value)||0;
+  const passport = p.passports?.[passIdx]?.flag||'';
+  const location = document.getElementById('sch-loc')?.value.trim()||'';
+  p.log.push({id:uid(), type:'in', date, passport, location});
+  p.activePassport = passIdx;
+  save(); hideModal(); schengenRerender();
+}
+
+function showSchengenCheckOut(personIdx) {
+  showModal('Check Out of Schengen', `
+    <div class="mi-label">Date</div><input class="mi" id="sch-date" type="date" value="${new Date().toISOString().slice(0,10)}">
+    <div class="mi-label">Destination</div><input class="mi" id="sch-loc" placeholder="e.g. Turkey (Istanbul)">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveSchengenCheckOut(${personIdx})">Check Out</button>
+    </div>`);
+}
+
+function saveSchengenCheckOut(personIdx) {
+  const sd = getSchengenData();
+  const p = sd.persons[personIdx]; if (!p) return;
+  const date = document.getElementById('sch-date')?.value;
+  if (!date) { showToast('Enter a date', true); return; }
+  const location = document.getElementById('sch-loc')?.value.trim()||'';
+  p.log.push({id:uid(), type:'out', date, location});
+  save(); hideModal(); schengenRerender();
+}
+
+function showSchengenEditEntry(personIdx, entryId) {
+  const sd = getSchengenData();
+  const p = sd.persons[personIdx]; if (!p) return;
+  const e = p.log.find(x=>x.id===entryId); if (!e) return;
+  const passOpts = e.type==='in' ? (p.passports||[]).map((pp,i)=>`<option value="${i}" ${pp.flag===e.passport?'selected':''}>${pp.flag} ${esc(pp.country)}</option>`).join('') : '';
+  showModal('Edit Entry', `
+    <div class="mi-label">Date</div><input class="mi" id="sch-date" type="date" value="${esc(e.date)}">
+    ${e.type==='in'?`<div class="mi-label">Passport</div><select class="mi" id="sch-pass">${passOpts}</select>`:''}
+    <div class="mi-label">${e.type==='in'?'Location':'Destination'}</div><input class="mi" id="sch-loc" value="${esc(e.location||'')}">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveSchengenEditEntry(${personIdx},'${entryId}')">Save</button>
+    </div>`);
+}
+
+function saveSchengenEditEntry(personIdx, entryId) {
+  const sd = getSchengenData();
+  const p = sd.persons[personIdx]; if (!p) return;
+  const e = p.log.find(x=>x.id===entryId); if (!e) return;
+  e.date = document.getElementById('sch-date')?.value||e.date;
+  if (e.type==='in') { const pi = parseInt(document.getElementById('sch-pass')?.value)||0; e.passport = p.passports?.[pi]?.flag||e.passport; }
+  e.location = document.getElementById('sch-loc')?.value.trim()||'';
+  save(); hideModal(); schengenRerender();
+}
+
+function deleteSchengenEntry(personIdx, entryId) {
+  const sd = getSchengenData();
+  const p = sd.persons[personIdx]; if (!p) return;
+  if (!confirm('Delete this entry?')) return;
+  p.log = p.log.filter(x=>x.id!==entryId);
+  save(); schengenRerender();
+}
+
+function showSchengenEdit() {
+  const sd = getSchengenData();
+  const personsHtml = sd.persons.map((p,i) => {
+    const passHtml = (p.passports||[]).map((pp,pi)=>`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <input class="fi" style="width:44px;font-size:16px;text-align:center" value="${esc(pp.flag)}" id="sch-pflag-${i}-${pi}" placeholder="🏳️">
+        <input class="fi" style="flex:1;font-size:13px" value="${esc(pp.country)}" id="sch-pcountry-${i}-${pi}" placeholder="Country">
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--label3);white-space:nowrap">
+          <input type="checkbox" id="sch-peu-${i}-${pi}" ${pp.eu?'checked':''}> EU
+        </label>
+        <button onclick="removeSchengenPassport(${i},${pi})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0 4px;font-family:var(--font)">✕</button>
+      </div>`).join('');
+    return `
+      <div class="mi-label">Person ${i+1} Name</div>
+      <input class="mi" id="sch-name-${i}" value="${esc(p.name||'')}">
+      <div class="mi-label" style="margin-top:8px">Passports</div>
+      ${passHtml}
+      <button onclick="addSchengenPassport(${i})" style="font-size:13px;color:var(--blue);background:none;border:none;cursor:pointer;padding:4px 0;font-family:var(--font)">+ Add passport</button>
+      ${i<sd.persons.length-1?'<hr style="border:none;border-top:1px solid var(--sep);margin:14px 0">':''}`;
+  }).join('');
+  showModal('Edit Travellers', `
+    ${personsHtml}
+    <div class="modal-btns" style="margin-top:14px">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveSchengenEdit()">Save</button>
+    </div>`);
+}
+
+function addSchengenPassport(personIdx) {
+  const sd = getSchengenData();
+  const p = sd.persons[personIdx]; if (!p) return;
+  if (!p.passports) p.passports = [];
+  p.passports.push({flag:'🏳️', country:'', eu:false});
+  save(); hideModal(); showSchengenEdit();
+}
+
+function removeSchengenPassport(personIdx, passIdx) {
+  const sd = getSchengenData();
+  const p = sd.persons[personIdx]; if (!p) return;
+  p.passports.splice(passIdx, 1);
+  if ((p.activePassport||0) >= p.passports.length) p.activePassport = 0;
+  save(); hideModal(); showSchengenEdit();
+}
+
+function saveSchengenEdit() {
+  const sd = getSchengenData();
+  sd.persons.forEach((p,i) => {
+    p.name = document.getElementById(`sch-name-${i}`)?.value.trim()||'';
+    (p.passports||[]).forEach((pp,pi) => {
+      pp.flag    = document.getElementById(`sch-pflag-${i}-${pi}`)?.value.trim()||'🏳️';
+      pp.country = document.getElementById(`sch-pcountry-${i}-${pi}`)?.value.trim()||'';
+      pp.eu      = document.getElementById(`sch-peu-${i}-${pi}`)?.checked||false;
+    });
+  });
+  save(); hideModal(); schengenRerender();
+}
+
+function prefillSchengenData() {
+  if (localStorage.getItem(EMAIL_KEY) !== '[EMAIL-REMOVED]@gmail.com') return false;
+  if (data.schengen?.persons?.some(p=>p.name)) return false;
+  data.schengen = { persons: [
+    { name:'Francesco', activePassport:0,
+      passports:[{flag:'🇺🇸',country:'US',eu:false},{flag:'🇮🇹',country:'Italy',eu:true},{flag:'🇯🇵',country:'Japan',eu:false}],
+      log:[
+        {id:uid(), type:'in',  date:'2025-10-15', passport:'🇺🇸', location:'Greece (Kilada)'},
+        {id:uid(), type:'out', date:'2026-01-26', passport:'',    location:'Turkey (Didim)'},
+        {id:uid(), type:'in',  date:'2026-04-24', passport:'🇺🇸', location:'Greece (Syros)'}
+      ]
+    },
+    { name:'Yuka', activePassport:0,
+      passports:[{flag:'🇺🇸',country:'US',eu:false},{flag:'🇯🇵',country:'Japan',eu:false}],
+      log:[]
+    }
+  ]};
+  return true;
+}
 
 function renderParts() {
   const parts = data.spareParts || [];
@@ -2971,6 +3283,7 @@ async function attemptUnlock() {
       try { if (prefillCustomsOwnerData()) prefillDirty = true; } catch(e) { console.warn('prefillCustoms', e); }
       try { if (prefillTransitLog()) prefillDirty = true; } catch(e) { console.warn('prefillTransitLog', e); }
       try { if (prefillUpgradesData()) prefillDirty = true; } catch(e) { console.warn('prefillUpgrades', e); }
+      try { if (prefillSchengenData()) prefillDirty = true; } catch(e) { console.warn('prefillSchengen', e); }
       if (prefillDirty) save();
       await pushToCloud();
     }
@@ -3093,6 +3406,7 @@ async function attemptLogin() {
         try { if (prefillCustomsOwnerData()) prefillDirty = true; } catch(e) { console.warn('prefillCustoms', e); }
         try { if (prefillTransitLog()) prefillDirty = true; } catch(e) { console.warn('prefillTransitLog', e); }
         try { if (prefillUpgradesData()) prefillDirty = true; } catch(e) { console.warn('prefillUpgrades', e); }
+        try { if (prefillSchengenData()) prefillDirty = true; } catch(e) { console.warn('prefillSchengen', e); }
         if (prefillDirty) save();
         await pushToCloud();
       }
