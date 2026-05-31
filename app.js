@@ -3837,10 +3837,10 @@ async function applyBackupData() {
     hideModal();
     if (cryptoKey) {
       migrateData(); renderApp();
-      showToast('Backup restored. Your own PIN and account are unchanged.');
+      showToast('Backup restored successfully ✓');
     } else {
       renderLockScreen();
-      showToast('Backup restored. Use your own PIN to unlock.');
+      showToast('Backup restored successfully ✓ — use your own PIN to unlock');
     }
   } catch(e) {
     const msg = e.message === 'corrupted' ? 'Backup file appears to be corrupted' : 'Could not restore backup';
