@@ -4358,4 +4358,8 @@ async function init() {
   }
 }
 
+if (new URLSearchParams(window.location.search).get('clearcache') === '1') {
+  localStorage.removeItem('bm_enc');
+  window.history.replaceState({}, '', window.location.pathname);
+}
 window.addEventListener('DOMContentLoaded', init);
