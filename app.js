@@ -1139,9 +1139,10 @@ function renderShipyard() {
       ${fr('Location','shipyard.current.location',s.location)}
       ${fr('Start date','shipyard.current.startDate',s.startDate,'date')}
       ${fr('End date','shipyard.current.endDate',s.endDate,'date')}
-      ${fr('Cost paid','shipyard.current.actualCost',s.actualCost)}
+      ${fr('Cost quoted','shipyard.current.actualCost',s.actualCost)}
       ${fr('Deposit paid','shipyard.current.depositPaid',s.depositPaid)}
       ${fr('Balance due','shipyard.current.balanceDue',s.balanceDue)}
+      <div class="fr"><div class="fl">Total paid</div><div class="fv">${(()=>{const d=parseFloat((s.depositPaid||'').replace(/[^0-9.]/g,''));const b=parseFloat((s.balanceDue||'').replace(/[^0-9.]/g,''));return(!isNaN(d)&&!isNaN(b))?'€'+(d+b).toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2}):'—';})()}</div></div>
       ${frArea('Notes','shipyard.current.notes',s.notes)}
     </div></div>`;
 
@@ -1185,8 +1186,10 @@ function renderShipyard() {
     const dateRange = [h.start, h.end].filter(Boolean).map(shortDate).join(' – ') || '—';
     return `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--sep)">
       <div style="font-size:12px;font-weight:700;flex-shrink:0;min-width:34px">${esc(h.year||'')}</div>
-      <div style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.name||'')}</div>
-      <div style="font-size:11px;color:var(--label3);flex-shrink:0;white-space:nowrap">${esc(dateRange)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.location||h.name||'')}</div>
+        <div style="font-size:11px;color:var(--label3);white-space:nowrap">${esc(dateRange)}${h.notes?` · <span style="color:var(--label3)">${esc(h.notes.slice(0,30)+(h.notes.length>30?'…':''))}</span>`:''}</div>
+      </div>
       <div style="font-size:12px;font-weight:600;flex-shrink:0;white-space:nowrap">${esc(h.cost||'')}</div>
       <div style="flex-shrink:0;display:flex;gap:2px">
         <button onclick="editShipyardHistory(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3)">✏️</button>
@@ -1209,7 +1212,7 @@ function showAddQuote() {
   showModal('Add Quote', `
     <div class="mi-label">Shipyard Name</div><input class="mi" id="m-sn" placeholder="Name" autofocus>
     <div class="mi-label">Location</div><input class="mi" id="m-sl" placeholder="City, Country">
-    <div class="mi-label">Price</div><input class="mi" id="m-sp" placeholder="€ 0,000">
+    <div class="mi-label">Cost quoted</div><input class="mi" id="m-sp" placeholder="€ 0,000">
     <div class="mi-label">Notes</div><input class="mi" id="m-snotes" placeholder="Optional">
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
@@ -1232,7 +1235,7 @@ function editQuote(i) {
   showModal('Edit Quote', `
     <div class="mi-label">Shipyard Name</div><input class="mi" id="m-sn" value="${esc(q.name||'')}" autofocus>
     <div class="mi-label">Location</div><input class="mi" id="m-sl" value="${esc(q.location||'')}">
-    <div class="mi-label">Price</div><input class="mi" id="m-sp" value="${esc(q.price||'')}">
+    <div class="mi-label">Cost quoted</div><input class="mi" id="m-sp" value="${esc(q.price||'')}">
     <div class="mi-label">Notes</div><input class="mi" id="m-snotes" value="${esc(q.notes||'')}">
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
@@ -1250,13 +1253,17 @@ function saveEditQuote(i) {
 function selectQuote(i) {
   if (!data.shipyard?.quotes?.[i]) return;
   const wasSelected = data.shipyard.quotes[i].selected;
-  data.shipyard.quotes.forEach((q,j) => q.selected = (j===i ? !wasSelected : false));
+  const q = data.shipyard.quotes[i];
+  data.shipyard.quotes.forEach((qq,j) => qq.selected = (j===i ? !wasSelected : false));
+  if (!data.shipyard.current) data.shipyard.current = {};
   if (!wasSelected) {
-    const q = data.shipyard.quotes[i];
-    if (!data.shipyard.current) data.shipyard.current = {};
-    if (q.name)     data.shipyard.current.name     = q.name;
-    if (q.location) data.shipyard.current.location = q.location;
-    if (q.price)    data.shipyard.current.actualCost = q.price;
+    if (q.name)     data.shipyard.current.name       = q.name;
+    if (q.location) data.shipyard.current.location   = q.location;
+    if (q.price)    data.shipyard.current.actualCost  = q.price;
+  } else {
+    if (data.shipyard.current.name       === q.name)     data.shipyard.current.name       = '';
+    if (data.shipyard.current.location   === q.location) data.shipyard.current.location   = '';
+    if (data.shipyard.current.actualCost === q.price)    data.shipyard.current.actualCost  = '';
   }
   save(); document.getElementById('mainContent').innerHTML = renderShipyard();
 }
