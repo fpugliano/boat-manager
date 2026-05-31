@@ -3775,27 +3775,74 @@ function loadBackupFile(input) {
     try {
       const backup = JSON.parse(e.target.result);
       if (backup.format !== 'oroboro-boat-backup-v1') {
-        showToast('Not a valid backup file', true); return;
+        showToast('Not a valid backup file', true); input.value = ''; return;
       }
       if (!backup.salt || !backup.verify || !backup.data) {
-        showToast('Backup file is incomplete', true); return;
+        showToast('Backup file is incomplete', true); input.value = ''; return;
       }
-      // Restore encrypted blobs to localStorage
-      localStorage.setItem(SALT_KEY,   backup.salt);
-      localStorage.setItem(VERIFY_KEY, backup.verify);
-      localStorage.setItem(ENC_KEY,    backup.data);
-      // Clear any lock-out state
-      localStorage.removeItem(ATTEMPTS_KEY);
-      // Show lock screen so user enters their password
-      document.getElementById('app').classList.add('hidden');
-      renderLockScreen();
-      showToast('Backup loaded — enter your password to unlock');
+      showModal('Restore Backup', `
+        <div style="font-size:14px;color:var(--label2);margin-bottom:6px">
+          Enter the PIN from the account that <b>created</b> this backup to decrypt it.
+        </div>
+        <div style="font-size:12px;color:var(--label3);margin-bottom:12px">Your own PIN and account credentials will not be changed.</div>
+        <div class="mi-label">Backup PIN</div>
+        <input class="mi" type="number" id="bkp-pw" placeholder="4-digit PIN" maxlength="4" pattern="[0-9]*" inputmode="numeric" autofocus>
+        <div id="bkp-err" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:8px"></div>
+        <div class="modal-btns">
+          <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+          <button class="btn btn-p" id="bkp-btn" onclick="applyBackupData(${JSON.stringify(JSON.stringify(backup))})">Restore</button>
+        </div>`);
     } catch {
       showToast('Could not read backup file', true);
     }
     input.value = '';
   };
   reader.readAsText(file);
+}
+
+async function applyBackupData(backupStr) {
+  const pin   = (document.getElementById('bkp-pw')?.value || '').trim();
+  const errEl = document.getElementById('bkp-err');
+  const btn   = document.getElementById('bkp-btn');
+  if (!pin) { if (errEl) errEl.textContent = 'Enter the backup PIN'; return; }
+  if (errEl) errEl.textContent = '';
+  if (btn) { btn.textContent = 'Restoring…'; btn.disabled = true; }
+  try {
+    const backup = JSON.parse(backupStr);
+    const salt   = b64ToU8(backup.salt);
+    const key    = await deriveKey(pin, salt);
+    try { await aesDecrypt(key, backup.verify); }
+    catch {
+      if (errEl) errEl.textContent = 'Wrong PIN — this backup was created with a different PIN';
+      if (btn) { btn.textContent = 'Restore'; btn.disabled = false; }
+      return;
+    }
+    let imported;
+    try { imported = JSON.parse(await aesDecrypt(key, backup.data)); }
+    catch { throw new Error('corrupted'); }
+    // Preserve current account credentials before merging
+    const keepEmail    = data.meta?.email;
+    const keepOwner    = data.meta?.ownerName;
+    const keepSetup    = data.meta?.setupComplete;
+    deepMerge(data, imported);
+    data.meta.email         = keepEmail    || data.meta?.email    || '';
+    data.meta.ownerName     = keepOwner    || data.meta?.ownerName || '';
+    data.meta.setupComplete = keepSetup    ?? data.meta?.setupComplete;
+    localStorage.setItem('bm_just_imported', Date.now());
+    await save();
+    hideModal();
+    if (cryptoKey) {
+      migrateData(); renderApp();
+      showToast('Backup restored. Your own PIN and account are unchanged.');
+    } else {
+      renderLockScreen();
+      showToast('Backup restored. Use your own PIN to unlock.');
+    }
+  } catch(e) {
+    const msg = e.message === 'corrupted' ? 'Backup file appears to be corrupted' : 'Could not restore backup';
+    if (errEl) errEl.textContent = msg;
+    if (btn) { btn.textContent = 'Restore'; btn.disabled = false; }
+  }
 }
 
 function renderBackupBar() {
