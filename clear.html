@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head><title>Clear Cache</title></head>
+<body>
+<script>
+localStorage.removeItem('bm_enc');
+localStorage.removeItem('bm_last_sync');
+alert('Cache cleared! Redirecting...');
+window.location.href = '/';
+</script>
+<p>Clearing cache...</p>
+</body>
+</html>
