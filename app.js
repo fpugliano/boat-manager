@@ -1123,6 +1123,9 @@ function shortDate(dateStr) {
 function renderShipyard() {
   if (!data.shipyard) data.shipyard = {current:{}, quotes:[], history:[]};
   const s = data.shipyard.current || {};
+  const isOwner = localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL;
+  const exMsg = !isOwner && (data.shipyard.history?.length || data.shipyard.quotes?.length)
+    ? `<div style="margin:8px 12px;font-size:12px;color:var(--label3);font-style:italic">These are examples — replace with your own data</div>` : '';
 
   // Season label from start date
   const yr = s.startDate ? new Date(s.startDate+'T00:00:00').getFullYear() : null;
@@ -1206,7 +1209,7 @@ function renderShipyard() {
     </div>
     <div class="card">${histRows}</div>`;
 
-  return card1 + card2 + card3;
+  return exMsg + card1 + card2 + card3;
 }
 
 function showAddQuote() {
@@ -2141,6 +2144,25 @@ function saveSchengenEdit() {
     if ((p.activePassport||0) >= p.passports.length) p.activePassport = 0;
   });
   save(); hideModal(); schengenRerender();
+}
+
+function prefillShipyardData() {
+  if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL) return false;
+  const sy = data.shipyard;
+  if (sy && (sy.history?.length || sy.quotes?.length)) return false;
+  if (!data.shipyard) data.shipyard = {};
+  data.shipyard.history = [
+    {id:uid(), year:'2023/2024', name:'Marina del Rey Boatyard', location:'Los Angeles', start:'2023-10-01', end:'2024-04-01', cost:'€3,200', notes:'Antifouling and hull inspection'},
+    {id:uid(), year:'2022/2023', name:'Palma Boat Services',     location:'Palma',       start:'2022-10-01', end:'2023-03-01', cost:'€4,800', notes:'Full haul out and keel repaint'},
+    {id:uid(), year:'2021/2022', name:'Porto Montenegro Yard',   location:'Montenegro',  start:'2021-11-01', end:'2022-04-01', cost:'€5,500', notes:'Engine service and osmosis treatment'},
+  ];
+  data.shipyard.quotes = [
+    {id:uid(), name:'Marina del Rey Boatyard', location:'Los Angeles',    price:'€3,200', notes:'Includes pressure wash and antifouling', selected:false},
+    {id:uid(), name:'Pacific Yacht Services',  location:'San Diego',      price:'€2,950', notes:'No travel lift fee',                     selected:false},
+    {id:uid(), name:'Bay Marine Works',        location:'San Francisco',  price:'€3,800', notes:'Premium yard, full refit available',     selected:false},
+  ];
+  if (!data.shipyard.current) data.shipyard.current = {};
+  return true;
 }
 
 function prefillSchengenData() {
@@ -3575,6 +3597,7 @@ async function attemptUnlock() {
       try { if (prefillTransitLog()) prefillDirty = true; } catch(e) { console.warn('prefillTransitLog', e); }
       try { if (prefillUpgradesData()) prefillDirty = true; } catch(e) { console.warn('prefillUpgrades', e); }
       try { if (prefillSchengenData()) prefillDirty = true; } catch(e) { console.warn('prefillSchengen', e); }
+      try { if (prefillShipyardData()) prefillDirty = true; } catch(e) { console.warn('prefillShipyard', e); }
       if (prefillDirty) save();
       await pushToCloud();
     }
@@ -3721,6 +3744,7 @@ async function attemptLogin() {
         try { if (prefillTransitLog()) prefillDirty = true; } catch(e) { console.warn('prefillTransitLog', e); }
         try { if (prefillUpgradesData()) prefillDirty = true; } catch(e) { console.warn('prefillUpgrades', e); }
         try { if (prefillSchengenData()) prefillDirty = true; } catch(e) { console.warn('prefillSchengen', e); }
+      try { if (prefillShipyardData()) prefillDirty = true; } catch(e) { console.warn('prefillShipyard', e); }
         if (prefillDirty) save();
         await pushToCloud();
       }
