@@ -3385,7 +3385,7 @@ function renderLockScreen() {
   const locked = at.lockUntil > Date.now();
   const email  = localStorage.getItem(EMAIL_KEY);
   ov.innerHTML = `
-    <div class="setup-inner">
+    <div class="setup-inner" style="padding-top:calc(env(safe-area-inset-top) + 20px)">
       <div class="setup-logo"><img src="oroboro-logo-15.jpg" alt="Oroboro" style="max-width:200px;height:auto;border-radius:8px;display:block;margin:0 auto"></div>
       <div style="font-size:48px;text-align:center;margin-bottom:10px">🔒</div>
       <div class="setup-h" style="text-align:center">Enter PIN</div>
@@ -3544,7 +3544,7 @@ function renderLoginScreen() {
   ov.classList.remove('hidden');
   document.getElementById('app').classList.add('hidden');
   ov.innerHTML = `
-    <div class="setup-inner">
+    <div class="setup-inner" style="padding-top:calc(env(safe-area-inset-top) + 20px)">
       <div class="setup-logo"><img src="oroboro-logo-15.jpg" alt="Oroboro" style="max-width:200px;height:auto;border-radius:8px;display:block;margin:0 auto"></div>
       <div class="setup-h">Boat Manager</div>
       <label class="setup-lbl">Email</label>
