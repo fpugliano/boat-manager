@@ -415,14 +415,6 @@ function handleJsonImport(input) {
       // Merge everything else (documents, crew, transitLog, spareParts, etc.)
       const rest = Object.assign({}, json);
       delete rest.maintenance;
-      // Append systems without replacing — avoid duplicates by id
-      if (Array.isArray(rest.systems)) {
-        const existing = data.systems || [];
-        const existingIds = new Set(existing.map(s => s.id).filter(Boolean));
-        const newItems = rest.systems.filter(s => !s.id || !existingIds.has(s.id));
-        data.systems = [...existing, ...newItems];
-        delete rest.systems;
-      }
       if (Object.keys(rest).length > 0) deepMerge(data, rest);
 
       await save();
@@ -3185,7 +3177,15 @@ window.addEventListener('DOMContentLoaded', () => {
 
 function deepMerge(target, source) {
   for (const key of Object.keys(source)) {
-    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+    if (Array.isArray(source[key])) {
+      if (!Array.isArray(target[key]) || target[key].length === 0) {
+        target[key] = source[key];
+      } else {
+        const existingIds = new Set(target[key].map(x => x.id).filter(Boolean));
+        const newItems = source[key].filter(x => !x.id || !existingIds.has(x.id));
+        target[key] = [...target[key], ...newItems];
+      }
+    } else if (source[key] && typeof source[key] === 'object') {
       if (!target[key] || typeof target[key] !== 'object') target[key] = {};
       deepMerge(target[key], source[key]);
     } else {
