@@ -4186,6 +4186,12 @@ async function pullFromCloud() {
   }
 }
 
+function forceResync() {
+  if (!confirm('This will clear local data and reload from cloud. You will need to enter your PIN again.')) return;
+  localStorage.removeItem(ENC_KEY);
+  location.reload();
+}
+
 async function syncNow() {
   setSyncStatus('syncing');
   if (ui.tab === 'settings') document.getElementById('mainContent').innerHTML = renderSettings();
@@ -4291,6 +4297,7 @@ function renderSettings() {
       </div>
       <div class="btn-row">
         <button class="btn btn-s btn-sm" onclick="syncNow()">↕ Sync Now</button>
+        <button class="btn btn-s btn-sm" onclick="forceResync()" style="color:var(--red)">↺ Force Re-sync from Cloud</button>
       </div>
     </div>
     <div class="sec-hd">Backup &amp; Restore</div>
