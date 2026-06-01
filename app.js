@@ -1816,8 +1816,9 @@ function calcSchengenDays(log) {
     if (e.type==='in') { inDate = parseISODate(e.date); }
     else if (e.type==='out' && inDate) {
       const out = parseISODate(e.date);
+      if (!out || out > today) continue; // ignore future checkouts — treat as still checked in
       const s = inDate < windowStart ? windowStart : inDate;
-      const end = out > today ? today : out;
+      const end = out;
       if (s <= end) days += Math.round((end-s)/86400000)+1;
       inDate = null;
     }
@@ -1827,9 +1828,16 @@ function calcSchengenDays(log) {
 }
 
 function isCurrentlyInSchengen(log) {
+  const todayMs = new Date().setHours(23,59,59,999);
   const sorted = [...(log||[])].sort((a,b)=>a.date.localeCompare(b.date));
   let inside = false;
-  for (const e of sorted) { if (e.type==='in') inside=true; else if (e.type==='out') inside=false; }
+  for (const e of sorted) {
+    if (e.type==='in') { inside = true; }
+    else if (e.type==='out') {
+      const out = parseISODate(e.date);
+      if (out && out.getTime() <= todayMs) inside = false; // ignore future checkouts
+    }
+  }
   return inside;
 }
 
@@ -1923,11 +1931,16 @@ function renderSchengenPersonStatus(p, idx) {
           <div style="font-size:9px;color:var(--label3)">Used</div>
         </div>
         <div style="background:var(--surface2);border-radius:8px;padding:5px;text-align:center">
-          <div style="font-size:14px;font-weight:700;color:${circleColor}">${overstayed?'-':'+'}${Math.abs(remaining)}</div>
+          <div style="font-size:14px;font-weight:700;color:${circleColor}">${overstayed?'-':''}${Math.abs(remaining)}</div>
           <div style="font-size:9px;color:var(--label3)">${overstayed?'Over':'Left'}</div>
         </div>
       </div>
-      <div style="font-size:10px;color:var(--label3);margin-bottom:8px;text-align:center">Exit by <span style="color:${exitByColor};font-weight:600">${exitByStr}</span></div>`}
+      ${overstayed
+        ? `<div style="font-size:10px;color:var(--red);margin-bottom:8px;text-align:center;font-weight:600">${exitByStr}</div>`
+        : inStatus
+          ? `<div style="font-size:10px;color:var(--label3);margin-bottom:8px;text-align:center">Exit by <span style="color:${exitByColor};font-weight:600">${exitByStr}</span></div>`
+          : `<div style="font-size:10px;color:var(--label3);margin-bottom:8px;text-align:center">Next entry: up to <span style="color:var(--green);font-weight:600">${remaining}</span> days</div>`
+      }`}
     <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap">${passportBtns}</div>
     <div style="display:flex;gap:5px">
       <button onclick="showSchengenCheckIn(${idx})" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 2px;font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer">Check In</button>
@@ -1939,6 +1952,23 @@ function renderSchengenPersonStatus(p, idx) {
 function renderSchengenPersonLog(p, idx) {
   const sorted = [...(p?.log||[])].sort((a,b)=>b.date.localeCompare(a.date));
   const borderRight = idx === 0 ? 'border-right:1px solid var(--sep);' : '';
+  // Build trip-duration map: check-in id → days count or 'ongoing'
+  const todayMs = new Date().setHours(23,59,59,999);
+  const chrono = [...(p?.log||[])].sort((a,b)=>a.date.localeCompare(b.date));
+  const tripDays = {};
+  let lastIn = null;
+  for (const e of chrono) {
+    if (e.type==='in') { lastIn = e; }
+    else if (e.type==='out' && lastIn) {
+      const outD = parseISODate(e.date);
+      if (outD && outD.getTime() <= todayMs) {
+        const inD = parseISODate(lastIn.date);
+        if (inD) tripDays[lastIn.id] = Math.round((outD-inD)/86400000)+1;
+        lastIn = null;
+      }
+    }
+  }
+  if (lastIn) tripDays[lastIn.id] = 'ongoing';
   const rows = sorted.map(e => {
     const typeColor = e.type==='in' ? 'var(--green)' : 'var(--label2)';
     const typeLabel = e.type==='in' ? '↓ In' : '↑ Out';
@@ -1946,10 +1976,12 @@ function renderSchengenPersonLog(p, idx) {
     const d = parseISODate(e.date); const dateStr = d ? String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getFullYear()).slice(-2) : esc(e.date);
     const loc = e.location ? ` · ${esc(e.location)}` : '';
     const note = e.notes ? ` · <span style="color:var(--label3)">${esc(e.notes)}</span>` : '';
+    const dur = e.type==='in' && tripDays[e.id] !== undefined
+      ? ` · <span style="color:var(--label3)">${tripDays[e.id]==='ongoing'?'ongoing':tripDays[e.id]+' days'}</span>` : '';
     return `<div style="display:flex;align-items:center;gap:4px;padding:7px 10px;border-bottom:1px solid var(--sep);overflow:hidden">
       <span style="font-size:11px;font-weight:600;color:${typeColor};flex-shrink:0;white-space:nowrap">${typeLabel} ${flag}</span>
       <span style="font-size:11px;color:var(--label3);flex-shrink:0;white-space:nowrap">${dateStr}</span>
-      <span style="font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--label2)">${loc}${note}</span>
+      <span style="font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--label2)">${loc}${note}${dur}</span>
       <button onclick="showSchengenEditEntry(${idx},'${e.id}')" style="background:none;border:none;padding:2px 3px;cursor:pointer;font-size:12px;color:var(--label3);flex-shrink:0">✏️</button>
       <button onclick="deleteSchengenEntry(${idx},'${e.id}')" style="background:none;border:none;padding:2px 3px;cursor:pointer;font-size:12px;color:var(--label3);flex-shrink:0">✕</button>
     </div>`;
