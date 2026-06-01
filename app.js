@@ -1081,31 +1081,44 @@ function renderPhotos() {
             <button class="photo-del" onclick="deletePhoto(${i},'${sub}')">✕</button>
             <input class="photo-cap" value="${esc(p.caption||'')}" placeholder="Caption…"
               onblur="savePhotoCaption('${sub}',${i},this.value)">
+            ${p.sizeKb ? `<div style="font-size:10px;color:var(--label3);text-align:center;padding:2px 0">Saved as ${p.sizeKb} KB</div>` : ''}
           </div>`).join('')}
       </div>
     </div>`;
 }
 
-function handlePhotoUpload(input) {
-  const file = input.files[0]; if (!file) return;
+function compressImage(file, maxSize, quality, callback) {
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = function(e) {
     const img = new Image();
-    img.onload = () => {
+    img.onload = function() {
       const canvas = document.createElement('canvas');
-      const MAX = 900;
-      const ratio = Math.min(1, MAX / Math.max(img.width, img.height));
-      canvas.width = img.width * ratio; canvas.height = img.height * ratio;
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      const section = _photoCtx?.section || ui.photoSub;
-      if (!data.photos) data.photos = {};
-      if (!data.photos[section]) data.photos[section] = [];
-      data.photos[section].push({id:uid(), data:canvas.toDataURL('image/jpeg',0.75), caption:''});
-      save(); document.getElementById('mainContent').innerHTML = renderPhotos();
+      let w = img.width, h = img.height;
+      if (w > maxSize || h > maxSize) {
+        if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+        else { w = Math.round(w * maxSize / h); h = maxSize; }
+      }
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      callback(canvas.toDataURL('image/jpeg', quality));
     };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+function handlePhotoUpload(input) {
+  const file = input.files[0]; if (!file) return;
+  compressImage(file, 1200, 0.7, function(compressed) {
+    const base64 = compressed.split(',')[1] || '';
+    const sizeKb = Math.round(base64.length * 0.75 / 1024);
+    const section = _photoCtx?.section || ui.photoSub;
+    if (!data.photos) data.photos = {};
+    if (!data.photos[section]) data.photos[section] = [];
+    data.photos[section].push({id:uid(), data:compressed, caption:'', sizeKb});
+    save(); document.getElementById('mainContent').innerHTML = renderPhotos();
+  });
   input.value = '';
 }
 
