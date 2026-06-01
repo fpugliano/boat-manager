@@ -549,14 +549,11 @@ function renderSetup(setupEmail = '') {
           <div class="hull-sub">Port + Starboard</div>
         </div>
       </div>
-      <div style="margin:18px 0 4px;font-size:14px;color:var(--label2)">
-        <button type="button" onclick="showPrivacyPolicy()" style="display:block;width:100%;text-align:center;background:none;border:1px solid var(--sep);border-radius:10px;color:var(--blue);font-family:var(--font);font-size:14px;cursor:pointer;padding:10px;margin-bottom:10px;text-decoration:underline">📄 Read Privacy Policy</button>
-        <div style="display:flex;align-items:center;gap:10px">
-          <input type="checkbox" id="s-consent" onchange="document.getElementById('s-go').disabled=!this.checked" style="flex-shrink:0;cursor:pointer;width:20px;height:20px">
-          <label for="s-consent" style="cursor:pointer;line-height:1.4">I have read and agree to the Privacy Policy</label>
-        </div>
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:20px;padding:14px;background:var(--surface);border-radius:12px;border:0.5px solid var(--sep);">
+        <input type="checkbox" id="privacyConsent" style="width:20px;height:20px;border-radius:5px;flex-shrink:0;margin-top:2px;cursor:pointer;" onchange="document.getElementById('setupSubmitBtn').disabled=!this.checked;">
+        <label for="privacyConsent" style="font-size:14px;color:var(--label);line-height:1.5;cursor:pointer;">I have read and agree to the <span style="color:#185FA5;text-decoration:underline;cursor:pointer;" onclick="event.preventDefault();showPrivacyPolicy()">Privacy Policy</span></label>
       </div>
-      <button class="setup-go" id="s-go" onclick="completeSetup()" disabled>Set Up My Boat →</button>
+      <button class="setup-go" id="setupSubmitBtn" onclick="completeSetup()" disabled>Set Up My Boat →</button>
       <button onclick="renderLoginScreen()"
         style="width:100%;margin-top:14px;border:none;background:none;font-family:var(--font);
           font-size:15px;color:var(--label3);cursor:pointer;padding:10px">
