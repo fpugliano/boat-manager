@@ -2873,8 +2873,18 @@ function removeSystem(id) {
 }
 function editSystem(id) {
   const s = (data.systems||[]).find(x=>x.id===id); if (!s) return;
+  const existingCats = [...new Set((data.systems||[]).map(x=>x.cat||x.category).filter(Boolean))];
+  const curCat = s.cat||s.category||'';
+  const catOptions = existingCats.map(c=>`<option value="${esc(c)}" ${c===curCat?'selected':''}>${esc(c)}</option>`).join('');
+  const isCustom = curCat && !existingCats.includes(curCat);
   showModal('Edit System', `
-    <div class="mi-label">Category</div><input class="mi" id="es-cat" value="${esc(s.cat||s.category||'')}">
+    <div class="mi-label">Category</div>
+    <select class="mi" id="es-cat-sel" onchange="var v=this.value;var ni=document.getElementById('es-cat-new');if(v==='__new__'){ni.style.display='block';ni.focus();}else{ni.style.display='none';}">
+      <option value="">— Select —</option>
+      ${catOptions}
+      <option value="__new__" ${isCustom?'selected':''}>+ New category…</option>
+    </select>
+    <input class="mi" id="es-cat-new" placeholder="New category name" value="${isCustom?esc(curCat):''}" style="display:${isCustom?'block':'none'};margin-top:6px">
     <div class="mi-label">Make</div><input class="mi" id="es-mk" value="${esc(s.make||'')}">
     <div class="mi-label">Model</div><input class="mi" id="es-md" value="${esc(s.model||'')}">
     <div class="mi-label">Serial Number</div><input class="mi" id="es-ser" value="${esc(s.serialNumber||'')}">
@@ -2891,7 +2901,10 @@ function editSystem(id) {
 }
 function saveEditSystem(id) {
   const s = (data.systems||[]).find(x=>x.id===id); if (!s) return;
-  const cat = document.getElementById('es-cat').value;
+  const selVal = document.getElementById('es-cat-sel')?.value;
+  const cat = (selVal === '__new__' || !selVal)
+    ? (document.getElementById('es-cat-new')?.value.trim() || '')
+    : selVal;
   s.cat = cat; s.category = cat;
   s.make          = document.getElementById('es-mk').value;
   s.model         = document.getElementById('es-md').value;
