@@ -689,7 +689,7 @@ function renderVesselDoc() {
     <div class="btn-row no-print">
       <button class="btn btn-s btn-sm" onclick="window.print()">🖨 Print</button>
     </div>
-    <div class="sec-hd">Vessel Identification</div>
+    <div class="sec-hd" style="display:flex;align-items:center;justify-content:space-between">Vessel Identification<button class="btn btn-s btn-sm" onclick="archiveVesselDoc()">Archive &amp; New</button></div>
     <div class="card"><div class="card-body">
       ${fr('Vessel Name','documents.vessel.vesselName',v.vesselName)}
       ${fr('Official No.','documents.vessel.officialNumber',v.officialNumber)}
@@ -717,7 +717,19 @@ function renderVesselDoc() {
       ${fr('Managing Owner','documents.vessel.managingOwner',v.managingOwner)}
       ${fr('Issue Date','documents.vessel.issueDate',v.issueDate,'date')}
       ${frExpiry('documents.vessel.expiryDate',v.expiryDate,exp)}
-    </div></div>`;
+    </div></div>
+    <div class="sec-hd">Registration History</div>
+    <div class="card">
+      <div style="overflow-x:auto">
+        <table class="tbl"><thead><tr><th>Reg No.</th><th>Issued</th><th>Expires</th><th>Owner(s)</th><th></th></tr></thead>
+        <tbody>${(v.registrationHistory||[]).map((r,i)=>`
+          <tr><td style="font-size:12px">${esc(r.officialNumber||'—')}</td><td style="font-size:12px">${esc(r.issueDate||'')}</td>
+          <td style="font-size:12px">${esc(r.expiryDate||'')}</td><td style="font-size:12px">${esc(r.owners||'')}</td>
+          <td><button class="btn btn-d btn-xs" onclick="removeVesselDocHistory(${i})">✕</button></td></tr>`
+        ).join('') || '<tr><td colspan="5" style="color:var(--label3);padding:12px">No history yet</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
 }
 
 function renderInsurance() {
@@ -848,6 +860,23 @@ function saveMonthsField(path, el) {
   const boxes = el.closest('.fr').querySelectorAll('input[type=checkbox]');
   const sorted = FULL.filter(m => [...boxes].some(b => b.dataset.month===m && b.checked));
   saveField(path, sorted.join(','));
+}
+
+function archiveVesselDoc() {
+  if (!confirm('Archive current registration details and clear for new period?')) return;
+  const v = data.documents.vessel;
+  if (!v.registrationHistory) v.registrationHistory = [];
+  v.registrationHistory.unshift({
+    officialNumber: v.officialNumber||'', issueDate: v.issueDate||'',
+    expiryDate: v.expiryDate||'', owners: v.owners||''
+  });
+  ['officialNumber','issueDate','expiryDate','owners','managingOwner'].forEach(k => { v[k] = ''; });
+  save(); document.getElementById('mainContent').innerHTML = renderDocuments();
+}
+
+function removeVesselDocHistory(i) {
+  data.documents.vessel.registrationHistory.splice(i, 1); save();
+  document.getElementById('mainContent').innerHTML = renderDocuments();
 }
 
 function archiveInsurance() {
