@@ -1364,14 +1364,21 @@ function renderShipyard() {
     const yrRaw = h.year||''; const yrM = yrRaw.match(/^(\d{4})[-\/](\d{2,4})$/);
     const yr = yrM ? yrM[1]+'/'+yrM[2].slice(-2) : yrRaw;
     const dateRange = [h.start, h.end].filter(Boolean).map(shortDate).join('–');
-    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--sep);overflow:hidden">
-      <div style="font-size:12px;font-weight:700;flex-shrink:0;width:60px;white-space:nowrap">${esc(yr)}</div>
-      <div style="font-size:13px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${esc(h.location||h.name||'')}</div>
-      <div style="font-size:11px;color:var(--label3);flex-shrink:0;white-space:nowrap">${esc(dateRange)}</div>
-      <div style="font-size:11px;color:var(--label3);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(h.notes||'')}</div>
-      <div style="font-size:12px;font-weight:600;flex-shrink:0;white-space:nowrap">${fmtCost(h.cost)}</div>
-      <button onclick="editShipyardHistory(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✏️</button>
-      <button onclick="removeShipyardHistory(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✕</button>
+    const hasNotes = (h.notes||'').length > 30;
+    const notesId = `sy-notes-${i}`;
+    return `<div style="border-bottom:1px solid var(--sep)">
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;overflow-x:hidden">
+        <div style="font-size:12px;font-weight:700;flex-shrink:0;width:60px;white-space:nowrap">${esc(yr)}</div>
+        <div style="font-size:13px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${esc(h.location||h.name||'')}</div>
+        <div style="font-size:11px;color:var(--label3);flex-shrink:0;white-space:nowrap">${esc(dateRange)}</div>
+        <div id="${notesId}" style="font-size:11px;color:var(--label3);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${hasNotes?'cursor:pointer':''}"
+          ${hasNotes?`onclick="var el=document.getElementById('${notesId}');var exp=el.dataset.expanded==='1';el.dataset.expanded=exp?'0':'1';el.style.whiteSpace=exp?'nowrap':'normal';el.style.overflow=exp?'hidden':'visible';el.style.textOverflow=exp?'ellipsis':'clip';" title="Tap to expand"`:''}>
+          ${esc(h.notes||'')}${hasNotes?` <span style="color:var(--blue);font-size:10px">▼</span>`:''}
+        </div>
+        <div style="font-size:12px;font-weight:600;flex-shrink:0;white-space:nowrap">${fmtCost(h.cost)}</div>
+        <button onclick="editShipyardHistory(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✏️</button>
+        <button onclick="removeShipyardHistory(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✕</button>
+      </div>
     </div>`;
   }).join('') : `<div style="padding:18px 14px;color:var(--label3);font-size:13px">No past seasons yet</div>`;
 
