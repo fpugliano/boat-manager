@@ -549,7 +549,7 @@ function renderSetup(setupEmail = '') {
           <div class="hull-sub">Port + Starboard</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px;background:var(--surface);border-radius:12px;border:0.5px solid var(--sep);"><input type="checkbox" id="privacyConsent" onchange="var b=document.getElementById('setupSubmitBtn');if(b)b.disabled=!this.checked;" style="width:20px;height:20px;cursor:pointer;flex-shrink:0;"><span style="font-size:14px;color:var(--label);line-height:1.4;">I have read and agree to the <span style="color:#185FA5;text-decoration:underline;cursor:pointer;" onclick="showPrivacyPolicy()">Privacy Policy</span></span></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px;background:var(--surface);border-radius:12px;border:0.5px solid var(--sep);"><input type="checkbox" id="privacyConsent" onchange="var b=document.getElementById('setupSubmitBtn');if(b)b.disabled=!this.checked;" style="width:20px;height:20px;cursor:pointer;flex-shrink:0;"><span style="font-size:14px;color:var(--label);line-height:1.4;">I have read and agree to the <span style="color:#185FA5;cursor:pointer;" onclick="showPrivacyPolicy()">Privacy Policy</span></span></div>
       <button class="setup-go" id="setupSubmitBtn" onclick="completeSetup()" disabled>Set Up My Boat →</button>
       <button onclick="renderLoginScreen()"
         style="width:100%;margin-top:14px;border:none;background:none;font-family:var(--font);
@@ -3605,7 +3605,7 @@ function renderLockScreen() {
   const email  = localStorage.getItem(EMAIL_KEY);
   ov.innerHTML = `
     <div class="setup-inner" style="padding-top:calc(env(safe-area-inset-top) + 20px)">
-      <div class="setup-logo"><img src="oroboro-logo-15.jpg" alt="Oroboro" style="max-width:220px;height:auto;display:block;margin:0 auto 24px;mix-blend-mode:multiply;"></div>
+      <div class="setup-logo"><img src="oroboro-logo-15.jpg" alt="Oroboro" style="max-width:220px;height:auto;display:block;margin:0 auto 24px;mix-blend-mode:screen;"></div>
       <div style="font-size:48px;text-align:center;margin-bottom:10px">🔒</div>
       <div class="setup-h" style="text-align:center">Enter PIN</div>
       <div class="setup-sub" style="text-align:center">${email ? esc(email) : ''}</div>
@@ -3765,7 +3765,7 @@ function renderLoginScreen() {
   document.getElementById('app').classList.add('hidden');
   ov.innerHTML = `
     <div class="setup-inner" style="padding-top:calc(env(safe-area-inset-top) + 20px)">
-      <div class="setup-logo"><img src="oroboro-logo-15.jpg" alt="Oroboro" style="max-width:220px;height:auto;display:block;margin:0 auto 24px;mix-blend-mode:multiply;"></div>
+      <div class="setup-logo"><img src="oroboro-logo-15.jpg" alt="Oroboro" style="max-width:220px;height:auto;display:block;margin:0 auto 24px;mix-blend-mode:screen;"></div>
       <div class="setup-h">Boat Manager</div>
       <label class="setup-lbl">Email</label>
       <input class="setup-inp" id="login-email" type="email" placeholder="your@email.com"
