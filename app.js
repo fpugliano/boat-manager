@@ -1942,19 +1942,16 @@ function renderSchengenPersonLog(p, idx) {
   const rows = sorted.map(e => {
     const typeColor = e.type==='in' ? 'var(--green)' : 'var(--label2)';
     const typeLabel = e.type==='in' ? '↓ In' : '↑ Out';
-    const passFlag = e.passport ? `${e.passport} ` : '';
-    return `<div style="padding:8px 10px;border-bottom:1px solid var(--sep)">
-      <div style="display:flex;align-items:flex-start;gap:4px">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:12px;font-weight:600;color:${typeColor}">${typeLabel} ${passFlag}</div>
-          <div style="font-size:11px;color:var(--label3);line-height:1.3">${esc(e.date)}</div>
-          <div style="font-size:11px;color:var(--label3);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.location||'')}</div>
-        </div>
-        <div style="display:flex;gap:0;flex-shrink:0">
-          <button onclick="showSchengenEditEntry(${idx},'${e.id}')" style="background:none;border:none;padding:3px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✏️</button>
-          <button onclick="deleteSchengenEntry(${idx},'${e.id}')" style="background:none;border:none;padding:3px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✕</button>
-        </div>
-      </div>
+    const flag = e.passport ? `${e.passport} ` : '';
+    const d = parseISODate(e.date); const dateStr = d ? String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getFullYear()).slice(-2) : esc(e.date);
+    const loc = e.location ? ` · ${esc(e.location)}` : '';
+    const note = e.notes ? ` · <span style="color:var(--label3)">${esc(e.notes)}</span>` : '';
+    return `<div style="display:flex;align-items:center;gap:4px;padding:7px 10px;border-bottom:1px solid var(--sep);overflow:hidden">
+      <span style="font-size:11px;font-weight:600;color:${typeColor};flex-shrink:0;white-space:nowrap">${typeLabel} ${flag}</span>
+      <span style="font-size:11px;color:var(--label3);flex-shrink:0;white-space:nowrap">${dateStr}</span>
+      <span style="font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--label2)">${loc}${note}</span>
+      <button onclick="showSchengenEditEntry(${idx},'${e.id}')" style="background:none;border:none;padding:2px 3px;cursor:pointer;font-size:12px;color:var(--label3);flex-shrink:0">✏️</button>
+      <button onclick="deleteSchengenEntry(${idx},'${e.id}')" style="background:none;border:none;padding:2px 3px;cursor:pointer;font-size:12px;color:var(--label3);flex-shrink:0">✕</button>
     </div>`;
   }).join('') || `<div style="padding:14px 10px;text-align:center;color:var(--label3);font-size:12px">No entries</div>`;
   return `<div style="min-width:0;overflow:hidden;${borderRight}">
