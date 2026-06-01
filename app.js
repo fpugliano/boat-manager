@@ -2464,26 +2464,22 @@ function renderWatermaker() {
   const target = wm.targetHours || 60;
   const hoursLeft = Math.max(0, target - hoursUsed);
   const pct = Math.min(1, hoursUsed / target);
-  const arcColor = hoursUsed >= 65 ? 'var(--red)' : hoursUsed >= 50 ? 'var(--orange)' : 'var(--green)';
+  const arcColor = pct < 0.7 ? '#22C55E' : pct < 0.9 ? '#F59E0B' : '#EF4444';
   const usedColor = hoursUsed >= 50 ? (hoursUsed >= 65 ? 'var(--red)' : 'var(--orange)') : 'var(--green)';
   const warn = (target - hoursUsed) <= 10
     ? `<div style="margin:0 0 10px;padding:10px 14px;background:rgba(255,149,0,.1);border:1.5px solid var(--orange);border-radius:10px;font-size:13px;color:var(--orange);font-weight:600">⚠ 5 &amp; 20 micron filters — change recommended in ${Math.max(0,target-hoursUsed)}h</div>` : '';
   const exampleBanner = (!isOwner && !wm.exampleDismissed) ? `<div style="margin:0 0 10px;padding:8px 12px;background:var(--surface2);border-radius:10px;font-size:12px;color:var(--label3);font-style:italic">These are example values — update with your own readings</div>` : '';
 
-  // SVG semicircular gauge
-  const r = 54, cx = 70, cy = 70;
-  const startAngle = 180, endAngle = 0; // left to right, top half
-  const toRad = a => a * Math.PI / 180;
-  const arcX = (a) => cx + r * Math.cos(toRad(a));
-  const arcY = (a) => cy + r * Math.sin(toRad(a));
-  const fillAngle = 180 - pct * 180;
-  const bgPath = `M ${arcX(180)} ${arcY(180)} A ${r} ${r} 0 0 1 ${arcX(0)} ${arcY(0)}`;
-  const fillPath = pct > 0 ? `M ${arcX(180)} ${arcY(180)} A ${r} ${r} 0 ${pct>0.5?1:0} 1 ${arcX(fillAngle)} ${arcY(fillAngle)}` : '';
-  const gauge = `<svg width="140" height="80" viewBox="0 0 140 80" style="display:block;margin:0 auto 8px">
-    <path d="${bgPath}" fill="none" stroke="var(--surface2)" stroke-width="12" stroke-linecap="round"/>
-    ${fillPath?`<path d="${fillPath}" fill="none" stroke="${arcColor}" stroke-width="12" stroke-linecap="round"/>`:''}
-    <text x="70" y="62" text-anchor="middle" font-size="24" font-weight="800" fill="${arcColor}" font-family="var(--font)">${hoursUsed}</text>
-    <text x="70" y="75" text-anchor="middle" font-size="10" fill="var(--label3)" font-family="var(--font)">hours used</text>
+  // SVG circular gauge using stroke-dasharray/dashoffset
+  const totalArc = 283;
+  const dashoffset = Math.round(totalArc * (1 - pct));
+  const gauge = `<svg width="140" height="140" viewBox="0 0 140 140" style="display:block;margin:0 auto 8px">
+    <circle cx="70" cy="70" r="45" fill="none" stroke="var(--surface2)" stroke-width="12"/>
+    <circle id="wmArcFill" cx="70" cy="70" r="45" fill="none" stroke="${arcColor}" stroke-width="12" stroke-linecap="round"
+      stroke-dasharray="${totalArc}" stroke-dashoffset="${dashoffset}"
+      transform="rotate(-90 70 70)"/>
+    <text x="70" y="66" text-anchor="middle" font-size="24" font-weight="800" fill="${arcColor}" font-family="var(--font)">${hoursUsed}</text>
+    <text x="70" y="82" text-anchor="middle" font-size="10" fill="var(--label3)" font-family="var(--font)">hours used</text>
   </svg>`;
 
   // Charcoal filter card
