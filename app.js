@@ -2557,6 +2557,7 @@ function renderWatermaker() {
             <div style="display:flex;align-items:center;gap:8px">
               <span style="font-size:14px;font-weight:600">${wm.lastChangeReading||0}h</span>
               <button onclick="wmUpdateLastChange()" style="background:var(--surface2);border:1.5px solid var(--sep);border-radius:14px;padding:3px 10px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">Update</button>
+              <button onclick="wmEditLastChange()" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:14px;color:var(--label3)">✏️</button>
             </div>
           </div>
           ${!(wm.lastChangeReading) ? `<div style="font-size:11px;color:var(--label3);margin-top:3px">Tap Update to set the reading from your last filter change</div>` : ''}
@@ -2584,7 +2585,7 @@ function renderWatermaker() {
           <div style="height:8px;background:${charBarColor};width:${Math.round(charPct*100)}%;border-radius:4px;transition:width .4s"></div>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--label3);margin-bottom:10px">
-          <span>Changed ${charChangedStr}</span><span>Due ${charDueStr}</span>
+          <span>Changed ${charChangedStr} <button onclick="wmEditCharcoalDate()" style="background:none;border:none;padding:0 2px;cursor:pointer;font-size:12px;color:var(--label3);vertical-align:middle">✏️</button></span><span>Due ${charDueStr}</span>
         </div>
         <button onclick="wmChangeCharcoal()" style="width:100%;background:var(--surface2);border:1.5px solid var(--sep);border-radius:10px;padding:9px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">Change Charcoal Filter</button>
       </div>
@@ -2629,6 +2630,40 @@ function wmSaveLastChange() {
   const wm = getWatermakerData();
   const v = parseInt(document.getElementById('wm-lc')?.value);
   if (!isNaN(v) && v >= 0) { wm.lastChangeReading = v; wm.exampleDismissed = true; save(); }
+  hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
+}
+
+function wmEditLastChange() {
+  const wm = getWatermakerData();
+  showModal('Edit Last Filter Change Reading', `
+    <div class="mi-label">Hour meter reading when filters were last changed</div>
+    <input class="mi" id="wm-elc" type="number" min="0" value="${wm.lastChangeReading||0}" autofocus>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="wmSaveEditLastChange()">Save</button>
+    </div>`);
+}
+function wmSaveEditLastChange() {
+  const wm = getWatermakerData();
+  const v = parseInt(document.getElementById('wm-elc')?.value);
+  if (!isNaN(v) && v >= 0) { wm.lastChangeReading = v; wm.exampleDismissed = true; save(); }
+  hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
+}
+
+function wmEditCharcoalDate() {
+  const wm = getWatermakerData();
+  showModal('Edit Charcoal Filter Change Date', `
+    <div class="mi-label">Date charcoal filter was last changed</div>
+    <input class="mi" id="wm-ecd" type="date" value="${wm.charcoalChangedDate||''}" autofocus>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="wmSaveEditCharcoalDate()">Save</button>
+    </div>`);
+}
+function wmSaveEditCharcoalDate() {
+  const wm = getWatermakerData();
+  const v = document.getElementById('wm-ecd')?.value;
+  if (v) { wm.charcoalChangedDate = v; wm.exampleDismissed = true; save(); }
   hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
 }
 
