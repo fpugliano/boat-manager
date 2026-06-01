@@ -2544,9 +2544,15 @@ function renderWatermaker() {
             <button onclick="wmUpdateReading()" style="background:var(--surface2);border:1.5px solid var(--sep);border-radius:14px;padding:3px 10px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">Update</button>
           </div>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--sep)">
-          <div style="font-size:13px;color:var(--label2)">Reading at last filter change</div>
-          <span style="font-size:14px;font-weight:600">${wm.lastChangeReading||0}h</span>
+        <div style="padding:8px 0;border-top:1px solid var(--sep)">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:13px;color:var(--label2)">Reading at last filter change</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:14px;font-weight:600">${wm.lastChangeReading||0}h</span>
+              <button onclick="wmUpdateLastChange()" style="background:var(--surface2);border:1.5px solid var(--sep);border-radius:14px;padding:3px 10px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">Update</button>
+            </div>
+          </div>
+          ${!(wm.lastChangeReading) ? `<div style="font-size:11px;color:var(--label3);margin-top:3px">Tap Update to set the reading from your last filter change</div>` : ''}
         </div>
         <div style="display:flex;gap:8px;margin-top:8px">
           <button onclick="wmEditTarget()" style="flex:1;background:var(--surface2);border:1.5px solid var(--sep);border-radius:10px;padding:9px 8px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">Edit target (${target}h)</button>
@@ -2599,6 +2605,23 @@ function wmSaveReading() {
   const wm = getWatermakerData();
   const v = parseInt(document.getElementById('wm-cur')?.value);
   if (!isNaN(v) && v >= 0) { wm.currentReading = v; save(); }
+  hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
+}
+
+function wmUpdateLastChange() {
+  const wm = getWatermakerData();
+  showModal('Last Filter Change Reading', `
+    <div class="mi-label">Hour meter reading when you last changed the filters</div>
+    <input class="mi" id="wm-lc" type="number" min="0" value="${wm.lastChangeReading||0}" autofocus>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="wmSaveLastChange()">Save</button>
+    </div>`);
+}
+function wmSaveLastChange() {
+  const wm = getWatermakerData();
+  const v = parseInt(document.getElementById('wm-lc')?.value);
+  if (!isNaN(v) && v >= 0) { wm.lastChangeReading = v; save(); }
   hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
 }
 
