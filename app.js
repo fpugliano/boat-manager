@@ -549,7 +549,7 @@ function renderSetup(setupEmail = '') {
           <div class="hull-sub">Port + Starboard</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px;background:var(--surface);border-radius:12px;border:0.5px solid var(--sep);"><input type="checkbox" id="privacyConsent" onchange="var b=document.getElementById('setupSubmitBtn');if(b)b.disabled=!this.checked;" style="width:20px;height:20px;cursor:pointer;flex-shrink:0;"><span style="font-size:14px;color:var(--label);line-height:1.4;">I have read and agree to the <button type="button" ontouchstart="event.preventDefault();showPrivacyPolicy();" onclick="showPrivacyPolicy();" style="background:none;border:none;color:#185FA5;font-family:var(--font);font-size:14px;cursor:pointer;padding:0;line-height:inherit;vertical-align:baseline;">Privacy Policy</button></span></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px;background:var(--surface);border-radius:12px;border:0.5px solid var(--sep);"><input type="checkbox" id="privacyConsent" onchange="var b=document.getElementById('setupSubmitBtn');if(b)b.disabled=!this.checked;" style="width:22px;height:22px;flex-shrink:0;cursor:pointer;display:inline-block!important;visibility:visible!important;appearance:checkbox!important;-webkit-appearance:checkbox!important;"><span style="font-size:14px;color:var(--label);line-height:1.4;">I have read and agree to the <button type="button" ontouchstart="event.preventDefault();showPrivacyPolicy();" onclick="showPrivacyPolicy();" style="background:none;border:none;color:#185FA5;font-family:var(--font);font-size:14px;cursor:pointer;padding:0;line-height:inherit;vertical-align:baseline;">Privacy Policy</button></span></div>
       <button class="setup-go" id="setupSubmitBtn" onclick="completeSetup()" disabled>Set Up My Boat →</button>
       <button onclick="renderLoginScreen()"
         style="width:100%;margin-top:14px;border:none;background:none;font-family:var(--font);
@@ -4284,36 +4284,25 @@ async function syncNow() {
 }
 
 function showPrivacyPolicy() {
-  showModal('Privacy Policy', `
-    <div style="font-size:13px;color:var(--label2);line-height:1.6;max-height:60vh;overflow-y:auto;padding-right:4px">
-      <div style="font-size:15px;font-weight:700;color:var(--label);margin-bottom:4px">Privacy Policy — Oroboro Boat Manager</div>
-      <div style="font-size:11px;color:var(--label3);margin-bottom:14px">Last updated: May 31, 2026</div>
-
-      <b>What this app is</b><br>
-      Oroboro Boat Manager is a personal boat management tool for sailors. It is not a commercial service open to the general public.<br><br>
-
-      <b>What data we collect</b><br>
-      Your email address (stored as an irreversible hash — we cannot read it), boat and vessel information, maintenance logs, documents and other data you enter manually. No location data, no tracking, no analytics, no advertising.<br><br>
-
-      <b>How data is stored</b><br>
-      All data is encrypted on your device using AES-256 before being transmitted. The encryption key is derived from your PIN and never leaves your device — not even the app developer can read your data. Encrypted data is stored on Cloudflare global infrastructure which may include servers outside the European Union. Since all data is end-to-end encrypted and unreadable without your PIN, this storage location does not affect the confidentiality of your information.<br><br>
-
-      <b>Who can access your data</b><br>
-      Only you with your PIN. Nobody else — not the app developer, not Cloudflare.<br><br>
-
-      <b>Your rights under GDPR</b><br>
-      • Right to access: your data is always accessible to you<br>
-      • Right to deletion: delete your account and all data permanently from Settings<br>
-      • Right to portability: export your data as JSON from Settings at any time<br><br>
-
-      <b>Data breach</b><br>
-      In the unlikely event of a security breach we will notify affected users within 72 hours.<br><br>
-
+  const existing = document.getElementById('ppOverlay');
+  if (existing) { existing.remove(); return; }
+  const div = document.createElement('div');
+  div.id = 'ppOverlay';
+  div.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:flex-end;justify-content:center;';
+  div.innerHTML = `<div style="background:#fff;border-radius:16px 16px 0 0;padding:24px;max-height:80vh;overflow-y:auto;width:100%;max-width:500px;">
+    <h2 style="margin-bottom:12px;font-size:18px;">Privacy Policy</h2>
+    <p style="font-size:13px;line-height:1.7;color:#444;">
+      <b>What this app is</b><br>Oroboro Boat Manager is a personal boat management tool for sailors. Not a commercial service.<br><br>
+      <b>What data we collect</b><br>Your email (stored as a hash we cannot read), boat info, maintenance logs. No tracking, no ads.<br><br>
+      <b>How data is stored</b><br>All data is AES-256 encrypted on your device before transmission. The encryption key is derived from your PIN and never leaves your device.<br><br>
+      <b>Who can access your data</b><br>Only you with your PIN.<br><br>
+      <b>Your GDPR rights</b><br>Access, deletion, and portability — all available in Settings.<br><br>
       <b>Contact:</b> [EMAIL-REMOVED]@gmail.com
-    </div>
-    <div class="modal-btns" style="margin-top:12px">
-      <button class="btn btn-p" onclick="hideModal()">Close</button>
-    </div>`);
+    </p>
+    <button onclick="document.getElementById('ppOverlay').remove()" style="width:100%;padding:14px;background:#185FA5;color:white;border:none;border-radius:12px;font-size:16px;font-weight:500;margin-top:16px;cursor:pointer;">Close</button>
+  </div>`;
+  document.body.appendChild(div);
+  div.addEventListener('click', function(e) { if(e.target===div) div.remove(); });
 }
 
 async function deleteAccount() {
