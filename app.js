@@ -549,10 +549,11 @@ function renderSetup(setupEmail = '') {
           <div class="hull-sub">Port + Starboard</div>
         </div>
       </div>
-      <div style="display:flex;align-items:flex-start;gap:10px;margin:18px 0 12px;font-size:14px;color:var(--label2);line-height:1.4">
-        <input type="checkbox" id="s-consent" onchange="document.getElementById('s-go').disabled=!this.checked" style="margin-top:3px;flex-shrink:0;cursor:pointer;width:18px;height:18px">
-        <div style="line-height:1.5">
-          <label for="s-consent" style="cursor:pointer">I have read and agree to the </label><button onclick="event.stopPropagation();showPrivacyPolicy()" style="background:none;border:none;color:var(--blue);font-family:var(--font);font-size:14px;cursor:pointer;padding:0;text-decoration:underline;vertical-align:baseline">Privacy Policy</button>
+      <div style="margin:18px 0 4px;font-size:14px;color:var(--label2)">
+        <button type="button" onclick="showPrivacyPolicy()" style="display:block;width:100%;text-align:center;background:none;border:1px solid var(--sep);border-radius:10px;color:var(--blue);font-family:var(--font);font-size:14px;cursor:pointer;padding:10px;margin-bottom:10px;text-decoration:underline">📄 Read Privacy Policy</button>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="checkbox" id="s-consent" onchange="document.getElementById('s-go').disabled=!this.checked" style="flex-shrink:0;cursor:pointer;width:20px;height:20px">
+          <label for="s-consent" style="cursor:pointer;line-height:1.4">I have read and agree to the Privacy Policy</label>
         </div>
       </div>
       <button class="setup-go" id="s-go" onclick="completeSetup()" disabled>Set Up My Boat →</button>
