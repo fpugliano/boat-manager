@@ -3417,54 +3417,79 @@ function renderTLStamps(log, archived) {
 function renderTransitLog() {
   try { return _renderTransitLog(); } catch(e) { console.error('renderTransitLog:', e); return `<div style="padding:20px;color:var(--red);font-size:13px">Transit Log error: ${esc(e.message)}<br><small style="color:var(--label3)">${esc(e.stack||'')}</small></div>`; }
 }
+function fmtTLSeason(s) { const m=String(s||'').match(/^(\d{4})-(\d{4})$/); return m?m[1]+'/'+m[2].slice(-2):s; }
 function _renderTransitLog() {
   const wd = getTLData();
-  if (!ui.tlSeasonId) ui.tlSeasonId = wd.currentLog;
   if (!ui.tlOpen) ui.tlOpen = {s1:true, s2:true, s3:true};
-  const log = wd.logs[ui.tlSeasonId]; if (!log) return '';
-  const archived = log.archived, isCurrent = ui.tlSeasonId === wd.currentLog;
-  const opts = Object.keys(wd.logs).reverse().map(id=>
-    `<option value="${id}" ${id===ui.tlSeasonId?'selected':''}>${esc(wd.logs[id].season)}${wd.logs[id].archived?' 🔒':''}</option>`
-  ).join('');
-  const hdr = `<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
-    <select onchange="ui.tlSeasonId=this.value;ui.tlOpen={s1:true,s2:true,s3:true};ui.tlEditStampId=null;document.getElementById('mainContent').innerHTML=renderDocuments()"
-      style="flex:1;background:var(--surface);border:1.5px solid var(--sep);border-radius:20px;padding:7px 14px;font-size:14px;font-weight:600;font-family:var(--font);color:var(--label);cursor:pointer;min-width:140px">${opts}</select>
-    ${isCurrent&&!archived?`<button class="btn btn-s btn-sm" onclick="archiveTransitLog()">Archive &amp; New</button>`:''}
-    ${archived?`<span style="font-size:12px;font-weight:500;padding:6px 10px;background:var(--surface2);border-radius:12px;color:var(--label3)">🔒 Archived</span>`:''}
+  const cur = wd.logs[wd.currentLog]; if (!cur) return '';
+  const exp = expiryBadge(cur.validUntil, 60);
+
+  const activeHdr = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:15px;font-weight:700">${esc(fmtTLSeason(cur.season))}</span>
+      <span style="background:var(--green);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px">Active</span>
+    </div>
+    <button class="btn btn-s btn-sm" onclick="archiveTransitLog()">Archive &amp; New</button>
   </div>`;
-  const exp = expiryBadge(log.validUntil, 60);
+
   const s1 = `<div class="card-body">
-    ${frTL('Document Number (Αρ. Δελτίου)','docNumber',log.docNumber)}
-    ${frTL('Issue Date (Ημερομηνία)','issueDate',log.issueDate)}
-    ${frTL('Valid From (Από)','validFrom',log.validFrom)}
-    <div class="fr"><div class="fl">Valid Until (Μέχρι) ${exp}</div><input class="fi" type="text" value="${esc(log.validUntil||'')}" onblur="saveTLField('validUntil',this.value)" placeholder="—"></div>
-    ${frTL('Customs Authority (Τελ. Αρχή)','customsAuthority',log.customsAuthority)}
-    ${frTLSelect('Validity Type','validityType',log.validityType||'Limited (Ορισμένη)',['Limited (Ορισμένη)','Unlimited (Αόριστη)'])}
-    ${frTL('Previous Documents Count','prevDocCount',log.prevDocCount)}
-    ${frTLArea('Other Notes','otherNotes',log.otherNotes)}
-    ${frTLArea('Vessel Provisions and Bonded Stores','provisions',log.provisions)}
+    ${frTL('Document Number (Αρ. Δελτίου)','docNumber',cur.docNumber)}
+    ${frTL('Issue Date (Ημερομηνία)','issueDate',cur.issueDate)}
+    ${frTL('Valid From (Από)','validFrom',cur.validFrom)}
+    <div class="fr"><div class="fl">Valid Until (Μέχρι) ${exp}</div><input class="fi" type="text" value="${esc(cur.validUntil||'')}" onblur="saveTLField('validUntil',this.value)" placeholder="—"></div>
+    ${frTL('Customs Authority (Τελ. Αρχή)','customsAuthority',cur.customsAuthority)}
+    ${frTLSelect('Validity Type','validityType',cur.validityType||'Limited (Ορισμένη)',['Limited (Ορισμένη)','Unlimited (Αόριστη)'])}
+    ${frTL('Previous Documents Count','prevDocCount',cur.prevDocCount)}
+    ${frTLArea('Other Notes','otherNotes',cur.otherNotes)}
+    ${frTLArea('Vessel Provisions and Bonded Stores','provisions',cur.provisions)}
   </div>`;
   const s2 = `<div class="card-body">
-    ${frTL('Vessel Name','vesselName',log.vesselName)}
-    ${frTL('Flag','flag',log.flag)}
-    ${frTL('Port of Registry','portOfRegistry',log.portOfRegistry)}
-    ${frTL('Registration Number','regNumber',log.regNumber)}
-    ${frTL('Call Sign','callSign',log.callSign)}
-    ${frTL('Type of Vessel','vesselType',log.vesselType)}
-    ${frTL('Gross Tonnage (GT)','gt',log.gt)}
-    ${frTL('Engine','engine',log.engine)}
-    ${frTL('Length (LOA)','loa',log.loa)}
-    ${frTL('Year Built','yearBuilt',log.yearBuilt)}
-    ${frTL('Year of First Registration','yearFirstReg',log.yearFirstReg)}
-    ${frTL('Owner Name (Πλοιοκτήτης)','ownerName',log.ownerName)}
-    ${frTL('Holder/User (Κατοχος-Χρηστης)','holderName',log.holderName)}
-    ${frTL('Address','address',log.address)}
-    ${frTL('Telephone','telephone',log.telephone)}
-    ${frTL('Email','email',log.email)}
-    ${frTL('AFM/TIN (ΑΦΜ)','afm',log.afm)}
-    ${frTL('ID / Passport (ΑΔΤ ή Διαβατήριο)','idNumber',log.idNumber)}
+    ${frTL('Vessel Name','vesselName',cur.vesselName)}
+    ${frTL('Flag','flag',cur.flag)}
+    ${frTL('Port of Registry','portOfRegistry',cur.portOfRegistry)}
+    ${frTL('Registration Number','regNumber',cur.regNumber)}
+    ${frTL('Call Sign','callSign',cur.callSign)}
+    ${frTL('Type of Vessel','vesselType',cur.vesselType)}
+    ${frTL('Gross Tonnage (GT)','gt',cur.gt)}
+    ${frTL('Engine','engine',cur.engine)}
+    ${frTL('Length (LOA)','loa',cur.loa)}
+    ${frTL('Year Built','yearBuilt',cur.yearBuilt)}
+    ${frTL('Year of First Registration','yearFirstReg',cur.yearFirstReg)}
+    ${frTL('Owner Name (Πλοιοκτήτης)','ownerName',cur.ownerName)}
+    ${frTL('Holder/User (Κατοχος-Χρηστης)','holderName',cur.holderName)}
+    ${frTL('Address','address',cur.address)}
+    ${frTL('Telephone','telephone',cur.telephone)}
+    ${frTL('Email','email',cur.email)}
+    ${frTL('AFM/TIN (ΑΦΜ)','afm',cur.afm)}
+    ${frTL('ID / Passport (ΑΔΤ ή Διαβατήριο)','idNumber',cur.idNumber)}
   </div>`;
-  return hdr + tlSection(1,'📋 Document Info',s1) + tlSection(2,'🚢 Vessel & Owner',s2) + tlSection(3,'🛂 Port Stamps (Δελτίο Κίνησης)',renderTLStamps(log,archived));
+
+  const archived = Object.entries(wd.logs)
+    .filter(([id,l])=>l.archived)
+    .sort((a,b)=>b[1].season.localeCompare(a[1].season));
+
+  const pastRows = archived.map(([id,l])=>{
+    const dates = [l.validFrom, l.validUntil].filter(Boolean).join('–');
+    const note = (l.otherNotes||l.docNumber||'');
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--sep);overflow:hidden">
+      <div style="font-size:12px;font-weight:700;flex-shrink:0;width:54px;white-space:nowrap">${esc(fmtTLSeason(l.season))}</div>
+      <div style="font-size:12px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">${esc(l.docNumber||'—')}</div>
+      <div style="font-size:11px;color:var(--label3);flex-shrink:0;white-space:nowrap">${esc(dates)}</div>
+      <div style="font-size:11px;color:var(--label3);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(note.length>40?note.slice(0,40)+'…':note)}</div>
+      <button onclick="showEditArchivedTL('${id}')" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✏️</button>
+      <button onclick="deleteArchivedTL('${id}')" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✕</button>
+    </div>`;
+  }).join('');
+
+  const pastSection = archived.length
+    ? `<div class="sec-hd">Past transit logs</div><div class="card">${pastRows}</div>`
+    : '';
+
+  return activeHdr
+    + tlSection(1,'📋 Document Info',s1)
+    + tlSection(2,'🚢 Vessel & Owner',s2)
+    + tlSection(3,'🛂 Port Stamps (Δελτίο Κίνησης)',renderTLStamps(cur,false))
+    + pastSection;
 }
 
 function showAddTLStamp() {
@@ -3515,7 +3540,39 @@ function archiveTransitLog() {
     prevDocCount:'', otherNotes:'', provisions:'', vesselName:'', flag:'', portOfRegistry:'', regNumber:'',
     callSign:'', vesselType:'', gt:'', engine:'', loa:'', yearBuilt:'', yearFirstReg:'',
     ownerName:'', holderName:'', address:'', telephone:'', email:'', afm:'', idNumber:''};
-  wd.currentLog=nid; ui.tlSeasonId=nid; ui.tlOpen={s1:true,s2:true,s3:true}; ui.tlEditStampId=null;
+  wd.currentLog=nid; ui.tlOpen={s1:true,s2:true,s3:true}; ui.tlEditStampId=null;
+  save(); document.getElementById('mainContent').innerHTML=renderDocuments();
+}
+function showEditArchivedTL(logId) {
+  const wd=getTLData(), l=wd.logs[logId]; if (!l) return;
+  showModal(`Edit: ${esc(fmtTLSeason(l.season))}`, `
+    <div class="mi-label">Season (e.g. 2024-2025)</div><input class="mi" id="tla-season" value="${esc(l.season||'')}">
+    <div class="mi-label">Document Number</div><input class="mi" id="tla-docNumber" value="${esc(l.docNumber||'')}">
+    <div class="mi-label">Issue Date</div><input class="mi" id="tla-issueDate" value="${esc(l.issueDate||'')}">
+    <div class="mi-label">Valid From</div><input class="mi" id="tla-validFrom" value="${esc(l.validFrom||'')}">
+    <div class="mi-label">Valid Until</div><input class="mi" id="tla-validUntil" value="${esc(l.validUntil||'')}">
+    <div class="mi-label">Customs Authority</div><input class="mi" id="tla-authority" value="${esc(l.customsAuthority||'')}">
+    <div class="mi-label">Notes</div><input class="mi" id="tla-notes" value="${esc(l.otherNotes||'')}">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveEditArchivedTL('${logId}')">Save</button>
+    </div>`);
+}
+function saveEditArchivedTL(logId) {
+  const wd=getTLData(), l=wd.logs[logId]; if (!l) return;
+  l.season            = document.getElementById('tla-season')?.value    || l.season;
+  l.docNumber         = document.getElementById('tla-docNumber')?.value || '';
+  l.issueDate         = document.getElementById('tla-issueDate')?.value || '';
+  l.validFrom         = document.getElementById('tla-validFrom')?.value || '';
+  l.validUntil        = document.getElementById('tla-validUntil')?.value|| '';
+  l.customsAuthority  = document.getElementById('tla-authority')?.value || '';
+  l.otherNotes        = document.getElementById('tla-notes')?.value     || '';
+  save(); hideModal(); document.getElementById('mainContent').innerHTML=renderDocuments();
+}
+function deleteArchivedTL(logId) {
+  if (!confirm('Delete this archived transit log?')) return;
+  const wd=getTLData();
+  delete wd.logs[logId];
   save(); document.getElementById('mainContent').innerHTML=renderDocuments();
 }
 
