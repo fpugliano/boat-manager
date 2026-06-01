@@ -725,7 +725,7 @@ function renderVesselDoc() {
         <tbody>${(v.registrationHistory||[]).map((r,i)=>`
           <tr><td style="font-size:12px">${esc(r.officialNumber||'—')}</td><td style="font-size:12px">${esc(r.issueDate||'')}</td>
           <td style="font-size:12px">${esc(r.expiryDate||'')}</td><td style="font-size:12px">${esc(r.owners||'')}</td>
-          <td><button class="btn btn-d btn-xs" onclick="removeVesselDocHistory(${i})">✕</button></td></tr>`
+          <td style="white-space:nowrap"><button class="btn btn-s btn-xs" onclick="editVesselDocHistory(${i})">✏️</button> <button class="btn btn-d btn-xs" onclick="removeVesselDocHistory(${i})">✕</button></td></tr>`
         ).join('') || '<tr><td colspan="5" style="color:var(--label3);padding:12px">No history yet</td></tr>'}</tbody>
         </table>
       </div>
@@ -762,7 +762,7 @@ function renderInsurance() {
         <table class="tbl"><thead><tr><th>Year</th><th>Insurer</th><th>Premium</th><th>Expiry</th><th></th></tr></thead>
         <tbody>${(I.renewalHistory||[]).map((r,i)=>`
           <tr><td>${esc(r.year)}</td><td>${esc(r.insurer)}</td><td>${esc(r.premium)}</td>
-          <td>${esc(r.expiry)}</td><td><button class="btn btn-d btn-xs" onclick="removeInsuranceRenewal(${i})">✕</button></td></tr>`
+          <td>${esc(r.expiry)}</td><td style="white-space:nowrap"><button class="btn btn-s btn-xs" onclick="editInsuranceHistory(${i})">✏️</button> <button class="btn btn-d btn-xs" onclick="removeInsuranceRenewal(${i})">✕</button></td></tr>`
         ).join('') || '<tr><td colspan="5" style="color:var(--label3);padding:12px">No history yet</td></tr>'}</tbody>
         </table>
       </div>
@@ -814,7 +814,7 @@ function renderCustoms() {
             <td style="font-size:11px">${esc(r.paymentCode||'')}</td>
             <td>${esc(r.datePaid||r.validUntil||'')}</td>
             <td>${esc(r.notes||'')}</td>
-            <td><button class="btn btn-d btn-xs" onclick="removeCustomsRenewal(${i})">✕</button></td>
+            <td style="white-space:nowrap"><button class="btn btn-s btn-xs" onclick="editCustomsHistory(${i})">✏️</button> <button class="btn btn-d btn-xs" onclick="removeCustomsRenewal(${i})">✕</button></td>
           </tr>`
         ).join('') || '<tr><td colspan="7" style="color:var(--label3);padding:12px">No history yet</td></tr>'}</tbody>
         </table>
@@ -860,6 +860,77 @@ function saveMonthsField(path, el) {
   const boxes = el.closest('.fr').querySelectorAll('input[type=checkbox]');
   const sorted = FULL.filter(m => [...boxes].some(b => b.dataset.month===m && b.checked));
   saveField(path, sorted.join(','));
+}
+
+function editVesselDocHistory(i) {
+  const r = data.documents.vessel?.registrationHistory?.[i]; if (!r) return;
+  showModal('Edit Registration', `
+    <div class="mi-label">Reg / Official No.</div><input class="mi" id="vh-reg" value="${esc(r.officialNumber||'')}">
+    <div class="mi-label">Issue Date</div><input class="mi" id="vh-iss" value="${esc(r.issueDate||'')}">
+    <div class="mi-label">Expiry Date</div><input class="mi" id="vh-exp" value="${esc(r.expiryDate||'')}">
+    <div class="mi-label">Owner(s)</div><input class="mi" id="vh-own" value="${esc(r.owners||'')}">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveVesselDocHistory(${i})">Save</button>
+    </div>`);
+}
+function saveVesselDocHistory(i) {
+  const r = data.documents.vessel?.registrationHistory?.[i]; if (!r) return;
+  r.officialNumber = document.getElementById('vh-reg')?.value||'';
+  r.issueDate      = document.getElementById('vh-iss')?.value||'';
+  r.expiryDate     = document.getElementById('vh-exp')?.value||'';
+  r.owners         = document.getElementById('vh-own')?.value||'';
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderDocuments();
+}
+
+function editInsuranceHistory(i) {
+  const r = data.documents.insurance?.renewalHistory?.[i]; if (!r) return;
+  showModal('Edit Insurance Record', `
+    <div class="mi-label">Year</div><input class="mi" id="ih-yr" value="${esc(r.year||'')}">
+    <div class="mi-label">Insurer</div><input class="mi" id="ih-ins" value="${esc(r.insurer||'')}">
+    <div class="mi-label">Premium</div><input class="mi" id="ih-pre" value="${esc(r.premium||'')}">
+    <div class="mi-label">Expiry Date</div><input class="mi" id="ih-exp" value="${esc(r.expiry||'')}">
+    <div class="mi-label">Cert Number</div><input class="mi" id="ih-cert" value="${esc(r.certNumber||'')}">
+    <div class="mi-label">Notes</div><input class="mi" id="ih-notes" value="${esc(r.notes||'')}">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveInsuranceHistory(${i})">Save</button>
+    </div>`);
+}
+function saveInsuranceHistory(i) {
+  const r = data.documents.insurance?.renewalHistory?.[i]; if (!r) return;
+  r.year       = document.getElementById('ih-yr')?.value||'';
+  r.insurer    = document.getElementById('ih-ins')?.value||'';
+  r.premium    = document.getElementById('ih-pre')?.value||'';
+  r.expiry     = document.getElementById('ih-exp')?.value||'';
+  r.certNumber = document.getElementById('ih-cert')?.value||'';
+  r.notes      = document.getElementById('ih-notes')?.value||'';
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderDocuments();
+}
+
+function editCustomsHistory(i) {
+  const r = data.documents.customs?.renewalHistory?.[i]; if (!r) return;
+  showModal('Edit eTEPAY Record', `
+    <div class="mi-label">Year</div><input class="mi" id="ch-yr" value="${esc(r.year||'')}">
+    <div class="mi-label">Months Covered</div><input class="mi" id="ch-mo" value="${esc(r.months||'')}">
+    <div class="mi-label">Amount</div><input class="mi" id="ch-amt" value="${esc(r.amount||'')}">
+    <div class="mi-label">Payment Code (RF)</div><input class="mi" id="ch-pc" value="${esc(r.paymentCode||'')}">
+    <div class="mi-label">Date Paid</div><input class="mi" id="ch-dp" value="${esc(r.datePaid||'')}">
+    <div class="mi-label">Notes</div><input class="mi" id="ch-notes" value="${esc(r.notes||'')}">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveCustomsHistory(${i})">Save</button>
+    </div>`);
+}
+function saveCustomsHistory(i) {
+  const r = data.documents.customs?.renewalHistory?.[i]; if (!r) return;
+  r.year        = document.getElementById('ch-yr')?.value||'';
+  r.months      = document.getElementById('ch-mo')?.value||'';
+  r.amount      = document.getElementById('ch-amt')?.value||'';
+  r.paymentCode = document.getElementById('ch-pc')?.value||'';
+  r.datePaid    = document.getElementById('ch-dp')?.value||'';
+  r.notes       = document.getElementById('ch-notes')?.value||'';
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderDocuments();
 }
 
 function archiveVesselDoc() {
