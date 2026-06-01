@@ -724,7 +724,7 @@ function renderInsurance() {
   const I = data.documents?.insurance || {};
   const exp = expiryBadge(I.expiryDate, 60);
   return `
-    <div class="sec-hd">Policy Details</div>
+    <div class="sec-hd" style="display:flex;align-items:center;justify-content:space-between">Policy Details<button class="btn btn-s btn-sm" onclick="archiveInsurance()">Archive &amp; New</button></div>
     <div class="card"><div class="card-body">
       ${fr('Insurer','documents.insurance.insurer',I.insurer)}
       ${fr('Certificate No.','documents.insurance.certNumber',I.certNumber)}
@@ -761,7 +761,7 @@ function renderCustoms() {
   const C = data.documents?.customs || {};
   const exp = expiryBadge(C.validUntil, 60);
   return `
-    <div class="sec-hd">eTEPAY Application</div>
+    <div class="sec-hd" style="display:flex;align-items:center;justify-content:space-between">eTEPAY Application<button class="btn btn-s btn-sm" onclick="archiveCustoms()">Archive &amp; New</button></div>
     <div class="card"><div class="card-body">
       ${fr('Application Number','documents.customs.applicationNumber',C.applicationNumber)}
       ${fr('Application Date','documents.customs.applicationDate',C.applicationDate)}
@@ -848,6 +848,32 @@ function saveMonthsField(path, el) {
   const boxes = el.closest('.fr').querySelectorAll('input[type=checkbox]');
   const sorted = FULL.filter(m => [...boxes].some(b => b.dataset.month===m && b.checked));
   saveField(path, sorted.join(','));
+}
+
+function archiveInsurance() {
+  if (!confirm('Archive current policy details and start fresh for the new period?')) return;
+  const I = data.documents.insurance;
+  if (!I.renewalHistory) I.renewalHistory = [];
+  const yr = I.issueDate ? I.issueDate.slice(-4)||I.issueDate.slice(0,4) : String(new Date().getFullYear());
+  I.renewalHistory.unshift({year:yr, insurer:I.insurer||'', premium:I.premium||'', expiry:I.expiryDate||''});
+  ['insurer','certNumber','issueDate','expiryDate','premium',
+   'maxPersonalInjury','maxMaterial','maxPollution','totalSumInsured',
+   'thirdPartyLiability','deductibles','navigationLimits','specialNotes'].forEach(k => { I[k] = ''; });
+  save(); document.getElementById('mainContent').innerHTML = renderDocuments();
+}
+
+function archiveCustoms() {
+  if (!confirm('Archive current eTEPAY application and start fresh for the new period?')) return;
+  const C = data.documents.customs;
+  if (!C.renewalHistory) C.renewalHistory = [];
+  C.renewalHistory.unshift({
+    year:C.year||'', months:C.monthsCovered||'', amount:C.amountPaid||'',
+    paymentCode:C.paymentCode||'', datePaid:C.applicationDate||'', notes:''
+  });
+  ['applicationNumber','applicationDate','entryDate','year','monthsCovered',
+   'amountPaid','paymentCode','adminFeeCode','validUntil'].forEach(k => { C[k] = ''; });
+  C.status = 'New';
+  save(); document.getElementById('mainContent').innerHTML = renderDocuments();
 }
 
 function addInsuranceRenewal() {
