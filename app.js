@@ -1835,8 +1835,18 @@ function isCurrentlyInSchengen(log) {
 
 function schengenRerender() { document.getElementById('mainContent').innerHTML = renderSchengen(); }
 
+function schengenDedup(sd) {
+  const seen = new Set();
+  sd.persons = sd.persons.filter(p => {
+    const k = (p.name||'').trim().toLowerCase();
+    if (!k) return true;
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+}
 function renderSchengen() {
   const sd = getSchengenData();
+  schengenDedup(sd);
   const hasData = sd.persons.some(p=>p.name);
   const isOwner = localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL;
   const exampleBanner = (!isOwner && hasData) ? `
@@ -2185,18 +2195,13 @@ function deleteSchengenPerson(i) {
   const sd = getSchengenData();
   const name = sd.persons[i]?.name || 'this person';
   if (!confirm(`Delete ${name} and all their travel history? This cannot be undone.`)) return;
-  sd.persons.splice(i, 1);
+  const key = name.trim().toLowerCase();
+  sd.persons = sd.persons.filter(p => (p.name||'').trim().toLowerCase() !== key);
   save(); hideModal(); showSchengenEdit(); schengenRerender();
 }
 function showSchengenEdit() {
   const sd = getSchengenData();
-  // Deduplicate by name — keep first occurrence of each name
-  const seen = new Set();
-  sd.persons = sd.persons.filter(p => {
-    const k = (p.name||'').trim().toLowerCase();
-    if (!k || !seen.has(k)) { seen.add(k); return true; }
-    return false;
-  });
+  schengenDedup(sd);
   _schPi = sd.persons.map(p => (p.passports||[]).length);
   const personsHtml = sd.persons.map((p,i) => {
     const passHtml = (p.passports||[]).map((pp,pi) => schPassportRow(i,pi,pp)).join('');
@@ -2247,6 +2252,7 @@ function saveSchengenEdit() {
     p.passports = newPassports;
     if ((p.activePassport||0) >= p.passports.length) p.activePassport = 0;
   });
+  schengenDedup(sd);
   save(); hideModal(); schengenRerender();
 }
 
