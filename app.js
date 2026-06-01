@@ -1627,11 +1627,7 @@ function renderMaintenance() {
         <div class="hours-box">
           <div class="hours-num">${h}</div><div class="hours-lbl">hours</div>
           <div class="hours-edit">
-            <button class="h-btn" onclick="adjustHours('${eid}',-10)">−10</button>
-            <button class="h-btn" onclick="adjustHours('${eid}',-1)">−</button>
             <input class="h-input" type="number" value="${h}" min="0" onblur="setHours('${eid}',this.value)">
-            <button class="h-btn" onclick="adjustHours('${eid}',1)">+</button>
-            <button class="h-btn" onclick="adjustHours('${eid}',10)">+10</button>
           </div>
         </div>
       </div>`;
