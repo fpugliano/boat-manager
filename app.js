@@ -549,7 +549,7 @@ function renderSetup(setupEmail = '') {
           <div class="hull-sub">Port + Starboard</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px;background:var(--surface);border-radius:12px;border:0.5px solid var(--sep);"><input type="checkbox" id="privacyConsent" onchange="var b=document.getElementById('setupSubmitBtn');if(b)b.disabled=!this.checked;" style="width:20px;height:20px;cursor:pointer;flex-shrink:0;"><span style="font-size:14px;color:var(--label);line-height:1.4;">I have read and agree to the <span style="color:#185FA5;cursor:pointer;" onclick="showPrivacyPolicy()">Privacy Policy</span></span></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px;background:var(--surface);border-radius:12px;border:0.5px solid var(--sep);"><input type="checkbox" id="privacyConsent" onchange="var b=document.getElementById('setupSubmitBtn');if(b)b.disabled=!this.checked;" style="width:20px;height:20px;cursor:pointer;flex-shrink:0;"><span style="font-size:14px;color:var(--label);line-height:1.4;">I have read and agree to the <button type="button" onclick="showPrivacyPolicy()" style="background:none;border:none;color:#185FA5;font-family:var(--font);font-size:14px;cursor:pointer;padding:0;line-height:inherit;vertical-align:baseline;">Privacy Policy</button></span></div>
       <button class="setup-go" id="setupSubmitBtn" onclick="completeSetup()" disabled>Set Up My Boat →</button>
       <button onclick="renderLoginScreen()"
         style="width:100%;margin-top:14px;border:none;background:none;font-family:var(--font);
