@@ -3032,7 +3032,7 @@ function renderSystemCard(s) {
 }
 
 function showAddSystem() {
-  const existingCats = [...new Set((data.systems||[]).map(s=>s.cat||s.category).filter(Boolean))];
+  const existingCats = [...new Set([...SYS_ALL_CATS, ...(data.systems||[]).map(s=>s.cat||s.category).filter(Boolean)])];
   const catOptions = existingCats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
   const hasExisting = existingCats.length > 0;
   showModal('Add System', `
@@ -3080,10 +3080,10 @@ function removeSystem(id) {
 }
 function editSystem(id) {
   const s = (data.systems||[]).find(x=>x.id===id); if (!s) return;
-  const existingCats = [...new Set((data.systems||[]).map(x=>x.cat||x.category).filter(Boolean))];
+  const existingCats = [...new Set([...SYS_ALL_CATS, ...(data.systems||[]).map(x=>x.cat||x.category).filter(Boolean)])];
   const curCat = s.cat||s.category||'';
   const catOptions = existingCats.map(c=>`<option value="${esc(c)}" ${c===curCat?'selected':''}>${esc(c)}</option>`).join('');
-  const isCustom = curCat && !existingCats.includes(curCat);
+  const isCustom = curCat && !existingCats.includes(curCat) && !SYS_ALL_CATS.includes(curCat);
   showModal('Edit System', `
     <div class="mi-label">Category</div>
     <select class="mi" id="es-cat-sel" onchange="var v=this.value;var ni=document.getElementById('es-cat-new');if(v==='__new__'){ni.style.display='block';ni.focus();}else{ni.style.display='none';}">
