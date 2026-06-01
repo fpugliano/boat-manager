@@ -3091,14 +3091,22 @@ function renderWinterSection(sid, season, archived) {
   const rows = items.map((item, i) => {
     const grpHdr = item.group !== lastGrp ? (lastGrp = item.group, item.group ? `<div class="wgrp">${esc(item.group)}</div>` : '') : '';
     const isEdit = ui.winterEditItem?.sid === sid && ui.winterEditItem?.idx === i;
-    if (isEdit) return grpHdr + `<div class="wrow">
-      <input id="wedit-inp" class="mi" style="flex:1;margin:0;font-size:14px" value="${esc(item.text)}"
-        onkeydown="if(event.key==='Enter')saveWinterItemEdit('${sid}',${i})" onkeyup="if(event.key==='Escape'){ui.winterEditItem=null;winterRerender()}">
-      <button class="btn btn-p btn-xs" onclick="saveWinterItemEdit('${sid}',${i})">Save</button>
-      <button class="wact" onclick="ui.winterEditItem=null;winterRerender()">✕</button>
-    </div>`;
-    const star = item.asterisk ? ` <span style="font-size:11px;opacity:.7">⚠️</span>` : '';
-    const ts = item.checked ? 'text-decoration:line-through;color:var(--label3)' : item.asterisk ? 'color:var(--label2)' : '';
+    if (isEdit) {
+      const isImp = item.text.endsWith(' ⚠️') || !!item.asterisk;
+      const editTxt = item.text.replace(/ ⚠️$/, '');
+      return grpHdr + `<div class="wrow" style="flex-wrap:wrap;gap:4px">
+        <input id="wedit-inp" class="mi" style="flex:1;min-width:120px;margin:0;font-size:14px" value="${esc(editTxt)}"
+          onkeydown="if(event.key==='Enter')saveWinterItemEdit('${sid}',${i})" onkeyup="if(event.key==='Escape'){ui.winterEditItem=null;winterRerender()}">
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;white-space:nowrap;color:var(--label2)">
+          <input type="checkbox" id="wedit-star" ${isImp?'checked':''}> Mark as important ⚠️
+        </label>
+        <button class="btn btn-p btn-xs" onclick="saveWinterItemEdit('${sid}',${i})">Save</button>
+        <button class="wact" onclick="ui.winterEditItem=null;winterRerender()">✕</button>
+      </div>`;
+    }
+    const isImp = !!item.asterisk || item.text?.endsWith(' ⚠️');
+    const star = (item.asterisk && !item.text?.endsWith(' ⚠️')) ? ` <span style="font-size:11px;opacity:.7">⚠️</span>` : '';
+    const ts = item.checked ? 'text-decoration:line-through;color:var(--label3)' : isImp ? 'color:var(--label2)' : '';
     const acts = archived ? '' : `<div style="display:flex;gap:1px;flex-shrink:0">
       <button class="wact" onclick="startWinterEdit('${sid}',${i})" title="Edit">✏️</button>
       <button class="wact" onclick="deleteWinterItem('${sid}',${i})" title="Delete">✕</button>
@@ -3161,8 +3169,13 @@ function startWinterEdit(sid, idx) {
 function saveWinterItemEdit(sid, idx) {
   const season = getWinterData().seasons[getWinterData().currentSeason];
   const item = season?.sections?.[sid]?.items?.[idx]; if (!item) return;
-  const v = document.getElementById('wedit-inp')?.value.trim();
-  if (v) item.text = v;
+  let v = document.getElementById('wedit-inp')?.value.trim();
+  if (!v) return;
+  v = v.replace(/ ⚠️$/, '');
+  const important = !!document.getElementById('wedit-star')?.checked;
+  if (important) v += ' ⚠️';
+  item.text = v;
+  item.asterisk = important;
   ui.winterEditItem = null;
   save(); winterRerender();
 }
@@ -3180,7 +3193,7 @@ function showAddWinterItem(sid) {
     <div class="mi-label">Item text</div>
     <input class="mi" id="m-wadd" placeholder="e.g. Check anchor chain" autofocus>
     <label style="display:flex;align-items:center;gap:8px;font-size:14px;margin:12px 0">
-      <input type="checkbox" id="m-wstar"> Mark as ⚠️ (needs a decision)
+      <input type="checkbox" id="m-wstar"> Mark as important ⚠️
     </label>
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
@@ -3189,13 +3202,16 @@ function showAddWinterItem(sid) {
 }
 
 function addWinterItem(sid) {
-  const text = document.getElementById('m-wadd')?.value.trim();
+  let text = document.getElementById('m-wadd')?.value.trim();
   if (!text) { showToast('Enter item text', true); return; }
+  const important = !!document.getElementById('m-wstar')?.checked;
+  text = text.replace(/ ⚠️$/, '');
+  if (important) text += ' ⚠️';
   const wd = getWinterData();
   const season = wd.seasons[wd.currentSeason];
   if (!season||season.archived) return;
   if (!season.sections[sid]) season.sections[sid] = {items:[]};
-  season.sections[sid].items.push({id:uid(), text, asterisk:!!document.getElementById('m-wstar')?.checked, checked:false, group:null});
+  season.sections[sid].items.push({id:uid(), text, asterisk: important, checked:false, group:null});
   save(); hideModal(); winterRerender();
 }
 
