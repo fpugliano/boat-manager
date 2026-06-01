@@ -2047,6 +2047,8 @@ function saveSchengenAddEntry(personIdx) {
   const date = document.getElementById('sch-date')?.value;
   if (!date) { showToast('Enter a date', true); return; }
   const type = document.getElementById('sch-etype')?.value || 'in';
+  const today = new Date().toISOString().slice(0,10);
+  if (type === 'out' && date > today) { showToast('Check out date cannot be in the future', true); return; }
   if (type === 'in') {
     const passIdx = parseInt(document.getElementById('sch-pass')?.value)||0;
     const passport = p.passports?.[passIdx]?.flag||'';
@@ -2106,6 +2108,7 @@ function saveSchengenCheckOut(personIdx) {
   const p = sd.persons[personIdx]; if (!p) return;
   const date = document.getElementById('sch-date')?.value;
   if (!date) { showToast('Enter a date', true); return; }
+  if (date > new Date().toISOString().slice(0,10)) { showToast('Check out date cannot be in the future', true); return; }
   const location = document.getElementById('sch-loc')?.value.trim()||'';
   p.log.push({id:uid(), type:'out', date, location});
   save(); hideModal(); schengenRerender();
@@ -2339,6 +2342,7 @@ function prefillSchengenData() {
   }
   // Non-owner: seed example travellers if empty
   if (data.schengen?.persons?.some(p => p.name)) return false;
+  const dAgo = n => { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); };
   data.schengen = { persons: [
     { name:'Alex Smith', activePassport:0,
       passports:[
@@ -2346,10 +2350,10 @@ function prefillSchengenData() {
         {flag:'🇦🇺', country:'Australia',     eu:false}
       ],
       log:[
-        {id:uid(), type:'in',  date:'2026-01-15', passport:'🇺🇸', location:'Spain (Barcelona)'},
-        {id:uid(), type:'out', date:'2026-03-15', passport:'',    location:'Morocco'},
-        {id:uid(), type:'in',  date:'2026-04-20', passport:'🇺🇸', location:'Greece (Athens)'},
-        {id:uid(), type:'out', date:'2026-05-20', passport:'',    location:'Turkey (Bodrum)'}
+        {id:uid(), type:'in',  date:dAgo(180), passport:'🇺🇸', location:'Spain (Barcelona)'},
+        {id:uid(), type:'out', date:dAgo(120), passport:'',    location:'Morocco'},
+        {id:uid(), type:'in',  date:dAgo(60),  passport:'🇺🇸', location:'Greece (Athens)'},
+        {id:uid(), type:'out', date:dAgo(30),  passport:'',    location:'Turkey (Bodrum)'}
       ]
     },
     { name:'Maria Santos', activePassport:0,
@@ -2357,8 +2361,8 @@ function prefillSchengenData() {
         {flag:'🇬🇧', country:'United Kingdom', eu:false}
       ],
       log:[
-        {id:uid(), type:'in',  date:'2026-03-01', passport:'🇬🇧', location:'France (Marseille)'},
-        {id:uid(), type:'out', date:'2026-04-30', passport:'',    location:'Morocco'}
+        {id:uid(), type:'in',  date:dAgo(90), passport:'🇬🇧', location:'France (Marseille)'},
+        {id:uid(), type:'out', date:dAgo(45), passport:'',    location:'Tunisia'}
       ]
     }
   ]};
