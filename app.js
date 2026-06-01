@@ -2470,16 +2470,17 @@ function renderWatermaker() {
     ? `<div style="margin:0 0 10px;padding:10px 14px;background:rgba(255,149,0,.1);border:1.5px solid var(--orange);border-radius:10px;font-size:13px;color:var(--orange);font-weight:600">⚠ 5 &amp; 20 micron filters — change recommended in ${Math.max(0,target-hoursUsed)}h</div>` : '';
   const exampleBanner = (!isOwner && !wm.exampleDismissed) ? `<div style="margin:0 0 10px;padding:8px 12px;background:var(--surface2);border-radius:10px;font-size:12px;color:var(--label3);font-style:italic">These are example values — update with your own readings</div>` : '';
 
-  // SVG circular gauge using stroke-dasharray/dashoffset
+  // SVG semicircular gauge — speedometer style
   const totalArc = 283;
   const dashoffset = Math.round(totalArc * (1 - pct));
-  const gauge = `<svg width="140" height="140" viewBox="0 0 140 140" style="display:block;margin:0 auto 8px">
-    <circle cx="70" cy="70" r="45" fill="none" stroke="var(--surface2)" stroke-width="12"/>
-    <circle id="wmArcFill" cx="70" cy="70" r="45" fill="none" stroke="${arcColor}" stroke-width="12" stroke-linecap="round"
-      stroke-dasharray="${totalArc}" stroke-dashoffset="${dashoffset}"
-      transform="rotate(-90 70 70)"/>
-    <text x="70" y="66" text-anchor="middle" font-size="24" font-weight="800" fill="${arcColor}" font-family="var(--font)">${hoursUsed}</text>
-    <text x="70" y="82" text-anchor="middle" font-size="10" fill="var(--label3)" font-family="var(--font)">hours used</text>
+  const gauge = `<svg width="220" height="130" viewBox="0 0 220 130" style="display:block;margin:0 auto 4px">
+    <path d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="#e5e7eb" stroke-width="16" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="0"/>
+    <path id="wmArcFill" d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="${arcColor}" stroke-width="16" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="${dashoffset}"/>
+    <text x="110" y="90" text-anchor="middle" font-size="30" font-weight="800" fill="${arcColor}" font-family="var(--font)">${hoursUsed}</text>
+    <text x="110" y="108" text-anchor="middle" font-size="11" fill="#9ca3af" font-family="var(--font)">hours used</text>
+    <text x="18" y="126" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="var(--font)">0</text>
+    <text x="110" y="22" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="var(--font)">${Math.round(target/2)}</text>
+    <text x="202" y="126" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="var(--font)">${target}</text>
   </svg>`;
 
   // Charcoal filter card
