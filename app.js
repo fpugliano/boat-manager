@@ -2181,8 +2181,22 @@ function schRemovePassport(i, pi) {
   if (other)   other.style.display = 'none';
 }
 
+function deleteSchengenPerson(i) {
+  const sd = getSchengenData();
+  const name = sd.persons[i]?.name || 'this person';
+  if (!confirm(`Delete ${name} and all their travel history? This cannot be undone.`)) return;
+  sd.persons.splice(i, 1);
+  save(); hideModal(); showSchengenEdit(); schengenRerender();
+}
 function showSchengenEdit() {
   const sd = getSchengenData();
+  // Deduplicate by name — keep first occurrence of each name
+  const seen = new Set();
+  sd.persons = sd.persons.filter(p => {
+    const k = (p.name||'').trim().toLowerCase();
+    if (!k || !seen.has(k)) { seen.add(k); return true; }
+    return false;
+  });
   _schPi = sd.persons.map(p => (p.passports||[]).length);
   const personsHtml = sd.persons.map((p,i) => {
     const passHtml = (p.passports||[]).map((pp,pi) => schPassportRow(i,pi,pp)).join('');
@@ -2191,6 +2205,7 @@ function showSchengenEdit() {
         <div id="sch-namerow-${i}" style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
           <span id="sch-namedisplay-${i}" style="font-size:16px;font-weight:700;flex:1;color:var(--label)">${esc(p.name||'Person '+(i+1))}</span>
           <button onclick="schEditName(${i})" style="background:none;border:none;cursor:pointer;font-size:15px;color:var(--label3);padding:2px 4px;font-family:var(--font)">✏️</button>
+          <button onclick="deleteSchengenPerson(${i})" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--red);padding:2px 6px;font-family:var(--font);border:1px solid var(--red);border-radius:8px;line-height:1.4">Delete</button>
         </div>
         <div id="sch-nameedit-${i}" style="display:none;align-items:center;gap:8px;margin-bottom:12px">
           <input id="sch-nameinput-${i}" class="fi" style="flex:1;font-size:15px;font-weight:600" value="${esc(p.name||'')}" placeholder="Person name">
