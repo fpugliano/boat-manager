@@ -61,6 +61,7 @@ const EMPTY_DEFAULTS = {
              estimatedCost:'', actualCost:'', status:'Provisional', depositPaid:'', balanceDue:'', notes:''},
     quotes:[], history:[]
   },
+  watermaker:{currentReading:0, lastChangeReading:0, targetHours:60, charcoalChangedDate:null, inventory:{micron20:0, micron5:0, charcoal:0}},
   spareParts:[
     {id:'ex_p1', desc:'Heat Exchanger gasket', pn:'128370-13201', category:'Inboard', qty:4, minQuantity:2, unitPrice:0,  location:'', storeUrl:''},
     {id:'ex_p2', desc:'Engine Oil filter',     pn:'119305-35170-9', category:'Inboard', qty:2, minQuantity:1, unitPrice:8,  location:'', storeUrl:''},
@@ -589,8 +590,9 @@ function completeSetup() {
 
 const TABS = [
   {id:'documents', icon:'📄', label:'Documents'},
-  {id:'shipyard',  icon:'⚓', label:'Shipyard'},
-  {id:'maint',     icon:'🔧', label:'Maintenance'},
+  {id:'shipyard',    icon:'⚓', label:'Shipyard'},
+  {id:'watermaker',  icon:'💧', label:'Water Maker'},
+  {id:'maint',       icon:'🔧', label:'Maintenance'},
   {id:'upgrades',  icon:'🔧', label:'Upgrades & Repairs'},
   {id:'schengen',  icon:'🛂', label:'Schengen'},
   {id:'parts',     icon:'🔩', label:'Spare Parts'},
@@ -637,8 +639,9 @@ function renderActiveTab() {
     switch(ui.tab) {
       case 'documents': mc.innerHTML = renderDocuments(); break;
       case 'crew':      mc.innerHTML = renderCrew(); break;
-      case 'shipyard':  mc.innerHTML = renderShipyard(); break;
-      case 'maint':     mc.innerHTML = renderMaintenance(); break;
+      case 'shipyard':    mc.innerHTML = renderShipyard(); break;
+      case 'watermaker':  mc.innerHTML = renderWatermaker(); break;
+      case 'maint':       mc.innerHTML = renderMaintenance(); break;
       case 'upgrades':  mc.innerHTML = renderUpgrades(); break;
       case 'schengen':  mc.innerHTML = renderSchengen(); break;
       case 'parts':     mc.innerHTML = renderParts(); break;
@@ -2443,6 +2446,238 @@ function saveSchengenEdit() {
   save(); hideModal(); schengenRerender();
 }
 
+// ═══════════════════════════════════════════════════════════
+//  WATER MAKER TAB
+// ═══════════════════════════════════════════════════════════
+
+function getWatermakerData() {
+  if (!data.watermaker) data.watermaker = {currentReading:0, lastChangeReading:0, targetHours:60, charcoalChangedDate:null, inventory:{micron20:0, micron5:0, charcoal:0}};
+  if (!data.watermaker.inventory) data.watermaker.inventory = {micron20:0, micron5:0, charcoal:0};
+  return data.watermaker;
+}
+
+function renderWatermaker() {
+  const wm = getWatermakerData();
+  const email = localStorage.getItem(EMAIL_KEY);
+  const isOwner = email === OWNER_EMAIL;
+  const hoursUsed = Math.max(0, (wm.currentReading||0) - (wm.lastChangeReading||0));
+  const target = wm.targetHours || 60;
+  const hoursLeft = Math.max(0, target - hoursUsed);
+  const pct = Math.min(1, hoursUsed / target);
+  const arcColor = hoursUsed >= 65 ? 'var(--red)' : hoursUsed >= 50 ? 'var(--orange)' : 'var(--green)';
+  const usedColor = hoursUsed >= 50 ? (hoursUsed >= 65 ? 'var(--red)' : 'var(--orange)') : 'var(--green)';
+  const warn = (target - hoursUsed) <= 10
+    ? `<div style="margin:0 0 10px;padding:10px 14px;background:rgba(255,149,0,.1);border:1.5px solid var(--orange);border-radius:10px;font-size:13px;color:var(--orange);font-weight:600">⚠ 5 &amp; 20 micron filters — change recommended in ${Math.max(0,target-hoursUsed)}h</div>` : '';
+  const exampleBanner = !isOwner ? `<div style="margin:0 0 10px;padding:8px 12px;background:var(--surface2);border-radius:10px;font-size:12px;color:var(--label3);font-style:italic">These are example values — update with your own readings</div>` : '';
+
+  // SVG semicircular gauge
+  const r = 54, cx = 70, cy = 70;
+  const startAngle = 180, endAngle = 0; // left to right, top half
+  const toRad = a => a * Math.PI / 180;
+  const arcX = (a) => cx + r * Math.cos(toRad(a));
+  const arcY = (a) => cy + r * Math.sin(toRad(a));
+  const fillAngle = 180 - pct * 180;
+  const bgPath = `M ${arcX(180)} ${arcY(180)} A ${r} ${r} 0 0 1 ${arcX(0)} ${arcY(0)}`;
+  const fillPath = pct > 0 ? `M ${arcX(180)} ${arcY(180)} A ${r} ${r} 0 ${pct>0.5?1:0} 1 ${arcX(fillAngle)} ${arcY(fillAngle)}` : '';
+  const gauge = `<svg width="140" height="80" viewBox="0 0 140 80" style="display:block;margin:0 auto 8px">
+    <path d="${bgPath}" fill="none" stroke="var(--surface2)" stroke-width="12" stroke-linecap="round"/>
+    ${fillPath?`<path d="${fillPath}" fill="none" stroke="${arcColor}" stroke-width="12" stroke-linecap="round"/>`:''}
+    <text x="70" y="62" text-anchor="middle" font-size="24" font-weight="800" fill="${arcColor}" font-family="var(--font)">${hoursUsed}</text>
+    <text x="70" y="75" text-anchor="middle" font-size="10" fill="var(--label3)" font-family="var(--font)">hours used</text>
+  </svg>`;
+
+  // Charcoal filter card
+  let charMonthsElapsed = 0, charMonthsLeft = 6, charDueStr = '—', charChangedStr = '—';
+  if (wm.charcoalChangedDate) {
+    const changed = parseISODate(wm.charcoalChangedDate);
+    if (changed) {
+      const now = new Date(); now.setHours(0,0,0,0);
+      charMonthsElapsed = Math.round((now - changed) / (30.44 * 86400000) * 10) / 10;
+      charMonthsLeft = Math.max(0, Math.round((6 - charMonthsElapsed) * 10) / 10);
+      charChangedStr = changed.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+      const due = new Date(changed); due.setMonth(due.getMonth() + 6);
+      charDueStr = due.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+    }
+  }
+  const charPct = Math.min(1, charMonthsElapsed / 6);
+  const charBarColor = charPct >= 0.9 ? 'var(--red)' : charPct >= 0.7 ? 'var(--orange)' : 'var(--green)';
+
+  // Inventory dots helper
+  const invDots = (count, max=5) => Array.from({length:max}, (_,i) => {
+    const col = i < count ? (count === 1 ? 'var(--orange)' : 'var(--green)') : 'var(--surface2)';
+    return `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${col};margin-right:3px"></span>`;
+  }).join('');
+  const invColor = n => n === 0 ? 'var(--red)' : n === 1 ? 'var(--orange)' : 'var(--green)';
+  const inv = wm.inventory;
+  const invRow = (label, key) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--sep)">
+      <div style="font-size:13px;flex:1">${label}</div>
+      <div>${invDots(inv[key]||0)}</div>
+      <div style="font-size:14px;font-weight:700;min-width:20px;text-align:right;color:${invColor(inv[key]||0)}">${inv[key]||0}</div>
+      <button onclick="wmInvChange('${key}',1)" style="background:var(--surface2);border:none;border-radius:8px;width:28px;height:28px;font-size:16px;cursor:pointer;line-height:1;font-family:var(--font)">+</button>
+      <button onclick="wmInvChange('${key}',-1)" style="background:var(--surface2);border:none;border-radius:8px;width:28px;height:28px;font-size:16px;cursor:pointer;line-height:1;font-family:var(--font)">−</button>
+    </div>`;
+
+  return `<div style="padding:12px">
+    ${exampleBanner}${warn}
+    <div class="card" style="margin-bottom:12px">
+      <div style="padding:16px 14px 8px">
+        ${gauge}
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px">
+          <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
+            <div style="font-size:18px;font-weight:800;color:${usedColor}">${hoursUsed}</div>
+            <div style="font-size:9px;color:var(--label3)">Hours used</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
+            <div style="font-size:18px;font-weight:800;color:var(--green)">${hoursLeft}</div>
+            <div style="font-size:9px;color:var(--label3)">Hours left</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
+            <div style="font-size:18px;font-weight:800">${target}</div>
+            <div style="font-size:9px;color:var(--label3)">Target hrs</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--sep)">
+          <div style="font-size:13px;color:var(--label2)">Current reading</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:15px;font-weight:700;color:var(--blue)">${wm.currentReading||0}h</span>
+            <button onclick="wmUpdateReading()" style="background:var(--surface2);border:1.5px solid var(--sep);border-radius:14px;padding:3px 10px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">Update</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--sep)">
+          <div style="font-size:13px;color:var(--label2)">Reading at last filter change</div>
+          <span style="font-size:14px;font-weight:600">${wm.lastChangeReading||0}h</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button onclick="wmEditTarget()" style="flex:1;background:var(--surface2);border:1.5px solid var(--sep);border-radius:10px;padding:9px 8px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">Edit target (${target}h)</button>
+          <button onclick="wmChangeFilters()" style="flex:1;background:var(--blue);border:none;border-radius:10px;padding:9px 8px;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;color:#fff">Change Filters</button>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-hd">Charcoal filter — 6 month interval</div>
+      <div style="padding:12px 14px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
+            <div style="font-size:18px;font-weight:800;color:${charBarColor}">${charMonthsElapsed}</div>
+            <div style="font-size:9px;color:var(--label3)">months elapsed</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
+            <div style="font-size:18px;font-weight:800;color:var(--green)">${charMonthsLeft}</div>
+            <div style="font-size:9px;color:var(--label3)">months left</div>
+          </div>
+        </div>
+        <div style="height:8px;background:var(--surface2);border-radius:4px;margin-bottom:8px;overflow:hidden">
+          <div style="height:8px;background:${charBarColor};width:${Math.round(charPct*100)}%;border-radius:4px;transition:width .4s"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--label3);margin-bottom:10px">
+          <span>Changed ${charChangedStr}</span><span>Due ${charDueStr}</span>
+        </div>
+        <button onclick="wmChangeCharcoal()" style="width:100%;background:var(--surface2);border:1.5px solid var(--sep);border-radius:10px;padding:9px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">Change Charcoal Filter</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd">Spare filters inventory</div>
+      ${invRow('20 micron filter','micron20')}
+      ${invRow('5 micron filter','micron5')}
+      ${invRow('Charcoal filter','charcoal')}
+    </div>
+  </div>`;
+}
+
+function wmUpdateReading() {
+  const wm = getWatermakerData();
+  showModal('Update Hour Meter Reading', `
+    <div class="mi-label">Current hour meter reading</div>
+    <input class="mi" id="wm-cur" type="number" min="0" placeholder="${wm.currentReading||0}" value="${wm.currentReading||0}" autofocus>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="wmSaveReading()">Save</button>
+    </div>`);
+}
+function wmSaveReading() {
+  const wm = getWatermakerData();
+  const v = parseInt(document.getElementById('wm-cur')?.value);
+  if (!isNaN(v) && v >= 0) { wm.currentReading = v; save(); }
+  hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
+}
+
+function wmEditTarget() {
+  const wm = getWatermakerData();
+  showModal('Edit Filter Target Hours', `
+    <div class="mi-label">Target hours between filter changes</div>
+    <input class="mi" id="wm-tgt" type="number" min="1" value="${wm.targetHours||60}" autofocus>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="wmSaveTarget()">Save</button>
+    </div>`);
+}
+function wmSaveTarget() {
+  const wm = getWatermakerData();
+  const v = parseInt(document.getElementById('wm-tgt')?.value);
+  if (!isNaN(v) && v > 0) { wm.targetHours = v; save(); }
+  hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
+}
+
+function wmChangeFilters() {
+  const wm = getWatermakerData();
+  showModal('Change Filters', `
+    <div class="mi-label">Current hour meter reading</div>
+    <input class="mi" id="wm-chg" type="number" min="0" value="${wm.currentReading||0}" autofocus>
+    <div style="font-size:12px;color:var(--label3);margin:8px 0 4px">Both 5 and 20 micron filters will be reset. Inventory will be decremented by 1 each.</div>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="wmSaveFilterChange()">Confirm Change</button>
+    </div>`);
+}
+function wmSaveFilterChange() {
+  const wm = getWatermakerData();
+  const v = parseInt(document.getElementById('wm-chg')?.value);
+  if (!isNaN(v) && v >= 0) {
+    wm.currentReading = v;
+    wm.lastChangeReading = v;
+    if (wm.inventory.micron20 > 0) wm.inventory.micron20--;
+    if (wm.inventory.micron5 > 0) wm.inventory.micron5--;
+    save();
+  }
+  hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
+}
+
+function wmChangeCharcoal() {
+  showModal('Change Charcoal Filter', `
+    <div style="font-size:14px;color:var(--label2);margin-bottom:12px">Set today as the new charcoal filter change date.<br>Inventory will be decremented by 1.</div>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="wmSaveCharcoalChange()">Confirm Change</button>
+    </div>`);
+}
+function wmSaveCharcoalChange() {
+  const wm = getWatermakerData();
+  wm.charcoalChangedDate = new Date().toISOString().slice(0,10);
+  if (wm.inventory.charcoal > 0) wm.inventory.charcoal--;
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
+}
+
+function wmInvChange(key, delta) {
+  const wm = getWatermakerData();
+  wm.inventory[key] = Math.max(0, (wm.inventory[key]||0) + delta);
+  save(); document.getElementById('mainContent').innerHTML = renderWatermaker();
+}
+
+function prefillWatermakerData() {
+  const email = localStorage.getItem(EMAIL_KEY);
+  const wm = data.watermaker;
+  if (wm && wm.currentReading) return false;
+  if (!data.watermaker) data.watermaker = {};
+  if (email === OWNER_EMAIL) {
+    data.watermaker = {currentReading:1978, lastChangeReading:1925, targetHours:60, charcoalChangedDate:'2026-03-20', inventory:{micron20:3, micron5:1, charcoal:2}};
+  } else {
+    const dAgo = n => { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); };
+    data.watermaker = {currentReading:320, lastChangeReading:268, targetHours:60, charcoalChangedDate:dAgo(90), inventory:{micron20:2, micron5:2, charcoal:1}};
+  }
+  return true;
+}
+
 function prefillShipyardData() {
   if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL) return false;
   const sy = data.shipyard;
@@ -4061,6 +4296,7 @@ async function attemptUnlock() {
       try { if (prefillUpgradesData()) prefillDirty = true; } catch(e) { console.warn('prefillUpgrades', e); }
       try { if (prefillSchengenData()) prefillDirty = true; } catch(e) { console.warn('prefillSchengen', e); }
       try { if (prefillShipyardData()) prefillDirty = true; } catch(e) { console.warn('prefillShipyard', e); }
+      try { if (prefillWatermakerData()) prefillDirty = true; } catch(e) { console.warn('prefillWatermaker', e); }
       if (prefillDirty) save();
       await pushToCloud();
     }
@@ -4208,6 +4444,7 @@ async function attemptLogin() {
         try { if (prefillUpgradesData()) prefillDirty = true; } catch(e) { console.warn('prefillUpgrades', e); }
         try { if (prefillSchengenData()) prefillDirty = true; } catch(e) { console.warn('prefillSchengen', e); }
       try { if (prefillShipyardData()) prefillDirty = true; } catch(e) { console.warn('prefillShipyard', e); }
+      try { if (prefillWatermakerData()) prefillDirty = true; } catch(e) { console.warn('prefillWatermaker', e); }
         if (prefillDirty) save();
         await pushToCloud();
       }
