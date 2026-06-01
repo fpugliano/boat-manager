@@ -2094,9 +2094,13 @@ function saveSchengenCheckIn(personIdx) {
 function showSchengenCheckOut(personIdx) {
   const sd = getSchengenData();
   const p = sd.persons[personIdx];
+  const activeIdx = p?.activePassport || 0;
+  const passOpts = (p?.passports||[]).map((pp,i)=>`<option value="${i}" ${i===activeIdx?'selected':''}>${[pp.flag, pp.country].filter(Boolean).join(' ') || 'Passport '+(i+1)}</option>`).join('');
   showModal(`Check Out — ${esc(p?.name||'Person '+(personIdx+1))}`, `
     <div class="mi-label">Date</div><input class="mi" id="sch-date" type="date" value="${new Date().toISOString().slice(0,10)}" autofocus>
+    <div class="mi-label">Passport</div><select class="mi" id="sch-pass">${passOpts}</select>
     <div class="mi-label">Destination</div><input class="mi" id="sch-loc" placeholder="e.g. Turkey (Istanbul)">
+    <div class="mi-label">Notes (optional)</div><input class="mi" id="sch-notes" placeholder="e.g. Overland to Tbilisi">
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="saveSchengenCheckOut(${personIdx})">Check Out</button>
@@ -2109,8 +2113,11 @@ function saveSchengenCheckOut(personIdx) {
   const date = document.getElementById('sch-date')?.value;
   if (!date) { showToast('Enter a date', true); return; }
   if (date > new Date().toISOString().slice(0,10)) { showToast('Check out date cannot be in the future', true); return; }
+  const passIdx = parseInt(document.getElementById('sch-pass')?.value)||0;
+  const passport = p.passports?.[passIdx]?.flag||'';
   const location = document.getElementById('sch-loc')?.value.trim()||'';
-  p.log.push({id:uid(), type:'out', date, location});
+  const notes = document.getElementById('sch-notes')?.value.trim()||'';
+  p.log.push({id:uid(), type:'out', date, passport, location, notes});
   save(); hideModal(); schengenRerender();
 }
 
