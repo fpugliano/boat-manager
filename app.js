@@ -3209,8 +3209,14 @@ function removeLogEntry(i) {
 // ═══════════════════════════════════════════════════════════
 
 function showModal(title, bodyHtml) {
-  document.getElementById('modalBody').innerHTML = `<div class="modal-title">${esc(title)}</div>${bodyHtml}`;
   const ov = document.getElementById('modalOv');
+  const body = document.getElementById('modalBody');
+  if (!ov || !body) {
+    alert('Modal error: overlay not found. Please reload the app.\n\nTitle: ' + title);
+    console.error('showModal: modalOv=' + ov + ' modalBody=' + body);
+    return;
+  }
+  body.innerHTML = `<div class="modal-title">${esc(title)}</div>${bodyHtml}`;
   ov.classList.remove('hide');
   ov.classList.remove('hidden');
   ov.style.display = 'flex';
