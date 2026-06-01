@@ -742,7 +742,7 @@ function renderInsurance() {
       ${fr('Certificate No.','documents.insurance.certNumber',I.certNumber)}
       ${fr('Issue Date','documents.insurance.issueDate',I.issueDate,'date')}
       ${frExpiry('documents.insurance.expiryDate',I.expiryDate,exp)}
-      ${fr('Annual Premium','documents.insurance.premium',I.premium)}
+      ${fr('Annual Premium (€)','documents.insurance.premium',I.premium)}
     </div></div>
     <div class="sec-hd">Maximum Cover</div>
     <div class="card"><div class="card-body">
@@ -762,7 +762,7 @@ function renderInsurance() {
         <table class="tbl"><thead><tr><th>Year</th><th>Insurer</th><th>Premium</th><th>Expiry</th><th></th></tr></thead>
         <tbody>${(I.renewalHistory||[]).map((r,i)=>`
           <tr><td>${esc(r.year)}</td><td>${esc(r.insurer)}</td><td>${esc(r.premium)}</td>
-          <td>${esc(r.expiry)}</td><td style="white-space:nowrap"><button class="btn btn-s btn-xs" onclick="editInsuranceHistory(${i})">✏️</button> <button class="btn btn-d btn-xs" onclick="removeInsuranceRenewal(${i})">✕</button></td></tr>`
+          <td>${esc(fmtDateEU(r.expiry)||r.expiry||'')}</td><td style="white-space:nowrap"><button class="btn btn-s btn-xs" onclick="editInsuranceHistory(${i})">✏️</button> <button class="btn btn-d btn-xs" onclick="removeInsuranceRenewal(${i})">✕</button></td></tr>`
         ).join('') || '<tr><td colspan="5" style="color:var(--label3);padding:12px">No history yet</td></tr>'}</tbody>
         </table>
       </div>
