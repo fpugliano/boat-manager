@@ -1854,7 +1854,8 @@ function renderSchengen() {
     if (eu) return;
     const {days} = calcSchengenDays(p.log);
     const rem = 90-days;
-    if (rem < 20) warnings.push(`${p.name}: ${rem} days remaining`);
+    if (rem < 0) warnings.push(`⚠ ${p.name}: OVERSTAYED by ${Math.abs(rem)} days`);
+    else if (rem < 20) warnings.push(`${p.name}: ${rem} days remaining`);
   });
   const warningBanner = warnings.length ? `
     <div style="margin:0 12px 10px;padding:10px 14px;background:rgba(255,59,48,.1);border:1.5px solid var(--red);border-radius:10px;font-size:13px;color:var(--red);font-weight:600">
@@ -1885,12 +1886,15 @@ function renderSchengenPersonStatus(p, idx) {
   const activePass = p.passports?.[activePassIdx];
   const isEU = activePass?.eu === true;
   const {days} = calcSchengenDays(p.log);
-  const remaining = Math.max(0, 90 - days);
+  const remaining = 90 - days;
+  const overstayed = remaining < 0;
   const inStatus = isCurrentlyInSchengen(p.log);
   const circleColor = remaining > 30 ? 'var(--green)' : remaining > 10 ? 'var(--orange)' : 'var(--red)';
-  const exitBy = new Date(); exitBy.setDate(exitBy.getDate() + remaining);
-  const exitByStr = exitBy.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
-  const exitByColor = remaining < 30 ? 'var(--red)' : 'var(--green)';
+  const exitBy = new Date(); exitBy.setDate(exitBy.getDate() + Math.max(0, remaining));
+  const exitByStr = overstayed
+    ? `⚠ Overstayed by ${Math.abs(remaining)} day${Math.abs(remaining)===1?'':'s'}`
+    : exitBy.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+  const exitByColor = overstayed || remaining < 30 ? 'var(--red)' : 'var(--green)';
   const borderRight = idx === 0 ? 'border-right:1px solid var(--sep);' : '';
   const passportBtns = (p.passports||[]).map((pp, pi) => {
     const label = [pp.flag, pp.country ? pp.country.slice(0,3) : ''].filter(Boolean).join(' ') || '?';
@@ -1903,8 +1907,8 @@ function renderSchengenPersonStatus(p, idx) {
     ${isEU ? `<div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:10px">🇪🇺 EU Passport · No limit</div>` : `
       <div style="display:flex;justify-content:center;margin-bottom:8px">
         <div style="width:60px;height:60px;border-radius:50%;border:4px solid ${circleColor};display:flex;flex-direction:column;align-items:center;justify-content:center">
-          <div style="font-size:17px;font-weight:800;color:${circleColor};line-height:1">${remaining}</div>
-          <div style="font-size:9px;color:var(--label3);line-height:1.2">days left</div>
+          <div style="font-size:17px;font-weight:800;color:${circleColor};line-height:1">${Math.abs(remaining)}</div>
+          <div style="font-size:9px;color:${overstayed?'var(--red)':'var(--label3)'};line-height:1.2">${overstayed?'over!':'days left'}</div>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px">
@@ -1913,8 +1917,8 @@ function renderSchengenPersonStatus(p, idx) {
           <div style="font-size:9px;color:var(--label3)">Used</div>
         </div>
         <div style="background:var(--surface2);border-radius:8px;padding:5px;text-align:center">
-          <div style="font-size:14px;font-weight:700;color:${circleColor}">${remaining}</div>
-          <div style="font-size:9px;color:var(--label3)">Left</div>
+          <div style="font-size:14px;font-weight:700;color:${circleColor}">${overstayed?'-':'+'}${Math.abs(remaining)}</div>
+          <div style="font-size:9px;color:var(--label3)">${overstayed?'Over':'Left'}</div>
         </div>
       </div>
       <div style="font-size:10px;color:var(--label3);margin-bottom:8px;text-align:center">Exit by <span style="color:${exitByColor};font-weight:600">${exitByStr}</span></div>`}
@@ -1951,7 +1955,7 @@ function renderSchengenPersonLog(p, idx) {
     <div style="padding:10px 10px 6px;font-size:12px;font-weight:700;color:var(--label);border-bottom:1px solid var(--sep)">${esc(p.name||'Person '+(idx+1))}</div>
     ${rows}
     <div style="padding:8px 10px">
-      <button onclick="showSchengenCheckIn(${idx})" style="font-size:11px;color:var(--blue);background:none;border:none;cursor:pointer;font-family:var(--font);padding:0">+ Add entry</button>
+      <button onclick="showSchengenAddEntry(${idx})" style="font-size:11px;color:var(--blue);background:none;border:none;cursor:pointer;font-family:var(--font);padding:0">+ Add entry</button>
     </div>
   </div>`;
 }
@@ -1968,6 +1972,56 @@ function setSchengenPassport(personIdx, passportIdx) {
   if (!sd.persons[personIdx]) return;
   sd.persons[personIdx].activePassport = passportIdx;
   save(); schengenRerender();
+}
+
+function showSchengenAddEntry(personIdx) {
+  const sd = getSchengenData();
+  const p = sd.persons[personIdx];
+  const today = new Date().toISOString().slice(0,10);
+  const passOpts = (p.passports||[]).map((pp,i)=>`<option value="${i}">${[pp.flag,pp.country].filter(Boolean).join(' ')||'Passport '+(i+1)}</option>`).join('');
+  const activeStyle = 'flex:1;padding:10px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;border-radius:10px;border:none;';
+  const inActive   = activeStyle+'background:var(--green);color:#fff';
+  const outActive  = activeStyle+'background:var(--blue);color:#fff';
+  const inInactive = activeStyle+'background:var(--surface2);color:var(--label);border:1.5px solid var(--sep)';
+  showModal(`Add Entry — ${esc(p.name||'Person '+(personIdx+1))}`, `
+    <input type="hidden" id="sch-etype" value="in">
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button type="button" id="sch-btn-in"  style="${inActive}"   onclick="document.getElementById('sch-etype').value='in';document.getElementById('sch-in-fields').style.display='';document.getElementById('sch-out-fields').style.display='none';document.getElementById('sch-btn-in').style.cssText='${inActive}';document.getElementById('sch-btn-out').style.cssText='${inInactive}'">↓ Check In</button>
+      <button type="button" id="sch-btn-out" style="${inInactive}" onclick="document.getElementById('sch-etype').value='out';document.getElementById('sch-out-fields').style.display='';document.getElementById('sch-in-fields').style.display='none';document.getElementById('sch-btn-out').style.cssText='${outActive}';document.getElementById('sch-btn-in').style.cssText='${inInactive}'">↑ Check Out</button>
+    </div>
+    <div class="mi-label">Date</div><input class="mi" id="sch-date" type="date" value="${today}">
+    <div id="sch-in-fields">
+      <div class="mi-label">Passport</div><select class="mi" id="sch-pass">${passOpts}</select>
+      <div class="mi-label">Location / Country</div><input class="mi" id="sch-loc" placeholder="e.g. Greece (Athens)">
+    </div>
+    <div id="sch-out-fields" style="display:none">
+      <div class="mi-label">Destination</div><input class="mi" id="sch-dest" placeholder="e.g. Turkey (Istanbul)">
+      <div class="mi-label">Notes</div><input class="mi" id="sch-notes" placeholder="Optional">
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveSchengenAddEntry(${personIdx})">Save</button>
+    </div>`);
+}
+
+function saveSchengenAddEntry(personIdx) {
+  const sd = getSchengenData();
+  const p = sd.persons[personIdx]; if (!p) return;
+  const date = document.getElementById('sch-date')?.value;
+  if (!date) { showToast('Enter a date', true); return; }
+  const type = document.getElementById('sch-etype')?.value || 'in';
+  if (type === 'in') {
+    const passIdx = parseInt(document.getElementById('sch-pass')?.value)||0;
+    const passport = p.passports?.[passIdx]?.flag||'';
+    const location = document.getElementById('sch-loc')?.value.trim()||'';
+    p.log.push({id:uid(), type:'in', date, passport, location});
+    p.activePassport = passIdx;
+  } else {
+    const location = document.getElementById('sch-dest')?.value.trim()||'';
+    const notes = document.getElementById('sch-notes')?.value.trim()||'';
+    p.log.push({id:uid(), type:'out', date, location, notes});
+  }
+  save(); hideModal(); schengenRerender();
 }
 
 function showSchengenCheckIn(personIdx) {
