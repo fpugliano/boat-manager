@@ -525,7 +525,7 @@ function renderSetup(setupEmail = '') {
   const hull = data.meta?.hullType || 'catamaran';
   ov.innerHTML = `
     <div class="setup-inner">
-      <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px;font-weight:800">⚓</div>'}</div>
+      <div class="setup-logo"><img src="oroboro-logo-black-transparent.png" alt="Oroboro" style="max-width:220px;height:auto;display:block;margin:0 auto 24px;"></div>
       <div class="setup-h">Boat Manager</div>
       <div class="setup-sub">Set up your boat. Your encrypted data syncs to the cloud.</div>
       <label class="setup-lbl">Boat Name</label>
@@ -604,7 +604,7 @@ function renderApp() {
   app.innerHTML = `
     <div class="hdr">
       <div class="hdr-content">
-        ${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:24px">⚓</div>'}
+        <img src="oroboro-logo-transparent.png" alt="Oroboro">
         <div class="hdr-sub">Boat Manager — ${esc(data.meta.boatName||'My Boat')}</div>
         <span id="sync-dot" class="sync-dot" onclick="pushToCloud()" title="Not synced">●</span>
         <button onclick="lockApp()" title="Lock app" style="position:absolute;right:14px;top:50%;
@@ -3593,7 +3593,7 @@ function renderPINSetup() {
   ov.classList.remove('hidden');
   ov.innerHTML = `
     <div class="setup-inner">
-      <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px">⚓</div>'}</div>
+      <div class="setup-logo"><img src="oroboro-logo-black-transparent.png" alt="Oroboro" style="max-width:220px;height:auto;display:block;margin:0 auto 24px;"></div>
       <div style="font-size:44px;text-align:center;margin-bottom:12px">🔐</div>
       <div class="setup-h">Choose a PIN</div>
       <div class="setup-sub">Your 4-digit PIN encrypts your data with AES-256. Don't forget it — it cannot be recovered.</div>
@@ -3659,7 +3659,7 @@ function renderLockScreen() {
   const email  = localStorage.getItem(EMAIL_KEY);
   ov.innerHTML = `
     <div class="setup-inner" style="padding-top:calc(env(safe-area-inset-top) + 20px)">
-      <div class="setup-logo"><img src="oroboro-logo-15.jpg" alt="Oroboro" style="max-width:220px;height:auto;display:block;margin:0 auto 24px;"></div>
+      <div class="setup-logo"><img src="oroboro-logo-black-transparent.png" alt="Oroboro" style="max-width:220px;height:auto;display:block;margin:0 auto 24px;"></div>
       <div style="font-size:48px;text-align:center;margin-bottom:10px">🔒</div>
       <div class="setup-h" style="text-align:center">Enter PIN</div>
       <div class="setup-sub" style="text-align:center">${email ? esc(email) : ''}</div>
@@ -3819,7 +3819,7 @@ function renderLoginScreen() {
   document.getElementById('app').classList.add('hidden');
   ov.innerHTML = `
     <div class="setup-inner" style="padding-top:calc(env(safe-area-inset-top) + 20px)">
-      <div class="setup-logo"><img src="oroboro-logo-15.jpg" alt="Oroboro" style="max-width:220px;height:auto;display:block;margin:0 auto 24px;"></div>
+      <div class="setup-logo"><img src="oroboro-logo-black-transparent.png" alt="Oroboro" style="max-width:220px;height:auto;display:block;margin:0 auto 24px;"></div>
       <div class="setup-h">Boat Manager</div>
       <label class="setup-lbl">Email</label>
       <input class="setup-inp" id="login-email" type="email" placeholder="your@email.com"
@@ -3930,7 +3930,7 @@ function renderForgotPIN() {
   const savedEmail = localStorage.getItem(EMAIL_KEY) || '';
   ov.innerHTML = `
     <div class="setup-inner">
-      <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px;font-weight:800">⚓</div>'}</div>
+      <div class="setup-logo"><img src="oroboro-logo-black-transparent.png" alt="Oroboro" style="max-width:220px;height:auto;display:block;margin:0 auto 24px;"></div>
       <div class="setup-h">Forgot PIN?</div>
       <div class="setup-sub">Enter your email to see your PIN hint.</div>
       <label class="setup-lbl">Email</label>
@@ -3986,7 +3986,7 @@ function showPINHint(email, hint) {
       </div>`;
   ov.innerHTML = `
     <div class="setup-inner">
-      <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px;font-weight:800">⚓</div>'}</div>
+      <div class="setup-logo"><img src="oroboro-logo-black-transparent.png" alt="Oroboro" style="max-width:220px;height:auto;display:block;margin:0 auto 24px;"></div>
       <div class="setup-h">Forgot PIN?</div>
       <div class="setup-sub" style="text-align:center">${esc(email)}</div>
       ${hintBlock}
@@ -4016,7 +4016,7 @@ function renderSetNewPIN() {
   const ov = document.getElementById('setupOv');
   ov.innerHTML = `
     <div class="setup-inner">
-      <div class="setup-logo">${logoSrc ? `<img src="${logoSrc}" alt="Oroboro">` : '<div style="font-size:32px;font-weight:800">⚓</div>'}</div>
+      <div class="setup-logo"><img src="oroboro-logo-black-transparent.png" alt="Oroboro" style="max-width:220px;height:auto;display:block;margin:0 auto 24px;"></div>
       <div style="font-size:40px;text-align:center;margin-bottom:8px">🔐</div>
       <div class="setup-h">Choose New PIN</div>
       <div class="setup-sub" style="color:var(--orange)">⚠️ Starting fresh — previous data is gone.</div>
