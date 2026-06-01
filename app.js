@@ -1808,34 +1808,36 @@ function getSchengenData() {
 }
 
 function calcSchengenDays(log) {
-  const today = new Date(); today.setHours(23,59,59,999);
-  const windowStart = new Date(today); windowStart.setDate(windowStart.getDate()-179); windowStart.setHours(0,0,0,0);
+  const todayMid = new Date(); todayMid.setHours(0,0,0,0);
+  const windowStart = new Date(todayMid); windowStart.setDate(windowStart.getDate()-179);
   const sorted = [...(log||[])].sort((a,b)=>a.date.localeCompare(b.date));
   let days = 0, inDate = null;
   for (const e of sorted) {
     if (e.type==='in') { inDate = parseISODate(e.date); }
     else if (e.type==='out' && inDate) {
       const out = parseISODate(e.date);
-      if (!out || out > today) continue; // ignore future checkouts — treat as still checked in
+      if (!out || out > todayMid) continue; // ignore future checkouts — treat as still checked in
       const s = inDate < windowStart ? windowStart : inDate;
-      const end = out;
-      if (s <= end) days += Math.round((end-s)/86400000)+1;
+      if (s <= out) days += Math.round((out-s)/86400000)+1;
       inDate = null;
     }
   }
-  if (inDate) { const s = inDate < windowStart ? windowStart : inDate; days += Math.round((today-s)/86400000)+1; }
+  if (inDate) {
+    const s = inDate < windowStart ? windowStart : inDate;
+    if (s <= todayMid) days += Math.round((todayMid-s)/86400000)+1;
+  }
   return { days, inSchengen: inDate !== null };
 }
 
 function isCurrentlyInSchengen(log) {
-  const todayMs = new Date().setHours(23,59,59,999);
+  const todayMid = new Date(); todayMid.setHours(0,0,0,0);
   const sorted = [...(log||[])].sort((a,b)=>a.date.localeCompare(b.date));
   let inside = false;
   for (const e of sorted) {
     if (e.type==='in') { inside = true; }
     else if (e.type==='out') {
       const out = parseISODate(e.date);
-      if (out && out.getTime() <= todayMs) inside = false; // ignore future checkouts
+      if (out && out <= todayMid) inside = false; // ignore future checkouts
     }
   }
   return inside;
@@ -2344,10 +2346,10 @@ function prefillSchengenData() {
         {flag:'🇦🇺', country:'Australia',     eu:false}
       ],
       log:[
-        {id:uid(), type:'in',  date:'2026-03-15', passport:'🇺🇸', location:'Greece (Athens)'},
-        {id:uid(), type:'out', date:'2026-05-20', passport:'',    location:'Turkey (Bodrum)'},
-        {id:uid(), type:'in',  date:'2025-10-01', passport:'🇺🇸', location:'Spain (Barcelona)'},
-        {id:uid(), type:'out', date:'2025-12-10', passport:'',    location:'UK'}
+        {id:uid(), type:'in',  date:'2026-01-15', passport:'🇺🇸', location:'Spain (Barcelona)'},
+        {id:uid(), type:'out', date:'2026-03-15', passport:'',    location:'Morocco'},
+        {id:uid(), type:'in',  date:'2026-04-20', passport:'🇺🇸', location:'Greece (Athens)'},
+        {id:uid(), type:'out', date:'2026-05-20', passport:'',    location:'Turkey (Bodrum)'}
       ]
     },
     { name:'Maria Santos', activePassport:0,
@@ -2355,10 +2357,8 @@ function prefillSchengenData() {
         {flag:'🇬🇧', country:'United Kingdom', eu:false}
       ],
       log:[
-        {id:uid(), type:'in',  date:'2026-04-01', passport:'🇬🇧', location:'France (Marseille)'},
-        {id:uid(), type:'out', date:'2026-05-15', passport:'',    location:'Morocco'},
-        {id:uid(), type:'in',  date:'2025-09-15', passport:'🇬🇧', location:'Italy (Palermo)'},
-        {id:uid(), type:'out', date:'2025-11-20', passport:'',    location:'Tunisia'}
+        {id:uid(), type:'in',  date:'2026-03-01', passport:'🇬🇧', location:'France (Marseille)'},
+        {id:uid(), type:'out', date:'2026-04-30', passport:'',    location:'Morocco'}
       ]
     }
   ]};
