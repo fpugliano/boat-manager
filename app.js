@@ -117,7 +117,7 @@ const YANMAR_SCHED = [
 let data = {};
 let ui = {
   tab:'documents', docSub:'vessel', maintEngine:'port',
-  photoSub:'vesselDoc', crewOpen:null, sysOpen:null,
+  photoSub:'vesselDoc', crewOpen:null, sysOpen:null, sysTab:'All',
   partsSearch:'', partsFilter:'All', alertsOpen:false, maintShowAll:false
 };
 let _photoCtx = null; // {section, index} for upload
@@ -2745,17 +2745,48 @@ function prefillUpgradesData() {
   return true;
 }
 
+const SYS_GROUPS = [
+  {id:'All',      label:'All'},
+  {id:'Victron',  label:'⚡ Victron',        cats:['Battery Storage','Distribution','Charge Controllers','Protection & Management','Inverter / Charger','Monitoring']},
+  {id:'Engines',  label:'🔧 Engines',        cats:['Engines','Propulsion','Sail Drive']},
+  {id:'Sails',    label:'⛵ Sails & Rigging', cats:['Main sail','Genoa','Standing rigging','Sails','Rigging','Halyards']},
+  {id:'Water',    label:'💧 Water & Fuel',    cats:['Watermaker','Fresh Water','Diesel','Water']},
+  {id:'Solar',    label:'☀️ Solar',           cats:['Solar','Flexible solar']},
+  {id:'Raymarine',label:'📡 Raymarine',       cats:['Raymarine','Navigation','Electronics']},
+  {id:'Other',    label:'➕ Other'},
+];
+const SYS_ALL_CATS = SYS_GROUPS.filter(g=>g.cats).flatMap(g=>g.cats);
+
 function renderSystems() {
   const systems = data.systems || [];
-  const cats = [...new Set(systems.map(s=>s.cat||s.category).filter(Boolean))];
+  if (!ui.sysTab) ui.sysTab = 'All';
+  const curGroup = SYS_GROUPS.find(g=>g.id===ui.sysTab) || SYS_GROUPS[0];
+
+  let filtered;
+  if (curGroup.id === 'All')        filtered = systems;
+  else if (curGroup.id === 'Other') filtered = systems.filter(s => !SYS_ALL_CATS.includes(s.cat||s.category));
+  else                              filtered = systems.filter(s => (curGroup.cats||[]).includes(s.cat||s.category));
+
+  const cats = [...new Set(filtered.map(s=>s.cat||s.category).filter(Boolean))];
+  const noCat = filtered.filter(s=>!(s.cat||s.category));
+
+  const pills = SYS_GROUPS.map(g =>
+    `<div class="pill ${ui.sysTab===g.id?'active':''}" onclick="ui.sysTab='${g.id}';document.getElementById('mainContent').innerHTML=renderSystems()">${g.label}</div>`
+  ).join('');
+
+  const body = (cats.length===0 && noCat.length===0)
+    ? `<div style="padding:30px 16px;text-align:center;color:var(--label3);font-size:14px">No systems in this category — tap + Add to add one</div>`
+    : cats.map(cat=>`
+        <div class="sec-hd">${esc(cat)}</div>
+        ${filtered.filter(s=>(s.cat||s.category)===cat).map(s=>renderSystemCard(s)).join('')}
+      `).join('') + noCat.map(s=>renderSystemCard(s)).join('');
+
   return `
+    <div class="subtab-bar" style="margin-bottom:10px">${pills}</div>
     <div class="btn-row">
       <button class="btn btn-p btn-sm" onclick="showAddSystem()">+ Add System</button>
     </div>
-    ${cats.map(cat => `
-      <div class="sec-hd">${esc(cat)}</div>
-      ${systems.filter(s=>(s.cat||s.category)===cat).map(s => renderSystemCard(s)).join('')}
-    `).join('')}`;
+    ${body}`;
 }
 
 function renderSystemCard(s) {
