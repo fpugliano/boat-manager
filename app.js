@@ -2500,20 +2500,30 @@ function renderWatermaker() {
   const charBarColor = charPct >= 0.9 ? 'var(--red)' : charPct >= 0.7 ? 'var(--orange)' : 'var(--green)';
 
   // Inventory dots helper
-  const invDots = (count, max=5) => Array.from({length:max}, (_,i) => {
-    const col = i < count ? (count === 1 ? 'var(--orange)' : 'var(--green)') : 'var(--surface2)';
-    return `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${col};margin-right:3px"></span>`;
-  }).join('');
-  const invColor = n => n === 0 ? 'var(--red)' : n === 1 ? 'var(--orange)' : 'var(--green)';
+  const invDotColor = n => n <= 2 ? '#EF4444' : n <= 5 ? '#F59E0B' : '#22C55E';
+  const invDots = count => {
+    if (count === 0) return '';
+    const dotCount = Math.min(count, 20);
+    const col = invDotColor(count);
+    return Array.from({length:dotCount}, () =>
+      `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${col};margin:1px 2px"></span>`
+    ).join('');
+  };
+  const invColor = n => n <= 2 ? '#EF4444' : n <= 5 ? '#F59E0B' : '#22C55E';
   const inv = wm.inventory;
-  const invRow = (label, key) => `
-    <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--sep)">
-      <div style="font-size:13px;flex:1">${label}</div>
-      <div>${invDots(inv[key]||0)}</div>
-      <div style="font-size:14px;font-weight:700;min-width:20px;text-align:right;color:${invColor(inv[key]||0)}">${inv[key]||0}</div>
-      <button onclick="wmInvChange('${key}',1)" style="background:var(--surface2);border:none;border-radius:8px;width:28px;height:28px;font-size:16px;cursor:pointer;line-height:1;font-family:var(--font)">+</button>
-      <button onclick="wmInvChange('${key}',-1)" style="background:var(--surface2);border:none;border-radius:8px;width:28px;height:28px;font-size:16px;cursor:pointer;line-height:1;font-family:var(--font)">−</button>
+  const invRow = (label, key) => {
+    const n = inv[key]||0;
+    return `
+    <div style="padding:8px 14px;border-bottom:1px solid var(--sep)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:${n>0?'4px':'0'}">
+        <div style="font-size:13px;flex:1">${label}</div>
+        <div style="font-size:14px;font-weight:700;min-width:20px;text-align:right;color:${invColor(n)}">${n}</div>
+        <button onclick="wmInvChange('${key}',1)" style="background:var(--surface2);border:none;border-radius:8px;width:28px;height:28px;font-size:16px;cursor:pointer;line-height:1;font-family:var(--font)">+</button>
+        <button onclick="wmInvChange('${key}',-1)" style="background:var(--surface2);border:none;border-radius:8px;width:28px;height:28px;font-size:16px;cursor:pointer;line-height:1;font-family:var(--font)">−</button>
+      </div>
+      ${n>0?`<div style="display:flex;flex-wrap:wrap;gap:1px">${invDots(n)}</div>`:''}
     </div>`;
+  };
 
   return `<div style="padding:12px">
     ${exampleBanner}${warn}
