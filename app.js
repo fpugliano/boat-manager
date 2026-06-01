@@ -3210,10 +3210,15 @@ function removeLogEntry(i) {
 
 function showModal(title, bodyHtml) {
   document.getElementById('modalBody').innerHTML = `<div class="modal-title">${esc(title)}</div>${bodyHtml}`;
-  document.getElementById('modalOv').classList.remove('hide');
+  const ov = document.getElementById('modalOv');
+  ov.classList.remove('hide');
+  ov.classList.remove('hidden');
+  ov.style.display = 'flex';
 }
 function hideModal() {
-  document.getElementById('modalOv').classList.add('hide');
+  const ov = document.getElementById('modalOv');
+  ov.classList.add('hide');
+  ov.style.display = '';
   document.getElementById('modalBody').innerHTML = '';
 }
 document.addEventListener('click', e => {
