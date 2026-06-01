@@ -1121,7 +1121,7 @@ function renderPhotos() {
   const photos = data.photos?.[sub] || [];
   return `
     <div class="subtab-bar">
-      ${PHOTO_SUBS.map(s=>`<div class="pill ${sub===s?'active':''}" onclick="ui.photoSub='${s}';document.getElementById('mainContent').innerHTML=renderPhotos()">
+      ${PHOTO_SUBS.map(s=>`<div class="pill ${sub===s?'active':''}" onclick="ui.photoSub='${s}';document.getElementById('mainContent').innerHTML=renderDocuments()">
         ${PHOTO_LABELS[s]}
       </div>`).join('')}
     </div>
