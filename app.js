@@ -2468,7 +2468,7 @@ function renderWatermaker() {
   const usedColor = hoursUsed >= 50 ? (hoursUsed >= 65 ? 'var(--red)' : 'var(--orange)') : 'var(--green)';
   const warn = (target - hoursUsed) <= 10
     ? `<div style="margin:0 0 10px;padding:10px 14px;background:rgba(255,149,0,.1);border:1.5px solid var(--orange);border-radius:10px;font-size:13px;color:var(--orange);font-weight:600">⚠ 5 &amp; 20 micron filters — change recommended in ${Math.max(0,target-hoursUsed)}h</div>` : '';
-  const exampleBanner = !isOwner ? `<div style="margin:0 0 10px;padding:8px 12px;background:var(--surface2);border-radius:10px;font-size:12px;color:var(--label3);font-style:italic">These are example values — update with your own readings</div>` : '';
+  const exampleBanner = (!isOwner && !wm.exampleDismissed) ? `<div style="margin:0 0 10px;padding:8px 12px;background:var(--surface2);border-radius:10px;font-size:12px;color:var(--label3);font-style:italic">These are example values — update with your own readings</div>` : '';
 
   // SVG semicircular gauge
   const r = 54, cx = 70, cy = 70;
@@ -2604,7 +2604,7 @@ function wmUpdateReading() {
 function wmSaveReading() {
   const wm = getWatermakerData();
   const v = parseInt(document.getElementById('wm-cur')?.value);
-  if (!isNaN(v) && v >= 0) { wm.currentReading = v; save(); }
+  if (!isNaN(v) && v >= 0) { wm.currentReading = v; wm.exampleDismissed = true; save(); }
   hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
 }
 
@@ -2621,7 +2621,7 @@ function wmUpdateLastChange() {
 function wmSaveLastChange() {
   const wm = getWatermakerData();
   const v = parseInt(document.getElementById('wm-lc')?.value);
-  if (!isNaN(v) && v >= 0) { wm.lastChangeReading = v; save(); }
+  if (!isNaN(v) && v >= 0) { wm.lastChangeReading = v; wm.exampleDismissed = true; save(); }
   hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
 }
 
@@ -2638,7 +2638,7 @@ function wmEditTarget() {
 function wmSaveTarget() {
   const wm = getWatermakerData();
   const v = parseInt(document.getElementById('wm-tgt')?.value);
-  if (!isNaN(v) && v > 0) { wm.targetHours = v; save(); }
+  if (!isNaN(v) && v > 0) { wm.targetHours = v; wm.exampleDismissed = true; save(); }
   hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
 }
 
@@ -2661,6 +2661,7 @@ function wmSaveFilterChange() {
     wm.lastChangeReading = v;
     if (wm.inventory.micron20 > 0) wm.inventory.micron20--;
     if (wm.inventory.micron5 > 0) wm.inventory.micron5--;
+    wm.exampleDismissed = true;
     save();
   }
   hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
@@ -2678,12 +2679,14 @@ function wmSaveCharcoalChange() {
   const wm = getWatermakerData();
   wm.charcoalChangedDate = new Date().toISOString().slice(0,10);
   if (wm.inventory.charcoal > 0) wm.inventory.charcoal--;
+  wm.exampleDismissed = true;
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
 }
 
 function wmInvChange(key, delta) {
   const wm = getWatermakerData();
   wm.inventory[key] = Math.max(0, (wm.inventory[key]||0) + delta);
+  wm.exampleDismissed = true;
   save(); document.getElementById('mainContent').innerHTML = renderWatermaker();
 }
 
@@ -2696,7 +2699,7 @@ function prefillWatermakerData() {
     data.watermaker = {currentReading:1978, lastChangeReading:1925, targetHours:60, charcoalChangedDate:'2026-03-20', inventory:{micron20:3, micron5:1, charcoal:2}};
   } else {
     const dAgo = n => { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); };
-    data.watermaker = {currentReading:320, lastChangeReading:268, targetHours:60, charcoalChangedDate:dAgo(90), inventory:{micron20:2, micron5:2, charcoal:1}};
+    data.watermaker = {currentReading:20, lastChangeReading:0, targetHours:60, charcoalChangedDate:dAgo(120), inventory:{micron20:3, micron5:3, charcoal:3}, exampleDismissed:false};
   }
   return true;
 }
