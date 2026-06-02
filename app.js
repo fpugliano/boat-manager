@@ -590,11 +590,11 @@ function completeSetup() {
 // ═══════════════════════════════════════════════════════════
 
 const TABS = [
-  {id:'documents', icon:'📄', label:'Documents'},
+  {id:'documents', icon:'📄', label:'Boat Docs'},
   {id:'shipyard',    icon:'⚓', label:'Shipyard'},
   {id:'watermaker',  icon:'💧', label:'Water Maker'},
   {id:'lpg',         icon:'🔥', label:'LPG'},
-  {id:'maint',       icon:'🔧', label:'Maintenance'},
+  {id:'maint',       icon:'🔧', label:'Engine Maintenance'},
   {id:'upgrades',  icon:'🔧', label:'Upgrades & Repairs'},
   {id:'schengen',  icon:'🛂', label:'Schengen'},
   {id:'parts',     icon:'🔩', label:'Spare Parts'},
