@@ -63,6 +63,7 @@ const EMPTY_DEFAULTS = {
   },
   watermaker:{currentReading:0, lastChangeReading:0, targetHours:60, charcoalChangedDate:null, inventory:{micron20:0, micron5:0, charcoal:0}},
   lpg:{bottles:[], history:[]},
+  provisions:{items:[]},
   spareParts:[
     {id:'ex_p1', desc:'Heat Exchanger gasket', pn:'128370-13201', category:'Inboard', qty:4, minQuantity:2, unitPrice:0,  location:'', storeUrl:''},
     {id:'ex_p2', desc:'Engine Oil filter',     pn:'119305-35170-9', category:'Inboard', qty:2, minQuantity:1, unitPrice:8,  location:'', storeUrl:''},
@@ -120,7 +121,8 @@ let data = {};
 let ui = {
   tab:'documents', docSub:'vessel', maintEngine:'port',
   photoSub:'vesselDoc', crewOpen:null, sysOpen:null, sysTab:'All',
-  partsSearch:'', partsFilter:'All', alertsOpen:false, maintShowAll:false
+  partsSearch:'', partsFilter:'All', alertsOpen:false, maintShowAll:false,
+  provisionsSub:'all'
 };
 let _photoCtx = null; // {section, index} for upload
 
@@ -403,7 +405,7 @@ function handleJsonImport(input) {
     try {
       const json = JSON.parse(e.target.result);
       if (typeof json !== 'object' || Array.isArray(json) || json === null) throw new Error('Expected a JSON object');
-      const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2','shipyard','systems','watermaker','lpg'];
+      const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2','shipyard','systems','watermaker','lpg','provisions'];
       if (!KNOWN.some(k => k in json)) throw new Error('No recognised fields found (expected: documents, crew, maintenance, transitLog, etc.)');
 
       // Handle maintenance separately — flat import format (engineHours, log[])
@@ -594,6 +596,7 @@ const TABS = [
   {id:'shipyard',    icon:'⚓', label:'Shipyard'},
   {id:'watermaker',  icon:'💧', label:'Water Maker'},
   {id:'lpg',         icon:'🔥', label:'LPG'},
+  {id:'provisions',  icon:'🛒', label:'Provisions'},
   {id:'maint',       icon:'🔧', label:'Engine Maintenance'},
   {id:'upgrades',  icon:'🔧', label:'Upgrades & Repairs'},
   {id:'schengen',  icon:'🛂', label:'Schengen'},
@@ -644,6 +647,7 @@ function renderActiveTab() {
       case 'shipyard':    mc.innerHTML = renderShipyard(); break;
       case 'watermaker':  mc.innerHTML = renderWatermaker(); break;
       case 'lpg':         mc.innerHTML = renderLpg(); break;
+      case 'provisions':  mc.innerHTML = renderProvisions(); break;
       case 'maint':       mc.innerHTML = renderMaintenance(); break;
       case 'upgrades':  mc.innerHTML = renderUpgrades(); break;
       case 'schengen':  mc.innerHTML = renderSchengen(); break;
@@ -3171,6 +3175,200 @@ function prefillLpgData() {
   return true;
 }
 
+// ═══════════════════════════════════════════════════════════
+//  PROVISIONS TAB
+// ═══════════════════════════════════════════════════════════
+
+const PROV_CATS = [
+  {id:'all',        label:'All'},
+  {id:'food',       label:'🥫 Food'},
+  {id:'drinks',     label:'🥤 Drinks'},
+  {id:'toiletries', label:'🧴 Toiletries'},
+  {id:'cleaning',   label:'🧹 Cleaning'},
+  {id:'medical',    label:'💊 Medical'},
+  {id:'misc',       label:'📦 Misc'},
+];
+const PROV_CAT_LABELS = {food:'Food',drinks:'Drinks',toiletries:'Toiletries',cleaning:'Cleaning',medical:'Medical',misc:'Misc'};
+const PROV_CAT_ORDER  = ['food','drinks','toiletries','cleaning','medical','misc'];
+
+function getProvisionsData() {
+  if (!data.provisions) data.provisions = {items:[]};
+  if (!data.provisions.items) data.provisions.items = [];
+  return data.provisions;
+}
+
+function renderProvisions() {
+  const prov = getProvisionsData();
+  const email = localStorage.getItem(EMAIL_KEY);
+  const isOwner = email === OWNER_EMAIL;
+  const sub = ui.provisionsSub || 'all';
+
+  const exampleBanner = (!isOwner && prov.exampleDismissed === false)
+    ? `<div style="margin:0 0 10px;padding:8px 12px;background:var(--surface2);border-radius:10px;font-size:12px;color:var(--label3);font-style:italic">These are example items — add your own provisions</div>`
+    : '';
+
+  // Subtab bar
+  const subtabs = PROV_CATS.map(c =>
+    `<div class="pill ${sub===c.id?'active':''}" onclick="setProvSub('${c.id}')">${c.label}</div>`
+  ).join('');
+
+  const items = prov.items || [];
+  const visible = sub === 'all' ? items : items.filter(it => it.category === sub);
+
+  // Shopping list — items below min, across all categories
+  const needed = items.filter(it => it.minQty > 0 && it.qty < it.minQty)
+    .sort((a,b) => PROV_CAT_ORDER.indexOf(a.category) - PROV_CAT_ORDER.indexOf(b.category));
+  const shoppingCard = needed.length ? `
+    <div style="background:rgba(251,146,60,.12);border:1.5px solid #fb923c;border-radius:14px;padding:10px 14px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:14px;font-weight:700">🛍 Shopping list</span>
+        <span style="background:#fb923c;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700">${needed.length}</span>
+      </div>
+      ${needed.map(it=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0">
+          <input type="checkbox" onchange="provMarkBought('${it.id}',this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:#fb923c">
+          <span style="flex:1;font-size:13px">${esc(it.name)}</span>
+          <span style="font-size:12px;color:#fb923c;font-weight:600">need ${it.minQty - it.qty} more</span>
+        </div>`).join('')}
+    </div>` : '';
+
+  // Group visible items by category
+  const byCat = {};
+  for (const it of visible) {
+    if (!byCat[it.category]) byCat[it.category] = [];
+    byCat[it.category].push(it);
+  }
+  const catCards = PROV_CAT_ORDER.filter(c => byCat[c]).map(c => {
+    const rows = byCat[c].map(it => {
+      const origIdx = items.indexOf(it);
+      const low = it.minQty > 0 && it.qty < it.minQty;
+      const badge = it.minQty > 0
+        ? (low ? `<span style="background:rgba(239,68,68,.12);color:#ef4444;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:600">Low</span>`
+                : `<span style="background:rgba(34,197,94,.12);color:#22c55e;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:600">OK</span>`)
+        : '';
+      const qtyColor = low ? '#ef4444' : '#22c55e';
+      const unitLabel = it.unit ? ` ${esc(it.unit)}` : '';
+      return `<div style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-top:1px solid var(--sep)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--label)">${esc(it.name)}</div>
+          <div style="font-size:11px;color:var(--label3)">${it.location?esc(it.location)+' · ':''}min ${it.minQty}${unitLabel}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          <button onclick="provAdj(${origIdx},-1)" style="background:var(--surface2);border:1.5px solid var(--sep);border-radius:8px;width:26px;height:26px;font-size:16px;line-height:1;cursor:pointer;color:var(--label);font-family:var(--font)">−</button>
+          <span style="font-size:15px;font-weight:700;color:${qtyColor};min-width:22px;text-align:center">${it.qty}</span>
+          <button onclick="provAdj(${origIdx},1)" style="background:var(--surface2);border:1.5px solid var(--sep);border-radius:8px;width:26px;height:26px;font-size:16px;line-height:1;cursor:pointer;color:var(--label);font-family:var(--font)">+</button>
+        </div>
+        ${badge}
+        <button onclick="provEdit(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✏️</button>
+        <button onclick="provDelete(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:13px;color:var(--label3)">✕</button>
+      </div>`;
+    }).join('');
+    return `<div class="card" style="margin-bottom:10px">
+      <div class="card-hd">${PROV_CAT_LABELS[c]}</div>
+      ${rows}
+    </div>`;
+  }).join('');
+
+  const emptyMsg = visible.length === 0
+    ? `<div style="padding:20px;text-align:center;color:var(--label3);font-size:13px">No items in this category</div>`
+    : '';
+
+  return `<div style="padding:12px">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+      <button onclick="provAddModal()" style="background:var(--blue);color:#fff;border:none;border-radius:14px;padding:5px 14px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">+ Add item</button>
+    </div>
+    ${exampleBanner}
+    <div class="subtab-bar" style="margin-bottom:10px">${subtabs}</div>
+    ${shoppingCard}
+    ${catCards}${emptyMsg}
+  </div>`;
+}
+
+function setProvSub(s) {
+  ui.provisionsSub = s;
+  document.getElementById('mainContent').innerHTML = renderProvisions();
+}
+
+function provAdj(idx, delta) {
+  const prov = getProvisionsData();
+  if (!prov.items[idx]) return;
+  prov.items[idx].qty = Math.max(0, (prov.items[idx].qty || 0) + delta);
+  save(); document.getElementById('mainContent').innerHTML = renderProvisions();
+}
+
+function provMarkBought(id, checked) {
+  if (!checked) return;
+  const prov = getProvisionsData();
+  const it = prov.items.find(x => x.id === id);
+  if (it) { it.qty = it.minQty; save(); document.getElementById('mainContent').innerHTML = renderProvisions(); }
+}
+
+function provItemModal(item, idx) {
+  const isEdit = item != null;
+  const e = item || {name:'', category:'food', location:'', qty:0, minQty:0, unit:''};
+  const catOpts = PROV_CAT_ORDER.map(c =>
+    `<option value="${c}" ${e.category===c?'selected':''}>${PROV_CAT_LABELS[c]}</option>`
+  ).join('');
+  showModal(isEdit ? 'Edit Item' : 'Add Item', `
+    <div class="mi-label">Name</div><input class="mi" id="pv-name" value="${esc(e.name)}" autofocus>
+    <div class="mi-label">Category</div>
+    <select class="mi" id="pv-cat">${catOpts}</select>
+    <div class="mi-label">Location on boat</div><input class="mi" id="pv-loc" value="${esc(e.location||'')}">
+    <div class="mi-label">Current quantity</div><input class="mi" id="pv-qty" type="number" min="0" value="${e.qty||0}">
+    <div class="mi-label">Minimum quantity</div><input class="mi" id="pv-min" type="number" min="0" value="${e.minQty||0}">
+    <div class="mi-label">Unit (optional)</div><input class="mi" id="pv-unit" placeholder="bottles, cans, rolls…" value="${esc(e.unit||'')}">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="provSave(${isEdit?idx:'null'})">${isEdit?'Save':'Add Item'}</button>
+    </div>`);
+}
+
+function provAddModal() { provItemModal(null, null); }
+function provEdit(idx) { const prov = getProvisionsData(); provItemModal(prov.items[idx], idx); }
+
+function provSave(idx) {
+  const prov = getProvisionsData();
+  const name = document.getElementById('pv-name')?.value.trim();
+  if (!name) { showToast('Enter a name', true); return; }
+  const category = document.getElementById('pv-cat')?.value || 'misc';
+  const location = document.getElementById('pv-loc')?.value.trim() || '';
+  const qty     = Math.max(0, parseInt(document.getElementById('pv-qty')?.value) || 0);
+  const minQty  = Math.max(0, parseInt(document.getElementById('pv-min')?.value) || 0);
+  const unit    = document.getElementById('pv-unit')?.value.trim() || '';
+  if (idx != null && idx !== 'null') {
+    prov.items[idx] = {...prov.items[idx], name, category, location, qty, minQty, unit};
+  } else {
+    prov.items.push({id:uid(), name, category, location, qty, minQty, unit});
+  }
+  if (prov.exampleDismissed === false) prov.exampleDismissed = true;
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderProvisions();
+}
+
+function provDelete(idx) {
+  if (!confirm('Delete this item?')) return;
+  const prov = getProvisionsData();
+  prov.items.splice(idx, 1);
+  save(); document.getElementById('mainContent').innerHTML = renderProvisions();
+}
+
+function prefillProvisionsData() {
+  const email = localStorage.getItem(EMAIL_KEY);
+  if (email === OWNER_EMAIL) return false;
+  const prov = data.provisions;
+  if (prov && prov.items?.length > 0) return false;
+  if (!data.provisions) data.provisions = {};
+  data.provisions = {exampleDismissed:false, items:[
+    {id:'pv_ex1', name:'Pasta',           category:'food',       location:'Galley locker', qty:2,  minQty:6, unit:'packs'},
+    {id:'pv_ex2', name:'Canned tomatoes', category:'food',       location:'Galley locker', qty:8,  minQty:4, unit:'cans'},
+    {id:'pv_ex3', name:'Olive oil',       category:'food',       location:'Galley',        qty:1,  minQty:3, unit:'bottles'},
+    {id:'pv_ex4', name:'Sunscreen SPF50', category:'toiletries', location:'Nav station',   qty:1,  minQty:3, unit:'bottles'},
+    {id:'pv_ex5', name:'Toilet paper',    category:'toiletries', location:'Aft cabin',     qty:2,  minQty:8, unit:'rolls'},
+    {id:'pv_ex6', name:'Dish soap',       category:'cleaning',   location:'Galley',        qty:0,  minQty:2, unit:'bottles'},
+    {id:'pv_ex7', name:'Paracetamol',     category:'medical',    location:'First aid kit', qty:2,  minQty:1, unit:'boxes'},
+  ]};
+  return true;
+}
+
 function prefillWatermakerData() {
   const email = localStorage.getItem(EMAIL_KEY);
   const wm = data.watermaker;
@@ -4805,6 +5003,7 @@ async function attemptUnlock() {
       try { if (prefillShipyardData()) prefillDirty = true; } catch(e) { console.warn('prefillShipyard', e); }
       try { if (prefillWatermakerData()) prefillDirty = true; } catch(e) { console.warn('prefillWatermaker', e); }
       try { if (prefillLpgData()) prefillDirty = true; } catch(e) { console.warn('prefillLpg', e); }
+      try { if (prefillProvisionsData()) prefillDirty = true; } catch(e) { console.warn('prefillProvisions', e); }
       if (prefillDirty) save();
       await pushToCloud();
     }
@@ -4954,6 +5153,7 @@ async function attemptLogin() {
       try { if (prefillShipyardData()) prefillDirty = true; } catch(e) { console.warn('prefillShipyard', e); }
       try { if (prefillWatermakerData()) prefillDirty = true; } catch(e) { console.warn('prefillWatermaker', e); }
       try { if (prefillLpgData()) prefillDirty = true; } catch(e) { console.warn('prefillLpg', e); }
+      try { if (prefillProvisionsData()) prefillDirty = true; } catch(e) { console.warn('prefillProvisions', e); }
         if (prefillDirty) save();
         await pushToCloud();
       }
