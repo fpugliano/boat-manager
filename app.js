@@ -62,7 +62,7 @@ const EMPTY_DEFAULTS = {
     quotes:[], history:[]
   },
   watermaker:{currentReading:0, lastChangeReading:0, targetHours:60, charcoalChangedDate:null, inventory:{micron20:0, micron5:0, charcoal:0}},
-  lpg:{fullBottles:0, totalBottles:3, kgPerBottle:11, history:[]},
+  lpg:{bottles:[], history:[]},
   spareParts:[
     {id:'ex_p1', desc:'Heat Exchanger gasket', pn:'128370-13201', category:'Inboard', qty:4, minQuantity:2, unitPrice:0,  location:'', storeUrl:''},
     {id:'ex_p2', desc:'Engine Oil filter',     pn:'119305-35170-9', category:'Inboard', qty:2, minQuantity:1, unitPrice:8,  location:'', storeUrl:''},
@@ -2912,8 +2912,9 @@ function wmInvChange(key, delta) {
 // ═══════════════════════════════════════════════════════════
 
 function getLpgData() {
-  if (!data.lpg) data.lpg = {fullBottles:0, totalBottles:3, kgPerBottle:11, history:[]};
+  if (!data.lpg) data.lpg = {bottles:[], history:[]};
   if (!data.lpg.history) data.lpg.history = [];
+  if (!data.lpg.bottles) data.lpg.bottles = [];
   return data.lpg;
 }
 
@@ -2921,7 +2922,10 @@ function renderLpg() {
   const lpg = getLpgData();
   const email = localStorage.getItem(EMAIL_KEY);
   const isOwner = email === OWNER_EMAIL;
-  const full = lpg.fullBottles||0, total = lpg.totalBottles||3, kpb = lpg.kgPerBottle||11;
+  const bottles = lpg.bottles||[];
+  const full = bottles.filter(b=>b.full).length;
+  const total = bottles.length;
+  const kgOnBoard = bottles.filter(b=>b.full).reduce((s,b)=>s+b.kg,0);
   const pct = total > 0 ? Math.min(1, full/total) : 0;
   const arcColor = pct > 0.5 ? '#22C55E' : pct >= 0.25 ? '#F59E0B' : '#EF4444';
   const exampleBanner = (!isOwner && lpg.exampleDismissed === false) ? `<div style="margin:0 0 10px;padding:8px 12px;background:var(--surface2);border-radius:10px;font-size:12px;color:var(--label3);font-style:italic">These are example values — update with your own data</div>` : '';
@@ -2940,10 +2944,9 @@ function renderLpg() {
   </svg>`;
 
   // Bottle icons
-  const bottleIcons = Array.from({length:total},(_,i)=>
-    i < full
-      ? `<span style="font-size:22px">🔥</span>`
-      : `<span style="display:inline-flex;width:24px;height:32px;border:2px dashed #d1d5db;border-radius:4px;margin:0 2px"></span>`
+  const bottleIcons = bottles.map(b=>b.full
+    ? `<div style="display:inline-flex;flex-direction:column;align-items:center;margin:0 4px"><span style="font-size:22px">🔥</span><span style="font-size:9px;color:var(--label3)">${b.kg}kg</span></div>`
+    : `<div style="display:inline-flex;flex-direction:column;align-items:center;margin:0 4px"><span style="display:inline-flex;width:24px;height:32px;border:2px dashed #d1d5db;border-radius:4px"></span><span style="font-size:9px;color:var(--label3)">${b.kg}kg</span></div>`
   ).join('');
 
   // Price stats from history
@@ -2982,7 +2985,7 @@ function renderLpg() {
     return `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--sep);font-size:12px">
       <span style="flex-shrink:0;color:var(--label3)">${ds}</span>
       ${h.location?`<span style="color:var(--label2);flex-shrink:0">${esc(h.location)}</span>`:''}
-      <span style="color:var(--label3);flex-shrink:0">${h.bottles}×${h.kg||kpb}kg</span>
+      <span style="color:var(--label3);flex-shrink:0">${h.bottles}×${h.kg||11}kg</span>
       ${h.pricePerKg?`<span style="color:var(--label3);flex-shrink:0">€${Number(h.pricePerKg).toFixed(2)}/kg</span>${priceBadge}`:''}
       <span style="flex:1"></span>
       <button onclick="lpgEditHistory(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✏️</button>
@@ -3006,7 +3009,7 @@ function renderLpg() {
             <div style="font-size:9px;color:var(--label3)">Full bottles</div>
           </div>
           <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
-            <div style="font-size:18px;font-weight:800">${(full*kpb).toFixed(0)}</div>
+            <div style="font-size:18px;font-weight:800">${kgOnBoard.toFixed(0)}</div>
             <div style="font-size:9px;color:var(--label3)">kg on board</div>
           </div>
           <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
@@ -3014,14 +3017,7 @@ function renderLpg() {
             <div style="font-size:9px;color:var(--label3)">Total bottles</div>
           </div>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--sep)">
-          <div style="font-size:13px;color:var(--label2)">kg per bottle</div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:14px;font-weight:600">${kpb} kg</span>
-            <button onclick="lpgEditKg()" style="background:var(--surface2);border:1.5px solid var(--sep);border-radius:14px;padding:3px 10px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">Edit</button>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:8px">
+        <div style="display:flex;gap:8px;margin-top:4px">
           <button onclick="lpgEditBottles()" style="flex:1;background:var(--surface2);border:1.5px solid var(--sep);border-radius:10px;padding:9px 8px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">Edit bottles</button>
           <button onclick="lpgUseBottle()" style="flex:1;background:var(--blue);border:none;border-radius:10px;padding:9px 8px;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;color:#fff">Used a bottle</button>
         </div>
@@ -3042,12 +3038,13 @@ function lpgFillModal(entry, idx) {
   const lpg = getLpgData();
   const today = new Date().toISOString().slice(0,10);
   const isEdit = entry != null;
-  const e = entry || {date:today, location:'', bottles:1, kg:lpg.kgPerBottle||11, pricePerKg:'', notes:''};
+  const defaultKg = (lpg.history?.length ? lpg.history[0].kg : null) || 11;
+  const e = entry || {date:today, location:'', bottles:1, kg:defaultKg, pricePerKg:'', notes:''};
   showModal(isEdit?'Edit Refill':'New Fill', `
     <div class="mi-label">Date</div><input class="mi" id="lpg-d" type="date" value="${esc(e.date)}" autofocus>
     <div class="mi-label">Location</div><input class="mi" id="lpg-loc" value="${esc(e.location||'')}">
     <div class="mi-label">Number of bottles</div><input class="mi" id="lpg-b" type="number" min="1" value="${e.bottles||1}" oninput="lpgUpdateTotal()">
-    <div class="mi-label">kg per bottle</div><input class="mi" id="lpg-kg" type="number" min="1" value="${e.kg||lpg.kgPerBottle||11}" oninput="lpgUpdateTotal()">
+    <div class="mi-label">kg per bottle</div><input class="mi" id="lpg-kg" type="number" min="1" value="${e.kg||11}" oninput="lpgUpdateTotal()">
     <div class="mi-label">Price per kg (€)</div><input class="mi" id="lpg-ppkg" type="number" min="0" step="0.01" value="${e.pricePerKg||''}" oninput="lpgUpdateTotal()">
     <div id="lpg-total" style="font-size:12px;color:var(--label3);margin:6px 0 4px;text-align:right"></div>
     <div class="mi-label">Notes (optional)</div><input class="mi" id="lpg-notes" value="${esc(e.notes||'')}">
@@ -3068,7 +3065,7 @@ function lpgSaveFill(idx) {
   const lpg = getLpgData();
   const date = document.getElementById('lpg-d')?.value; if (!date) { showToast('Enter a date', true); return; }
   const bottles = parseInt(document.getElementById('lpg-b')?.value)||1;
-  const kg = parseFloat(document.getElementById('lpg-kg')?.value)||lpg.kgPerBottle||11;
+  const kg = parseFloat(document.getElementById('lpg-kg')?.value)||11;
   const pricePerKg = parseFloat(document.getElementById('lpg-ppkg')?.value)||0;
   const location = document.getElementById('lpg-loc')?.value.trim()||'';
   const notes = document.getElementById('lpg-notes')?.value.trim()||'';
@@ -3076,8 +3073,6 @@ function lpgSaveFill(idx) {
     lpg.history[idx] = {...lpg.history[idx], date, location, bottles, kg, pricePerKg, notes};
   } else {
     lpg.history.unshift({id:uid(), date, location, bottles, kg, pricePerKg, notes});
-    lpg.fullBottles = Math.min(lpg.totalBottles||3, (lpg.fullBottles||0) + bottles);
-    lpg.kgPerBottle = kg;
   }
   if (lpg.exampleDismissed === false) lpg.exampleDismissed = true;
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderLpg();
@@ -3089,67 +3084,86 @@ function lpgDeleteHistory(i) {
   const lpg = getLpgData(); lpg.history.splice(i,1);
   save(); document.getElementById('mainContent').innerHTML = renderLpg();
 }
+let lpgBottlesWip = [];
 function lpgEditBottles() {
   const lpg = getLpgData();
+  lpgBottlesWip = lpg.bottles.map(b=>({...b}));
+  lpgRenderBottlesModal();
+}
+function lpgRenderBottlesModal() {
+  const rows = lpgBottlesWip.map((b,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--sep)">
+      <span style="flex:1;font-size:14px">${b.kg} kg</span>
+      <button onclick="lpgBottleToggle(${i})" style="background:${b.full?'rgba(52,199,89,.15)':'var(--surface2)'};color:${b.full?'var(--green)':'var(--label3)'};border:1.5px solid ${b.full?'var(--green)':'var(--sep)'};border-radius:14px;padding:3px 10px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">${b.full?'Full':'Empty'}</button>
+      <button onclick="lpgBottleRemove(${i})" style="background:none;border:none;padding:2px 6px;cursor:pointer;font-size:14px;color:var(--label3)">✕</button>
+    </div>`).join('');
   showModal('Edit Bottles', `
-    <div class="mi-label">Full bottles (currently on board)</div>
-    <input class="mi" id="lpg-full" type="number" min="0" value="${lpg.fullBottles||0}" autofocus>
-    <div class="mi-label">Total bottles (capacity)</div>
-    <input class="mi" id="lpg-total-b" type="number" min="1" value="${lpg.totalBottles||3}">
+    <div>${rows}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+      <input class="mi" id="lpg-new-kg" type="number" min="1" placeholder="kg size" style="flex:1">
+      <button onclick="lpgBottleAdd()" style="background:var(--blue);color:#fff;border:none;border-radius:14px;padding:6px 12px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">+ Add bottle</button>
+    </div>
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="lpgSaveBottles()">Save</button>
     </div>`);
 }
+function lpgBottleToggle(i) { lpgBottlesWip[i].full=!lpgBottlesWip[i].full; lpgRenderBottlesModal(); }
+function lpgBottleRemove(i) { lpgBottlesWip.splice(i,1); lpgRenderBottlesModal(); }
+function lpgBottleAdd() {
+  const v = parseFloat(document.getElementById('lpg-new-kg')?.value);
+  if (!v||v<=0) { showToast('Enter a valid kg size', true); return; }
+  lpgBottlesWip.push({id:uid(), kg:v, full:true});
+  lpgRenderBottlesModal();
+}
 function lpgSaveBottles() {
   const lpg = getLpgData();
-  const f = parseInt(document.getElementById('lpg-full')?.value);
-  const t = parseInt(document.getElementById('lpg-total-b')?.value);
-  if (!isNaN(f) && f >= 0) lpg.fullBottles = f;
-  if (!isNaN(t) && t > 0) lpg.totalBottles = t;
-  if (lpg.fullBottles > lpg.totalBottles) lpg.fullBottles = lpg.totalBottles;
+  lpg.bottles = lpgBottlesWip.map(b=>({...b}));
   if (lpg.exampleDismissed === false) lpg.exampleDismissed = true;
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderLpg();
 }
-function lpgEditKg() {
-  const lpg = getLpgData();
-  showModal('kg per bottle', `
-    <div class="mi-label">kg per bottle</div>
-    <input class="mi" id="lpg-kpb" type="number" min="1" value="${lpg.kgPerBottle||11}" autofocus>
-    <div class="modal-btns">
-      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
-      <button class="btn btn-p" onclick="lpgSaveKg()">Save</button>
-    </div>`);
-}
-function lpgSaveKg() {
-  const lpg = getLpgData();
-  const v = parseFloat(document.getElementById('lpg-kpb')?.value);
-  if (!isNaN(v) && v > 0) { lpg.kgPerBottle = v; if (lpg.exampleDismissed === false) lpg.exampleDismissed = true; save(); }
-  hideModal(); document.getElementById('mainContent').innerHTML = renderLpg();
-}
 function lpgUseBottle() {
   const lpg = getLpgData();
-  if (lpg.fullBottles <= 0) { showToast('No full bottles remaining', true); return; }
-  lpg.fullBottles = Math.max(0, (lpg.fullBottles||0) - 1);
-  if (lpg.exampleDismissed === false) lpg.exampleDismissed = true;
-  save(); document.getElementById('mainContent').innerHTML = renderLpg();
+  const fullList = (lpg.bottles||[]).map((b,i)=>({...b,i})).filter(b=>b.full);
+  if (fullList.length===0) { showToast('No full bottles remaining', true); return; }
+  const rows = fullList.map(b=>`
+    <button onclick="lpgMarkUsed(${b.i})" style="display:flex;align-items:center;gap:10px;width:100%;background:var(--surface2);border:1.5px solid var(--sep);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;font-family:var(--font)">
+      <span style="font-size:22px">🔥</span>
+      <span style="font-size:14px;font-weight:600;color:var(--label)">${b.kg} kg bottle</span>
+    </button>`).join('');
+  showModal('Which bottle was used?', `
+    ${rows}
+    <div class="modal-btns"><button class="btn btn-s" onclick="hideModal()">Cancel</button></div>`);
+}
+function lpgMarkUsed(i) {
+  const lpg = getLpgData();
+  if (lpg.bottles[i]) { lpg.bottles[i].full=false; if (lpg.exampleDismissed===false) lpg.exampleDismissed=true; save(); }
+  hideModal(); document.getElementById('mainContent').innerHTML = renderLpg();
 }
 
 function prefillLpgData() {
   const email = localStorage.getItem(EMAIL_KEY);
   const existing = data.lpg;
-  if (existing && (existing.history?.length || existing.fullBottles > 0)) return false;
+  if (existing && (existing.history?.length || existing.bottles?.length > 0)) return false;
   if (!data.lpg) data.lpg = {};
   const dAgo = n => { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); };
   if (email === OWNER_EMAIL) {
-    data.lpg = {fullBottles:1, totalBottles:3, kgPerBottle:11, history:[
+    data.lpg = {bottles:[
+      {id:'b1', kg:11, full:true},
+      {id:'b2', kg:11, full:false},
+      {id:'b3', kg:11, full:false}
+    ], history:[
       {id:'lpg001', date:'2026-06-01', location:'Syros',  bottles:2, kg:11, pricePerKg:2.10, notes:''},
       {id:'lpg002', date:'2026-04-15', location:'Kilada', bottles:3, kg:11, pricePerKg:1.85, notes:''},
       {id:'lpg003', date:'2025-08-22', location:'Paros',  bottles:2, kg:11, pricePerKg:1.60, notes:''},
       {id:'lpg004', date:'2025-06-10', location:'Leros',  bottles:2, kg:11, pricePerKg:1.20, notes:''}
     ]};
   } else {
-    data.lpg = {fullBottles:2, totalBottles:3, kgPerBottle:11, exampleDismissed:false, history:[
+    data.lpg = {bottles:[
+      {id:uid(), kg:11, full:true},
+      {id:uid(), kg:11, full:true},
+      {id:uid(), kg:11, full:false}
+    ], exampleDismissed:false, history:[
       {id:'ex_lpg1', date:dAgo(60),  location:'Example Marina', bottles:3, kg:11, pricePerKg:1.90, notes:''},
       {id:'ex_lpg2', date:dAgo(180), location:'Another Port',   bottles:2, kg:11, pricePerKg:1.65, notes:''}
     ]};
