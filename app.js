@@ -2557,7 +2557,6 @@ function renderWatermaker() {
             <div style="display:flex;align-items:center;gap:8px">
               <span style="font-size:14px;font-weight:600">${wm.lastChangeReading||0}h</span>
               <button onclick="wmUpdateLastChange()" style="background:var(--surface2);border:1.5px solid var(--sep);border-radius:14px;padding:3px 10px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">Update</button>
-              <button onclick="wmEditLastChange()" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:14px;color:var(--label3)">✏️</button>
             </div>
           </div>
           ${!(wm.lastChangeReading) ? `<div style="font-size:11px;color:var(--label3);margin-top:3px">Tap Update to set the reading from your last filter change</div>` : ''}
@@ -2603,16 +2602,11 @@ function renderWatermaker() {
         ? `<div style="padding:8px 14px 10px;font-size:13px;color:var(--label3)">No changes recorded yet</div>`
         : (wm.micronHistory||[]).map((r,i,arr)=>{
             const d = parseISODate(r.date); const ds = d ? String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getFullYear()).slice(-2) : r.date;
-            let hrsLabel;
-            if (i === 0) {
-              const soFar = Math.max(0, (wm.currentReading||0) - (r.reading||0));
-              hrsLabel = `<span style="color:var(--blue);flex-shrink:0">${soFar}h so far</span>`;
-            } else {
-              const lasted = (arr[i-1].reading||0) - (r.reading||0);
-              hrsLabel = lasted > 0
-                ? `<span style="color:var(--label3);flex-shrink:0">${lasted}h</span>`
-                : `<span style="color:var(--label3);flex-shrink:0">—</span>`;
-            }
+            const nextReading = i === 0 ? (wm.currentReading||0) : (arr[i-1].reading||0);
+            const lasted = Math.max(0, nextReading - (r.reading||0));
+            const hrsLabel = lasted > 0
+              ? `<span style="color:var(--label3);flex-shrink:0">${lasted}h</span>`
+              : `<span style="color:var(--label3);flex-shrink:0">—</span>`;
             return `<div style="display:flex;align-items:center;gap:8px;padding:7px 14px;border-top:1px solid var(--sep);font-size:12px">
               <span style="flex-shrink:0;color:var(--label3)">${ds}</span>
               ${r.location?`<span style="color:var(--label2);flex-shrink:0">${esc(r.location)}</span>`:''}
