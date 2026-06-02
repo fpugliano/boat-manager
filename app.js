@@ -3278,7 +3278,8 @@ function renderProvisions() {
     : '';
 
   return `<div style="padding:12px">
-    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px">
+      <button onclick="provUncheckAll()" style="background:var(--surface2);color:var(--label);border:1.5px solid var(--sep);border-radius:14px;padding:5px 14px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">Uncheck All</button>
       <button onclick="provAddModal()" style="background:var(--blue);color:#fff;border:none;border-radius:14px;padding:5px 14px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">+ Add item</button>
     </div>
     ${exampleBanner}
@@ -3303,6 +3304,11 @@ function provToggleBought(idx, checked) {
   const prov = getProvisionsData();
   if (!prov.items[idx]) return;
   prov.items[idx].bought = checked;
+  save(); document.getElementById('mainContent').innerHTML = renderProvisions();
+}
+function provUncheckAll() {
+  const prov = getProvisionsData();
+  prov.items.forEach(it => { it.bought = false; });
   save(); document.getElementById('mainContent').innerHTML = renderProvisions();
 }
 
