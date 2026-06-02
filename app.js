@@ -3183,17 +3183,19 @@ const PROV_CATS = [
   {id:'all',        label:'All'},
   {id:'food',       label:'🥫 Food'},
   {id:'drinks',     label:'🥤 Drinks'},
-  {id:'toiletries', label:'🧴 Toiletries'},
-  {id:'cleaning',   label:'🧹 Cleaning'},
-  {id:'medical',    label:'💊 Medical'},
+  {id:'toiletries', label:'🧴 Toiletries & Cleaning'},
   {id:'misc',       label:'📦 Misc'},
 ];
-const PROV_CAT_LABELS = {food:'Food',drinks:'Drinks',toiletries:'Toiletries',cleaning:'Cleaning',medical:'Medical',misc:'Misc'};
-const PROV_CAT_ORDER  = ['food','drinks','toiletries','cleaning','medical','misc'];
+const PROV_CAT_LABELS = {food:'Food',drinks:'Drinks',toiletries:'Toiletries & Cleaning',misc:'Misc'};
+const PROV_CAT_ORDER  = ['food','drinks','toiletries','misc'];
 
 function getProvisionsData() {
   if (!data.provisions) data.provisions = {items:[]};
   if (!data.provisions.items) data.provisions.items = [];
+  for (const it of data.provisions.items) {
+    if (it.category === 'cleaning') it.category = 'toiletries';
+    if (it.category === 'medical')  it.category = 'misc';
+  }
   return data.provisions;
 }
 
@@ -3303,16 +3305,18 @@ function provMarkBought(id, checked) {
   if (it) { it.qty = it.minQty; save(); document.getElementById('mainContent').innerHTML = renderProvisions(); }
 }
 
-function provItemModal(item, idx) {
+function provItemModal(item, idx, lockedCat) {
   const isEdit = item != null;
-  const e = item || {name:'', category:'food', location:'', qty:0, minQty:0, unit:''};
-  const catOpts = PROV_CAT_ORDER.map(c =>
-    `<option value="${c}" ${e.category===c?'selected':''}>${PROV_CAT_LABELS[c]}</option>`
-  ).join('');
+  const sub = ui.provisionsSub || 'all';
+  const defaultCat = lockedCat || (sub !== 'all' ? sub : 'food');
+  const e = item || {name:'', category:defaultCat, location:'', qty:0, minQty:0, unit:''};
+  const catField = lockedCat
+    ? `<div style="font-size:14px;color:var(--label);padding:8px 0 4px">${esc(PROV_CAT_LABELS[lockedCat]||lockedCat)}</div><input type="hidden" id="pv-cat" value="${esc(lockedCat)}">`
+    : `<select class="mi" id="pv-cat">${PROV_CAT_ORDER.map(c=>`<option value="${c}" ${e.category===c?'selected':''}>${PROV_CAT_LABELS[c]}</option>`).join('')}</select>`;
   showModal(isEdit ? 'Edit Item' : 'Add Item', `
     <div class="mi-label">Name</div><input class="mi" id="pv-name" value="${esc(e.name)}" autofocus>
     <div class="mi-label">Category</div>
-    <select class="mi" id="pv-cat">${catOpts}</select>
+    ${catField}
     <div class="mi-label">Location on boat</div><input class="mi" id="pv-loc" value="${esc(e.location||'')}">
     <div class="mi-label">Current quantity</div><input class="mi" id="pv-qty" type="number" min="0" value="${e.qty||0}">
     <div class="mi-label">Minimum quantity</div><input class="mi" id="pv-min" type="number" min="0" value="${e.minQty||0}">
@@ -3323,7 +3327,11 @@ function provItemModal(item, idx) {
     </div>`);
 }
 
-function provAddModal() { provItemModal(null, null); }
+function provAddModal() {
+  const sub = ui.provisionsSub || 'all';
+  const locked = sub !== 'all' ? sub : null;
+  provItemModal(null, null, locked);
+}
 function provEdit(idx) { const prov = getProvisionsData(); provItemModal(prov.items[idx], idx); }
 
 function provSave(idx) {
@@ -3363,8 +3371,7 @@ function prefillProvisionsData() {
     {id:'pv_ex3', name:'Olive oil',       category:'food',       location:'Galley',        qty:1,  minQty:3, unit:'bottles'},
     {id:'pv_ex4', name:'Sunscreen SPF50', category:'toiletries', location:'Nav station',   qty:1,  minQty:3, unit:'bottles'},
     {id:'pv_ex5', name:'Toilet paper',    category:'toiletries', location:'Aft cabin',     qty:2,  minQty:8, unit:'rolls'},
-    {id:'pv_ex6', name:'Dish soap',       category:'cleaning',   location:'Galley',        qty:0,  minQty:2, unit:'bottles'},
-    {id:'pv_ex7', name:'Paracetamol',     category:'medical',    location:'First aid kit', qty:2,  minQty:1, unit:'boxes'},
+    {id:'pv_ex6', name:'Dish soap',       category:'toiletries', location:'Galley',        qty:0,  minQty:2, unit:'bottles'},
   ]};
   return true;
 }
