@@ -3250,9 +3250,11 @@ function renderProvisions() {
         : '';
       const qtyColor = low ? '#ef4444' : '#22c55e';
       const unitLabel = it.unit ? ` ${esc(it.unit)}` : '';
-      return `<div style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-top:1px solid var(--sep)">
+      const dimmed = it.bought ? 'opacity:0.45;' : '';
+      return `<div style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-top:1px solid var(--sep);${dimmed}">
+        <input type="checkbox" ${it.bought?'checked':''} onchange="provToggleBought(${origIdx},this.checked)" style="width:17px;height:17px;flex-shrink:0;cursor:pointer;accent-color:var(--blue)">
         <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:600;color:var(--label)">${esc(it.name)}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--label);${it.bought?'text-decoration:line-through;':''}">${esc(it.name)}</div>
           <div style="font-size:11px;color:var(--label3)">${it.location?esc(it.location)+' · ':''}min ${it.minQty}${unitLabel}</div>
         </div>
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
@@ -3295,6 +3297,12 @@ function provAdj(idx, delta) {
   const prov = getProvisionsData();
   if (!prov.items[idx]) return;
   prov.items[idx].qty = Math.max(0, (prov.items[idx].qty || 0) + delta);
+  save(); document.getElementById('mainContent').innerHTML = renderProvisions();
+}
+function provToggleBought(idx, checked) {
+  const prov = getProvisionsData();
+  if (!prov.items[idx]) return;
+  prov.items[idx].bought = checked;
   save(); document.getElementById('mainContent').innerHTML = renderProvisions();
 }
 
