@@ -2597,9 +2597,12 @@ function renderWatermaker() {
     </div>
     <div class="card" style="margin-top:12px">
       <div class="card-hd">Filter change history</div>
-      <div style="padding:8px 14px 4px;font-size:11px;font-weight:700;color:var(--label3);text-transform:uppercase;letter-spacing:.5px">5 &amp; 20 micron filters</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 4px">
+        <span style="font-size:11px;font-weight:700;color:var(--label3);text-transform:uppercase;letter-spacing:.5px">5 &amp; 20 micron filters</span>
+        <button onclick="wmAddMicronHistoryEntry()" style="background:none;border:none;font-size:12px;font-weight:600;color:var(--blue);font-family:var(--font);cursor:pointer;padding:0">+ Add entry</button>
+      </div>
       ${(wm.micronHistory||[]).length === 0
-        ? `<div style="padding:8px 14px 10px;font-size:13px;color:var(--label3)">No changes recorded yet</div>`
+        ? `<div style="padding:4px 14px 10px;font-size:13px;color:var(--label3)">No changes recorded yet</div>`
         : (wm.micronHistory||[]).map((r,i,arr)=>{
             const d = parseISODate(r.date); const ds = d ? String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getFullYear()).slice(-2) : r.date;
             const nextReading = i === 0 ? (wm.currentReading||0) : (arr[i-1].reading||0);
@@ -2617,9 +2620,12 @@ function renderWatermaker() {
               <button onclick="wmDeleteMicronHistory(${i})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✕</button>
             </div>`;
           }).join('')}
-      <div style="padding:8px 14px 4px;font-size:11px;font-weight:700;color:var(--label3);text-transform:uppercase;letter-spacing:.5px;border-top:1px solid var(--sep)">Charcoal filter</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 4px;border-top:1px solid var(--sep)">
+        <span style="font-size:11px;font-weight:700;color:var(--label3);text-transform:uppercase;letter-spacing:.5px">Charcoal filter</span>
+        <button onclick="wmAddCharcoalHistoryEntry()" style="background:none;border:none;font-size:12px;font-weight:600;color:var(--blue);font-family:var(--font);cursor:pointer;padding:0">+ Add entry</button>
+      </div>
       ${(wm.charcoalHistory||[]).length === 0
-        ? `<div style="padding:8px 14px 10px;font-size:13px;color:var(--label3)">No changes recorded yet</div>`
+        ? `<div style="padding:4px 14px 10px;font-size:13px;color:var(--label3)">No changes recorded yet</div>`
         : (wm.charcoalHistory||[]).map((r,i)=>{
             const d = parseISODate(r.date); const ds = d ? String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getFullYear()).slice(-2) : r.date;
             return `<div style="display:flex;align-items:center;gap:8px;padding:7px 14px;border-top:1px solid var(--sep);font-size:12px">
@@ -2766,6 +2772,54 @@ function wmSaveCharcoalChange() {
   if (!wm.charcoalHistory) wm.charcoalHistory = [];
   wm.charcoalHistory.unshift({id:uid(), date:today, location:loc});
   if (wm.inventory.charcoal > 0) wm.inventory.charcoal--;
+  wm.exampleDismissed = true;
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
+}
+
+function wmAddMicronHistoryEntry() {
+  const wm = getWatermakerData();
+  const today = new Date().toISOString().slice(0,10);
+  showModal('Add Filter Change Entry', `
+    <div class="mi-label">Date</div><input class="mi" id="wmna-d" type="date" value="${today}" autofocus>
+    <div class="mi-label">Hour meter reading</div><input class="mi" id="wmna-r" type="number" min="0" placeholder="0">
+    <div class="mi-label">Location (optional)</div><input class="mi" id="wmna-l" placeholder="e.g. Paros marina">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="wmSaveAddMicronHistoryEntry()">Save</button>
+    </div>`);
+}
+function wmSaveAddMicronHistoryEntry() {
+  const wm = getWatermakerData();
+  const date = document.getElementById('wmna-d')?.value; if (!date) { showToast('Enter a date', true); return; }
+  const reading = parseInt(document.getElementById('wmna-r')?.value);
+  const loc = document.getElementById('wmna-l')?.value.trim()||'';
+  if (isNaN(reading) || reading < 0) { showToast('Enter a valid reading', true); return; }
+  if (!wm.micronHistory) wm.micronHistory = [];
+  wm.micronHistory.unshift({id:uid(), date, location:loc, reading});
+  wm.micronHistory.sort((a,b) => b.date.localeCompare(a.date));
+  wm.lastChangeReading = wm.micronHistory[0].reading;
+  wm.exampleDismissed = true;
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
+}
+
+function wmAddCharcoalHistoryEntry() {
+  const today = new Date().toISOString().slice(0,10);
+  showModal('Add Charcoal Filter Change Entry', `
+    <div class="mi-label">Date</div><input class="mi" id="wmca-d" type="date" value="${today}" autofocus>
+    <div class="mi-label">Location (optional)</div><input class="mi" id="wmca-l" placeholder="e.g. Paros marina">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="wmSaveAddCharcoalHistoryEntry()">Save</button>
+    </div>`);
+}
+function wmSaveAddCharcoalHistoryEntry() {
+  const wm = getWatermakerData();
+  const date = document.getElementById('wmca-d')?.value; if (!date) { showToast('Enter a date', true); return; }
+  const loc = document.getElementById('wmca-l')?.value.trim()||'';
+  if (!wm.charcoalHistory) wm.charcoalHistory = [];
+  wm.charcoalHistory.unshift({id:uid(), date, location:loc});
+  wm.charcoalHistory.sort((a,b) => b.date.localeCompare(a.date));
+  wm.charcoalChangedDate = wm.charcoalHistory[0].date;
   wm.exampleDismissed = true;
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
 }
