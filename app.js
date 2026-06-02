@@ -2969,14 +2969,21 @@ function renderLpg() {
 
   // Refill history
   const sorted = [...(lpg.history||[])].sort((a,b)=>b.date.localeCompare(a.date));
+  const pricedEntries = sorted.filter(h=>h.pricePerKg>0);
+  const minPrice = pricedEntries.length>=2 ? Math.min(...pricedEntries.map(h=>h.pricePerKg)) : null;
+  const maxPrice = pricedEntries.length>=2 ? Math.max(...pricedEntries.map(h=>h.pricePerKg)) : null;
+  const showBadges = minPrice !== null && minPrice !== maxPrice;
   const histRows = sorted.map(h => {
     const origIdx = lpg.history.indexOf(h);
     const d = parseISODate(h.date); const ds = d ? String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getFullYear()).slice(-2) : h.date;
+    const priceBadge = showBadges && h.pricePerKg
+      ? (h.pricePerKg<=minPrice ? `<span style="background:rgba(52,199,89,.15);color:var(--green);border-radius:6px;padding:1px 6px;font-size:10px;font-weight:600">Cheapest</span>`
+         : h.pricePerKg>=maxPrice ? `<span style="background:rgba(255,59,48,.12);color:var(--red);border-radius:6px;padding:1px 6px;font-size:10px;font-weight:600">Priciest</span>` : '') : '';
     return `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--sep);font-size:12px">
       <span style="flex-shrink:0;color:var(--label3)">${ds}</span>
       ${h.location?`<span style="color:var(--label2);flex-shrink:0">${esc(h.location)}</span>`:''}
       <span style="color:var(--label3);flex-shrink:0">${h.bottles}×${h.kg||kpb}kg</span>
-      ${h.pricePerKg?`<span style="color:var(--label3);flex-shrink:0">€${Number(h.pricePerKg).toFixed(2)}/kg</span>`:''}
+      ${h.pricePerKg?`<span style="color:var(--label3);flex-shrink:0">€${Number(h.pricePerKg).toFixed(2)}/kg</span>${priceBadge}`:''}
       <span style="flex:1"></span>
       <button onclick="lpgEditHistory(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✏️</button>
       <button onclick="lpgDeleteHistory(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✕</button>
