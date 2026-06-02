@@ -2601,25 +2601,45 @@ function renderWatermaker() {
         <span style="font-size:11px;font-weight:700;color:var(--label3);text-transform:uppercase;letter-spacing:.5px">5 &amp; 20 micron filters</span>
         <button onclick="wmAddMicronHistoryEntry()" style="background:none;border:none;font-size:12px;font-weight:600;color:var(--blue);font-family:var(--font);cursor:pointer;padding:0">+ Add entry</button>
       </div>
-      ${(wm.micronHistory||[]).length === 0
-        ? `<div style="padding:4px 14px 10px;font-size:13px;color:var(--label3)">No changes recorded yet</div>`
-        : (wm.micronHistory||[]).map((r,i,arr)=>{
+      ${(()=>{
+          // Deduplicate by reading and date, exclude currentReading as a history row
+          const seen = new Set();
+          const clean = (wm.micronHistory||[]).filter(r => {
+            const key = `${r.reading}|${r.date}`;
+            if (seen.has(key) || r.reading === (wm.currentReading||0)) return false;
+            seen.add(key); return true;
+          });
+          if (clean.length === 0) return `<div style="padding:4px 14px 10px;font-size:13px;color:var(--label3)">No changes recorded yet</div>`;
+          // Sort by reading ascending for hours-lasted calc, then display descending by date
+          const byReading = [...clean].sort((a,b) => (a.reading||0) - (b.reading||0));
+          const lastedMap = {};
+          byReading.forEach((r,i,arr) => {
+            if (i === 0) { lastedMap[r.reading] = null; return; } // oldest: no prior
+            lastedMap[r.reading] = (r.reading||0) - (arr[i-1].reading||0);
+          });
+          // Most recent: lasted = currentReading - its reading
+          const mostRecent = byReading[byReading.length-1];
+          if (mostRecent) lastedMap[mostRecent.reading] = Math.max(0, (wm.currentReading||0) - (mostRecent.reading||0));
+          // Display sorted date-descending, use original indices for edit/delete
+          const display = clean.slice().sort((a,b) => b.date.localeCompare(a.date));
+          return display.map(r => {
+            const origIdx = (wm.micronHistory||[]).indexOf(r);
             const d = parseISODate(r.date); const ds = d ? String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getFullYear()).slice(-2) : r.date;
-            const nextReading = i === 0 ? (wm.currentReading||0) : (arr[i-1].reading||0);
-            const lasted = Math.max(0, nextReading - (r.reading||0));
-            const hrsLabel = lasted > 0
-              ? `<span style="color:var(--label3);flex-shrink:0">${lasted}h</span>`
-              : `<span style="color:var(--label3);flex-shrink:0">—</span>`;
+            const lasted = lastedMap[r.reading];
+            const hrsLabel = (lasted == null || lasted <= 0)
+              ? `<span style="color:var(--label3);flex-shrink:0">—</span>`
+              : `<span style="color:var(--label3);flex-shrink:0">${lasted}h</span>`;
             return `<div style="display:flex;align-items:center;gap:8px;padding:7px 14px;border-top:1px solid var(--sep);font-size:12px">
               <span style="flex-shrink:0;color:var(--label3)">${ds}</span>
               ${r.location?`<span style="color:var(--label2);flex-shrink:0">${esc(r.location)}</span>`:''}
               <span style="color:var(--label3)">${r.reading}h</span>
               <span style="flex:1"></span>
               ${hrsLabel}
-              <button onclick="wmEditMicronHistory(${i})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✏️</button>
-              <button onclick="wmDeleteMicronHistory(${i})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✕</button>
+              <button onclick="wmEditMicronHistory(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✏️</button>
+              <button onclick="wmDeleteMicronHistory(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✕</button>
             </div>`;
-          }).join('')}
+          }).join('');
+        })()}
       <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 4px;border-top:1px solid var(--sep)">
         <span style="font-size:11px;font-weight:700;color:var(--label3);text-transform:uppercase;letter-spacing:.5px">Charcoal filter</span>
         <button onclick="wmAddCharcoalHistoryEntry()" style="background:none;border:none;font-size:12px;font-weight:600;color:var(--blue);font-family:var(--font);cursor:pointer;padding:0">+ Add entry</button>
