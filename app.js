@@ -696,9 +696,6 @@ function renderVesselDoc() {
   const v = data.documents?.vessel || {};
   const exp = expiryBadge(v.expiryDate, 90);
   return `
-    <div class="btn-row no-print">
-      <button class="btn btn-s btn-sm" onclick="window.print()">🖨 Print</button>
-    </div>
     <div class="sec-hd" style="display:flex;align-items:center;justify-content:space-between">Vessel Identification<button class="btn btn-s btn-sm" onclick="archiveVesselDoc()">Archive &amp; New</button></div>
     <div class="card"><div class="card-body">
       ${fr('Vessel Name','documents.vessel.vesselName',v.vesselName)}
