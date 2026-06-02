@@ -2601,12 +2601,24 @@ function renderWatermaker() {
       <div style="padding:8px 14px 4px;font-size:11px;font-weight:700;color:var(--label3);text-transform:uppercase;letter-spacing:.5px">5 &amp; 20 micron filters</div>
       ${(wm.micronHistory||[]).length === 0
         ? `<div style="padding:8px 14px 10px;font-size:13px;color:var(--label3)">No changes recorded yet</div>`
-        : (wm.micronHistory||[]).map((r,i)=>{
+        : (wm.micronHistory||[]).map((r,i,arr)=>{
             const d = parseISODate(r.date); const ds = d ? String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getFullYear()).slice(-2) : r.date;
+            let hrsLabel;
+            if (i === 0) {
+              const soFar = Math.max(0, (wm.currentReading||0) - (r.reading||0));
+              hrsLabel = `<span style="color:var(--blue);flex-shrink:0">${soFar}h so far</span>`;
+            } else {
+              const lasted = (arr[i-1].reading||0) - (r.reading||0);
+              hrsLabel = lasted > 0
+                ? `<span style="color:var(--label3);flex-shrink:0">${lasted}h</span>`
+                : `<span style="color:var(--label3);flex-shrink:0">—</span>`;
+            }
             return `<div style="display:flex;align-items:center;gap:8px;padding:7px 14px;border-top:1px solid var(--sep);font-size:12px">
               <span style="flex-shrink:0;color:var(--label3)">${ds}</span>
               ${r.location?`<span style="color:var(--label2);flex-shrink:0">${esc(r.location)}</span>`:''}
-              <span style="color:var(--label3);flex:1">${r.reading}h</span>
+              <span style="color:var(--label3)">${r.reading}h</span>
+              <span style="flex:1"></span>
+              ${hrsLabel}
               <button onclick="wmEditMicronHistory(${i})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✏️</button>
               <button onclick="wmDeleteMicronHistory(${i})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✕</button>
             </div>`;
