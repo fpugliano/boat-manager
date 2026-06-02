@@ -62,6 +62,7 @@ const EMPTY_DEFAULTS = {
     quotes:[], history:[]
   },
   watermaker:{currentReading:0, lastChangeReading:0, targetHours:60, charcoalChangedDate:null, inventory:{micron20:0, micron5:0, charcoal:0}},
+  lpg:{fullBottles:0, totalBottles:3, kgPerBottle:11, history:[]},
   spareParts:[
     {id:'ex_p1', desc:'Heat Exchanger gasket', pn:'128370-13201', category:'Inboard', qty:4, minQuantity:2, unitPrice:0,  location:'', storeUrl:''},
     {id:'ex_p2', desc:'Engine Oil filter',     pn:'119305-35170-9', category:'Inboard', qty:2, minQuantity:1, unitPrice:8,  location:'', storeUrl:''},
@@ -402,7 +403,7 @@ function handleJsonImport(input) {
     try {
       const json = JSON.parse(e.target.result);
       if (typeof json !== 'object' || Array.isArray(json) || json === null) throw new Error('Expected a JSON object');
-      const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2','shipyard','systems','watermaker'];
+      const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2','shipyard','systems','watermaker','lpg'];
       if (!KNOWN.some(k => k in json)) throw new Error('No recognised fields found (expected: documents, crew, maintenance, transitLog, etc.)');
 
       // Handle maintenance separately — flat import format (engineHours, log[])
@@ -592,6 +593,7 @@ const TABS = [
   {id:'documents', icon:'📄', label:'Documents'},
   {id:'shipyard',    icon:'⚓', label:'Shipyard'},
   {id:'watermaker',  icon:'💧', label:'Water Maker'},
+  {id:'lpg',         icon:'🔥', label:'LPG'},
   {id:'maint',       icon:'🔧', label:'Maintenance'},
   {id:'upgrades',  icon:'🔧', label:'Upgrades & Repairs'},
   {id:'schengen',  icon:'🛂', label:'Schengen'},
@@ -641,6 +643,7 @@ function renderActiveTab() {
       case 'crew':      mc.innerHTML = renderCrew(); break;
       case 'shipyard':    mc.innerHTML = renderShipyard(); break;
       case 'watermaker':  mc.innerHTML = renderWatermaker(); break;
+      case 'lpg':         mc.innerHTML = renderLpg(); break;
       case 'maint':       mc.innerHTML = renderMaintenance(); break;
       case 'upgrades':  mc.innerHTML = renderUpgrades(); break;
       case 'schengen':  mc.innerHTML = renderSchengen(); break;
@@ -2904,6 +2907,249 @@ function wmInvChange(key, delta) {
   save(); document.getElementById('mainContent').innerHTML = renderWatermaker();
 }
 
+// ═══════════════════════════════════════════════════════════
+//  LPG TAB
+// ═══════════════════════════════════════════════════════════
+
+function getLpgData() {
+  if (!data.lpg) data.lpg = {fullBottles:0, totalBottles:3, kgPerBottle:11, history:[]};
+  if (!data.lpg.history) data.lpg.history = [];
+  return data.lpg;
+}
+
+function renderLpg() {
+  const lpg = getLpgData();
+  const email = localStorage.getItem(EMAIL_KEY);
+  const isOwner = email === OWNER_EMAIL;
+  const full = lpg.fullBottles||0, total = lpg.totalBottles||3, kpb = lpg.kgPerBottle||11;
+  const pct = total > 0 ? Math.min(1, full/total) : 0;
+  const arcColor = pct > 0.5 ? '#22C55E' : pct >= 0.25 ? '#F59E0B' : '#EF4444';
+  const exampleBanner = (!isOwner && lpg.exampleDismissed === false) ? `<div style="margin:0 0 10px;padding:8px 12px;background:var(--surface2);border-radius:10px;font-size:12px;color:var(--label3);font-style:italic">These are example values — update with your own data</div>` : '';
+  const warn = full <= 1 ? `<div style="margin:0 0 10px;padding:10px 14px;background:rgba(255,59,48,.1);border:1.5px solid var(--red);border-radius:10px;font-size:13px;color:var(--red);font-weight:600">⚠ Only ${full} bottle${full===1?'':'s'} remaining — consider refilling soon</div>` : '';
+
+  // Semicircle gauge
+  const totalArc = 283, dashoffset = Math.round(totalArc*(1-pct));
+  const gauge = `<svg width="220" height="130" viewBox="0 0 220 130" style="display:block;margin:0 auto 4px">
+    <path d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="#e5e7eb" stroke-width="16" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="0"/>
+    <path d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="${arcColor}" stroke-width="16" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="${dashoffset}"/>
+    <text x="110" y="88" text-anchor="middle" font-size="34" font-weight="800" fill="${arcColor}" font-family="var(--font)">${full}</text>
+    <text x="110" y="108" text-anchor="middle" font-size="11" fill="#9ca3af" font-family="var(--font)">of ${total} bottles</text>
+    <text x="18" y="126" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="var(--font)">0</text>
+    <text x="110" y="22" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="var(--font)">${Math.round(total/2)}</text>
+    <text x="202" y="126" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="var(--font)">${total}</text>
+  </svg>`;
+
+  // Bottle icons
+  const bottleIcons = Array.from({length:total},(_,i)=>
+    i < full
+      ? `<span style="font-size:22px">🔥</span>`
+      : `<span style="display:inline-flex;width:24px;height:32px;border:2px dashed #d1d5db;border-radius:4px;margin:0 2px"></span>`
+  ).join('');
+
+  // Price stats from history
+  const prices = (lpg.history||[]).filter(h=>h.pricePerKg>0).map(h=>h.pricePerKg);
+  const priceCard = prices.length ? `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-hd">Price per kg — all time</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:12px 14px">
+        <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
+          <div style="font-size:16px;font-weight:800;color:#22C55E">€${Math.min(...prices).toFixed(2)}</div>
+          <div style="font-size:9px;color:var(--label3)">Lowest</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
+          <div style="font-size:16px;font-weight:800">€${(prices.reduce((a,b)=>a+b,0)/prices.length).toFixed(2)}</div>
+          <div style="font-size:9px;color:var(--label3)">Average</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
+          <div style="font-size:16px;font-weight:800;color:#EF4444">€${Math.max(...prices).toFixed(2)}</div>
+          <div style="font-size:9px;color:var(--label3)">Highest</div>
+        </div>
+      </div>
+    </div>` : '';
+
+  // Refill history
+  const sorted = [...(lpg.history||[])].sort((a,b)=>b.date.localeCompare(a.date));
+  const histRows = sorted.map(h => {
+    const origIdx = lpg.history.indexOf(h);
+    const d = parseISODate(h.date); const ds = d ? String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getFullYear()).slice(-2) : h.date;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--sep);font-size:12px">
+      <span style="flex-shrink:0;color:var(--label3)">${ds}</span>
+      ${h.location?`<span style="color:var(--label2);flex-shrink:0">${esc(h.location)}</span>`:''}
+      <span style="color:var(--label3);flex-shrink:0">${h.bottles}×${h.kg||kpb}kg</span>
+      ${h.pricePerKg?`<span style="color:var(--label3);flex-shrink:0">€${Number(h.pricePerKg).toFixed(2)}/kg</span>`:''}
+      <span style="flex:1"></span>
+      <button onclick="lpgEditHistory(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✏️</button>
+      <button onclick="lpgDeleteHistory(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✕</button>
+    </div>`;
+  }).join('');
+
+  return `<div style="padding:12px">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+      <button onclick="lpgAddFill()" style="background:var(--blue);color:#fff;border:none;border-radius:14px;padding:5px 14px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">+ New Fill</button>
+    </div>
+    ${exampleBanner}${warn}
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-hd">Bottles on board</div>
+      <div style="padding:12px 14px 8px">
+        ${gauge}
+        <div style="display:flex;justify-content:center;gap:4px;align-items:center;margin-bottom:12px;flex-wrap:wrap">${bottleIcons}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px">
+          <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
+            <div style="font-size:18px;font-weight:800;color:${arcColor}">${full}</div>
+            <div style="font-size:9px;color:var(--label3)">Full bottles</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
+            <div style="font-size:18px;font-weight:800">${(full*kpb).toFixed(0)}</div>
+            <div style="font-size:9px;color:var(--label3)">kg on board</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
+            <div style="font-size:18px;font-weight:800">${total}</div>
+            <div style="font-size:9px;color:var(--label3)">Total bottles</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--sep)">
+          <div style="font-size:13px;color:var(--label2)">kg per bottle</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:14px;font-weight:600">${kpb} kg</span>
+            <button onclick="lpgEditKg()" style="background:var(--surface2);border:1.5px solid var(--sep);border-radius:14px;padding:3px 10px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">Edit</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button onclick="lpgEditBottles()" style="flex:1;background:var(--surface2);border:1.5px solid var(--sep);border-radius:10px;padding:9px 8px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">Edit bottles</button>
+          <button onclick="lpgUseBottle()" style="flex:1;background:var(--blue);border:none;border-radius:10px;padding:9px 8px;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;color:#fff">Used a bottle</button>
+        </div>
+      </div>
+    </div>
+    ${priceCard}
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px 6px">
+        <span style="font-size:14px;font-weight:700">Refill history</span>
+        <button onclick="lpgAddFill()" style="background:var(--blue);color:#fff;border:none;border-radius:14px;padding:4px 12px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">+ Add entry</button>
+      </div>
+      ${sorted.length===0?`<div style="padding:8px 14px 12px;font-size:13px;color:var(--label3)">No refills recorded yet</div>`:histRows}
+    </div>
+  </div>`;
+}
+
+function lpgFillModal(entry, idx) {
+  const lpg = getLpgData();
+  const today = new Date().toISOString().slice(0,10);
+  const isEdit = entry != null;
+  const e = entry || {date:today, location:'', bottles:1, kg:lpg.kgPerBottle||11, pricePerKg:'', notes:''};
+  showModal(isEdit?'Edit Refill':'New Fill', `
+    <div class="mi-label">Date</div><input class="mi" id="lpg-d" type="date" value="${esc(e.date)}" autofocus>
+    <div class="mi-label">Location</div><input class="mi" id="lpg-loc" value="${esc(e.location||'')}">
+    <div class="mi-label">Number of bottles</div><input class="mi" id="lpg-b" type="number" min="1" value="${e.bottles||1}" oninput="lpgUpdateTotal()">
+    <div class="mi-label">kg per bottle</div><input class="mi" id="lpg-kg" type="number" min="1" value="${e.kg||lpg.kgPerBottle||11}" oninput="lpgUpdateTotal()">
+    <div class="mi-label">Price per kg (€)</div><input class="mi" id="lpg-ppkg" type="number" min="0" step="0.01" value="${e.pricePerKg||''}" oninput="lpgUpdateTotal()">
+    <div id="lpg-total" style="font-size:12px;color:var(--label3);margin:6px 0 4px;text-align:right"></div>
+    <div class="mi-label">Notes (optional)</div><input class="mi" id="lpg-notes" value="${esc(e.notes||'')}">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="lpgSaveFill(${isEdit?idx:'null'})">${isEdit?'Save':'Add Refill'}</button>
+    </div>`);
+  lpgUpdateTotal();
+}
+function lpgUpdateTotal() {
+  const b = parseFloat(document.getElementById('lpg-b')?.value)||0;
+  const kg = parseFloat(document.getElementById('lpg-kg')?.value)||0;
+  const p = parseFloat(document.getElementById('lpg-ppkg')?.value)||0;
+  const el = document.getElementById('lpg-total');
+  if (el) el.textContent = (b&&kg&&p) ? `Total: €${(b*kg*p).toFixed(2)}` : '';
+}
+function lpgSaveFill(idx) {
+  const lpg = getLpgData();
+  const date = document.getElementById('lpg-d')?.value; if (!date) { showToast('Enter a date', true); return; }
+  const bottles = parseInt(document.getElementById('lpg-b')?.value)||1;
+  const kg = parseFloat(document.getElementById('lpg-kg')?.value)||lpg.kgPerBottle||11;
+  const pricePerKg = parseFloat(document.getElementById('lpg-ppkg')?.value)||0;
+  const location = document.getElementById('lpg-loc')?.value.trim()||'';
+  const notes = document.getElementById('lpg-notes')?.value.trim()||'';
+  if (idx != null && idx !== 'null') {
+    lpg.history[idx] = {...lpg.history[idx], date, location, bottles, kg, pricePerKg, notes};
+  } else {
+    lpg.history.unshift({id:uid(), date, location, bottles, kg, pricePerKg, notes});
+    lpg.fullBottles = Math.min(lpg.totalBottles||3, (lpg.fullBottles||0) + bottles);
+    lpg.kgPerBottle = kg;
+  }
+  if (lpg.exampleDismissed === false) lpg.exampleDismissed = true;
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderLpg();
+}
+function lpgAddFill() { lpgFillModal(null, null); }
+function lpgEditHistory(i) { const lpg = getLpgData(); lpgFillModal(lpg.history[i], i); }
+function lpgDeleteHistory(i) {
+  if (!confirm('Delete this refill entry?')) return;
+  const lpg = getLpgData(); lpg.history.splice(i,1);
+  save(); document.getElementById('mainContent').innerHTML = renderLpg();
+}
+function lpgEditBottles() {
+  const lpg = getLpgData();
+  showModal('Edit Bottles', `
+    <div class="mi-label">Full bottles (currently on board)</div>
+    <input class="mi" id="lpg-full" type="number" min="0" value="${lpg.fullBottles||0}" autofocus>
+    <div class="mi-label">Total bottles (capacity)</div>
+    <input class="mi" id="lpg-total-b" type="number" min="1" value="${lpg.totalBottles||3}">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="lpgSaveBottles()">Save</button>
+    </div>`);
+}
+function lpgSaveBottles() {
+  const lpg = getLpgData();
+  const f = parseInt(document.getElementById('lpg-full')?.value);
+  const t = parseInt(document.getElementById('lpg-total-b')?.value);
+  if (!isNaN(f) && f >= 0) lpg.fullBottles = f;
+  if (!isNaN(t) && t > 0) lpg.totalBottles = t;
+  if (lpg.fullBottles > lpg.totalBottles) lpg.fullBottles = lpg.totalBottles;
+  if (lpg.exampleDismissed === false) lpg.exampleDismissed = true;
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderLpg();
+}
+function lpgEditKg() {
+  const lpg = getLpgData();
+  showModal('kg per bottle', `
+    <div class="mi-label">kg per bottle</div>
+    <input class="mi" id="lpg-kpb" type="number" min="1" value="${lpg.kgPerBottle||11}" autofocus>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="lpgSaveKg()">Save</button>
+    </div>`);
+}
+function lpgSaveKg() {
+  const lpg = getLpgData();
+  const v = parseFloat(document.getElementById('lpg-kpb')?.value);
+  if (!isNaN(v) && v > 0) { lpg.kgPerBottle = v; if (lpg.exampleDismissed === false) lpg.exampleDismissed = true; save(); }
+  hideModal(); document.getElementById('mainContent').innerHTML = renderLpg();
+}
+function lpgUseBottle() {
+  const lpg = getLpgData();
+  if (lpg.fullBottles <= 0) { showToast('No full bottles remaining', true); return; }
+  lpg.fullBottles = Math.max(0, (lpg.fullBottles||0) - 1);
+  if (lpg.exampleDismissed === false) lpg.exampleDismissed = true;
+  save(); document.getElementById('mainContent').innerHTML = renderLpg();
+}
+
+function prefillLpgData() {
+  const email = localStorage.getItem(EMAIL_KEY);
+  const existing = data.lpg;
+  if (existing && (existing.history?.length || existing.fullBottles > 0)) return false;
+  if (!data.lpg) data.lpg = {};
+  const dAgo = n => { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); };
+  if (email === OWNER_EMAIL) {
+    data.lpg = {fullBottles:1, totalBottles:3, kgPerBottle:11, history:[
+      {id:'lpg001', date:'2026-06-01', location:'Syros',  bottles:2, kg:11, pricePerKg:2.10, notes:''},
+      {id:'lpg002', date:'2026-04-15', location:'Kilada', bottles:3, kg:11, pricePerKg:1.85, notes:''},
+      {id:'lpg003', date:'2025-08-22', location:'Paros',  bottles:2, kg:11, pricePerKg:1.60, notes:''},
+      {id:'lpg004', date:'2025-06-10', location:'Leros',  bottles:2, kg:11, pricePerKg:1.20, notes:''}
+    ]};
+  } else {
+    data.lpg = {fullBottles:2, totalBottles:3, kgPerBottle:11, exampleDismissed:false, history:[
+      {id:'ex_lpg1', date:dAgo(60),  location:'Example Marina', bottles:3, kg:11, pricePerKg:1.90, notes:''},
+      {id:'ex_lpg2', date:dAgo(180), location:'Another Port',   bottles:2, kg:11, pricePerKg:1.65, notes:''}
+    ]};
+  }
+  return true;
+}
+
 function prefillWatermakerData() {
   const email = localStorage.getItem(EMAIL_KEY);
   const wm = data.watermaker;
@@ -4537,6 +4783,7 @@ async function attemptUnlock() {
       try { if (prefillSchengenData()) prefillDirty = true; } catch(e) { console.warn('prefillSchengen', e); }
       try { if (prefillShipyardData()) prefillDirty = true; } catch(e) { console.warn('prefillShipyard', e); }
       try { if (prefillWatermakerData()) prefillDirty = true; } catch(e) { console.warn('prefillWatermaker', e); }
+      try { if (prefillLpgData()) prefillDirty = true; } catch(e) { console.warn('prefillLpg', e); }
       if (prefillDirty) save();
       await pushToCloud();
     }
@@ -4685,6 +4932,7 @@ async function attemptLogin() {
         try { if (prefillSchengenData()) prefillDirty = true; } catch(e) { console.warn('prefillSchengen', e); }
       try { if (prefillShipyardData()) prefillDirty = true; } catch(e) { console.warn('prefillShipyard', e); }
       try { if (prefillWatermakerData()) prefillDirty = true; } catch(e) { console.warn('prefillWatermaker', e); }
+      try { if (prefillLpgData()) prefillDirty = true; } catch(e) { console.warn('prefillLpg', e); }
         if (prefillDirty) save();
         await pushToCloud();
       }
