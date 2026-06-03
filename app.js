@@ -3569,6 +3569,197 @@ function prefillProvisionsData() {
   return true;
 }
 
+function prefillNewUserSampleData() {
+  const email = localStorage.getItem(EMAIL_KEY);
+  if (email === OWNER_EMAIL) return false;
+
+  const dAgo = n => { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); };
+  let dirty = false;
+
+  // ── Boat Docs / Transit Log ──
+  if (!data.transitLog) data.transitLog = {};
+  const tl = data.transitLog;
+  if (!tl.logs) tl.logs = {};
+  if (!tl.currentLog) tl.currentLog = 'tl_2526';
+  const curLog = tl.logs[tl.currentLog];
+  if (!curLog?.docNumber && !curLog?.vesselName && !curLog?.stamps?.length) {
+    tl.currentLog = 'tl_2526';
+    tl.logs['tl_2526'] = {
+      season:'2025-2026', archived:false,
+      stamps:[
+        {id:uid(), date:dAgo(90), port:'Example Marina', type:'Arrival',   authority:'GR003102 - Syros', notes:'Example'},
+        {id:uid(), date:dAgo(30), port:'Another Port',   type:'Departure', authority:'GR003102 - Syros', notes:'Example'},
+      ],
+      docNumber:'25GRDK310200000001', issueDate:dAgo(90), validFrom:dAgo(90), validUntil:'01/12/2026',
+      customsAuthority:'GR003102 - Syros', validityType:'Limited (Ορισμένη)', prevDocCount:'0',
+      otherNotes:'Example transit log — replace with your own data', provisions:'',
+      vesselName:'S/V Example', flag:'US', portOfRegistry:'Example Port', regNumber:'EX123456',
+      callSign:'EX1234', vesselType:'Sail Yacht', gt:'14', engine:'Example Diesel 30hp', loa:'12m',
+      yearBuilt:'2015', yearFirstReg:'2015',
+      ownerName:'Example Owner', holderName:'Example Owner', address:'', telephone:'', email:'', afm:'', idNumber:''
+    };
+    tl.logs['tl_2425'] = {
+      season:'2024-2025', archived:true,
+      stamps:[
+        {id:uid(), date:'2024-10-05', port:'Barcelona',   type:'Arrival',   authority:'Spain Customs',   notes:'Example'},
+        {id:uid(), date:'2025-04-20', port:'Palma',       type:'Departure', authority:'Spain Customs',   notes:'Example'},
+      ],
+      docNumber:'24GRDK310200000005', issueDate:'2024-10-01', validFrom:'2024-10-01', validUntil:'01/11/2025',
+      customsAuthority:'GR003102 - Syros', validityType:'Limited (Ορισμένη)', prevDocCount:'0',
+      otherNotes:'Example — past season', provisions:'',
+      vesselName:'S/V Example', flag:'US', portOfRegistry:'Example Port', regNumber:'EX123456',
+      callSign:'EX1234', vesselType:'Sail Yacht', gt:'14', engine:'Example Diesel 30hp', loa:'12m',
+      yearBuilt:'2015', yearFirstReg:'2015',
+      ownerName:'Example Owner', holderName:'Example Owner', address:'', telephone:'', email:'', afm:'', idNumber:''
+    };
+    dirty = true;
+  }
+
+  // ── Provisions ──
+  if (!data.provisions?.items?.length) {
+    data.provisions = {exampleDismissed:false, items:[
+      {id:uid(), name:'Pasta',        category:'food',       location:'Galley locker', qty:4,  minQty:6, unit:'packs'},
+      {id:uid(), name:'Olive oil',    category:'food',       location:'Galley',        qty:2,  minQty:3, unit:'bottles'},
+      {id:uid(), name:'Tomato sauce', category:'food',       location:'Galley locker', qty:6,  minQty:4, unit:'cans'},
+      {id:uid(), name:'Rice',         category:'food',       location:'Galley locker', qty:3,  minQty:4, unit:'packs'},
+      {id:uid(), name:'Canned tuna',  category:'food',       location:'Galley locker', qty:8,  minQty:6, unit:'cans'},
+      {id:uid(), name:'Water 6L',     category:'drinks',     location:'Cockpit locker',qty:6,  minQty:4, unit:'bottles'},
+      {id:uid(), name:'Wine',         category:'drinks',     location:'Galley locker', qty:3,  minQty:2, unit:'bottles'},
+      {id:uid(), name:'Beer',         category:'drinks',     location:'Fridge',        qty:12, minQty:6, unit:'cans'},
+      {id:uid(), name:'Soap',         category:'toiletries', location:'Heads',         qty:3,  minQty:2, unit:'bars'},
+      {id:uid(), name:'Shampoo',      category:'toiletries', location:'Heads',         qty:2,  minQty:2, unit:'bottles'},
+      {id:uid(), name:'Dish soap',    category:'toiletries', location:'Galley',        qty:2,  minQty:2, unit:'bottles'},
+      {id:uid(), name:'Sunscreen',    category:'misc',       location:'Nav station',   qty:2,  minQty:2, unit:'bottles'},
+      {id:uid(), name:'Batteries AA', category:'misc',       location:'Nav station',   qty:8,  minQty:4, unit:'pcs'},
+    ]};
+    dirty = true;
+  }
+
+  // ── Water Maker ──
+  if (!data.watermaker?.currentReading) {
+    data.watermaker = {
+      currentReading:150, lastChangeReading:0, targetHours:200,
+      charcoalChangedDate:dAgo(180), exampleDismissed:false,
+      inventory:{micron20:2, micron5:1, charcoal:1}
+    };
+    dirty = true;
+  }
+
+  // ── LPG ──
+  if (!data.lpg?.bottles?.length && !data.lpg?.history?.length) {
+    data.lpg = {
+      exampleDismissed:false,
+      bottles:[
+        {id:uid(), kg:11, full:true},
+        {id:uid(), kg:11, full:false},
+      ],
+      history:[
+        {id:uid(), date:dAgo(60), location:'Example Marina', bottles:1, kg:11, pricePerKg:1.80, notes:'Example — replace with your own'},
+      ]
+    };
+    dirty = true;
+  }
+
+  // ── Engine Maintenance ──
+  const realMaintEntries = (data.maintenance?.log||[]).filter(e => !e.id?.startsWith('seed_'));
+  if (!realMaintEntries.length) {
+    if (!data.maintenance) data.maintenance = {engines:{}, sched:{}, log:[]};
+    if (!data.maintenance.engines) data.maintenance.engines = {};
+    if (!data.maintenance.log) data.maintenance.log = [];
+    ['port','starboard'].forEach(eid => {
+      if (!data.maintenance.engines[eid]) data.maintenance.engines[eid] = {hours:0, schedule:[], log:[], customTasks:[]};
+      data.maintenance.engines[eid].hours = 450;
+    });
+    const entries = [
+      {id:uid(), date:dAgo(90),  hours:'300', task:'Engine oil change',    cost:'€85',  notes:'Example entry', engines:['port','starboard']},
+      {id:uid(), date:dAgo(180), hours:'250', task:'Impeller replacement', cost:'€120', notes:'Example entry', engines:['port','starboard']},
+      {id:uid(), date:dAgo(90),  hours:'300', task:'Gear oil change',      cost:'€60',  notes:'Example entry', engines:['port','starboard']},
+    ];
+    entries.forEach(e => data.maintenance.log.unshift(e));
+    if (!data.maintenance.sched) data.maintenance.sched = {};
+    ['mt_oil','mt_sailoil','mt_impeller'].forEach(tid => {
+      data.maintenance.sched[tid] = {};
+      ['port','starboard'].forEach(eid => { data.maintenance.sched[tid][eid] = {lastDoneAt:300, date:dAgo(90)}; });
+    });
+    dirty = true;
+  }
+
+  // ── Schengen ──
+  if (!data.schengen?.persons?.some(p => p.name)) {
+    data.schengen = {persons:[{
+      name:'Example Crew Member', activePassport:0,
+      passports:[{flag:'🇺🇸', country:'United States', eu:false}],
+      log:[
+        {id:uid(), type:'in',  date:dAgo(45), passport:'🇺🇸', location:'Greece (Example port)'},
+      ]
+    }]};
+    dirty = true;
+  }
+
+  // ── Shipyard ──
+  if (!data.shipyard?.history?.length && !data.shipyard?.quotes?.length) {
+    if (!data.shipyard) data.shipyard = {};
+    if (!data.shipyard.current) data.shipyard.current = {};
+    data.shipyard.history = [
+      {id:uid(), year:'2024/2025', name:'Example Boatyard', location:'Example Marina', start:'2024-10-01', end:'2025-04-01', cost:'€2,800', notes:'Antifouling and hull inspection — Example'},
+      {id:uid(), year:'2023/2024', name:'Another Yard',     location:'Another Port',   start:'2023-10-15', end:'2024-03-15', cost:'€3,500', notes:'Full haul out and engine service — Example'},
+    ];
+    dirty = true;
+  }
+
+  // ── Winterize ──
+  if (!data.winterization) {
+    const mk = (text, checked) => ({id:uid(), text, asterisk:false, checked:!!checked, group:null});
+    data.winterization = {currentSeason:'w2526', seasons:{w2526:{
+      name:'Winter 2025/26', archived:false, sections:{
+        winterize:  {items:[mk('Remove sails',true), mk('Change engine oil',true), mk('Flush raw water system'), mk('Remove impellers'), mk('Drain water tanks')]},
+        needs:      {items:[mk('Engine oil'), mk('Fuel filters'), mk('Impeller kit')]},
+        backOnBoard:{items:[mk('Connect shore power'), mk('Hoist sails'), mk('Watermaker flush')]}
+      }
+    }}};
+    dirty = true;
+  }
+
+  // ── Upgrades & Repairs ──
+  if (!data.upgrades?.seasons?.length) {
+    const mk = (text, cost, done) => ({id:uid(), text, cost:cost||'', checked:!!done});
+    data.upgrades = {version:UPGRADES_DATA_VERSION, seasons:[
+      {id:uid(), name:'2024/2025', location:'Example Marina', items:[
+        mk('Replaced engine impeller (Example)','120',true),
+        mk('New shore power cable (Example)','85',false),
+        mk('Antifouling repaint (Example)','380',false),
+      ]}
+    ]};
+    dirty = true;
+  }
+
+  // ── Spare Parts (replace default ex_ entries) ──
+  const hasRealParts = data.spareParts?.some(p => !p.id?.startsWith('ex_'));
+  if (!hasRealParts) {
+    data.spareParts = [
+      {id:uid(), desc:'Impeller (raw water pump)',pn:'',category:'Yanmar Engine',qty:1,minQuantity:1,unitPrice:45, location:'Engine bay',notes:'Example'},
+      {id:uid(), desc:'Engine oil filter',        pn:'',category:'Yanmar Engine',qty:2,minQuantity:1,unitPrice:12, location:'Engine bay',notes:'Example'},
+      {id:uid(), desc:'Diesel fuel filter',       pn:'',category:'Yanmar Engine',qty:1,minQuantity:1,unitPrice:18, location:'Engine bay',notes:'Example'},
+      {id:uid(), desc:'Hull zinc anodes',         pn:'',category:'Saildrive',    qty:4,minQuantity:2,unitPrice:8,  location:'Lazarette', notes:'Example'},
+      {id:uid(), desc:'V-belts (alternator)',     pn:'',category:'Yanmar Engine',qty:2,minQuantity:1,unitPrice:15, location:'Engine bay',notes:'Example'},
+    ];
+    dirty = true;
+  }
+
+  // ── Systems (replace default ex_ entries) ──
+  const hasRealSystems = data.systems?.some(s => !s.id?.startsWith('ex_'));
+  if (!hasRealSystems) {
+    data.systems = [
+      {id:uid(), cat:'Solar',      category:'Solar',      make:'Example', model:'Solar Panels 400W', serialNumber:'', location:'Coachroof',  notes:'Example — update with your own details', installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', photos:[]},
+      {id:uid(), cat:'Watermaker', category:'Watermaker', make:'Example', model:'Watermaker 12V',    serialNumber:'', location:'Engine bay', notes:'Example — update with your own details', installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', photos:[]},
+      {id:uid(), cat:'Navigation', category:'Navigation', make:'Example', model:'Autopilot',         serialNumber:'', location:'Helm',       notes:'Example — update with your own details', installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', photos:[]},
+    ];
+    dirty = true;
+  }
+
+  return dirty;
+}
+
 function prefillWatermakerData() {
   const email = localStorage.getItem(EMAIL_KEY);
   const wm = data.watermaker;
@@ -5432,6 +5623,7 @@ async function attemptUnlock() {
     const pulled = await pullFromCloud();
     if (!pulled) {
       let prefillDirty = false;
+      try { if (prefillNewUserSampleData()) prefillDirty = true; } catch(e) { console.warn('prefillNewUser', e); }
       try { if (prefillCustomsOwnerData()) prefillDirty = true; } catch(e) { console.warn('prefillCustoms', e); }
       try { if (prefillTransitLog()) prefillDirty = true; } catch(e) { console.warn('prefillTransitLog', e); }
       try { if (prefillUpgradesData()) prefillDirty = true; } catch(e) { console.warn('prefillUpgrades', e); }
@@ -5582,6 +5774,7 @@ async function attemptLogin() {
       const pulled = await pullFromCloud();
       if (!pulled) {
         let prefillDirty = false;
+        try { if (prefillNewUserSampleData()) prefillDirty = true; } catch(e) { console.warn('prefillNewUser', e); }
         try { if (prefillCustomsOwnerData()) prefillDirty = true; } catch(e) { console.warn('prefillCustoms', e); }
         try { if (prefillTransitLog()) prefillDirty = true; } catch(e) { console.warn('prefillTransitLog', e); }
         try { if (prefillUpgradesData()) prefillDirty = true; } catch(e) { console.warn('prefillUpgrades', e); }
