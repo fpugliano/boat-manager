@@ -4487,7 +4487,7 @@ function renderWinterSection(sid, season, archived) {
     }
     const isImp = !!item.asterisk || item.text?.endsWith(' ⚠️');
     const star = (item.asterisk && !item.text?.endsWith(' ⚠️')) ? ` <span style="font-size:11px;opacity:.7">⚠️</span>` : '';
-    const ts = item.checked ? 'text-decoration:line-through;color:var(--label3)' : isImp ? 'color:var(--label2)' : '';
+    const ts = item.checked ? 'opacity:0.4' : isImp ? 'color:var(--label2)' : '';
     const acts = archived ? '' : `<div style="display:flex;gap:1px;flex-shrink:0">
       <button class="wact" onclick="startWinterEdit('${sid}',${i})" title="Edit">✏️</button>
     </div>`;
