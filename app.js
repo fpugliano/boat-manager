@@ -1348,7 +1348,6 @@ function renderShipyard() {
           ? 'background:var(--green);color:#fff;border:none;border-radius:10px;padding:3px 10px;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer'
           : 'background:var(--surface2);color:var(--label2);border:1.5px solid var(--sep);border-radius:10px;padding:3px 10px;font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer'}">${q.selected ? '✓ Selected' : 'Select'}</button>
         <button onclick="editQuote(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3)">✏️</button>
-        <button onclick="removeQuote(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3)">✕</button>
       </div>
     </div>`).join('') : `<div style="padding:18px 14px;color:var(--label3);font-size:13px">No quotes yet — tap + Add quote</div>`;
 
@@ -1384,7 +1383,6 @@ function renderShipyard() {
         </div>
         <div style="font-size:12px;font-weight:600;flex-shrink:0;white-space:nowrap">${fmtCost(h.cost)}</div>
         <button onclick="editShipyardHistory(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✏️</button>
-        <button onclick="removeShipyardHistory(${i})" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✕</button>
       </div>
     </div>`;
   }).join('') : `<div style="padding:18px 14px;color:var(--label3);font-size:13px">No past seasons yet</div>`;
@@ -1435,6 +1433,7 @@ function editQuote(i) {
     <div class="mi-label">End date</div><input class="mi" id="m-qed" type="date" value="${esc(q.endDate||'')}">
     <div class="mi-label">Notes</div><input class="mi" id="m-snotes" value="${esc(q.notes||'')}">
     <div class="modal-btns">
+      <button onclick="if(confirm('Remove this quote?')){hideModal();removeQuote(${i})}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:10px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">🗑 Delete</button>
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="saveEditQuote(${i})">Save</button>
     </div>`);
@@ -1471,7 +1470,6 @@ function selectQuote(i) {
   save(); document.getElementById('mainContent').innerHTML = renderShipyard();
 }
 function removeQuote(i) {
-  if (!confirm('Remove this quote?')) return;
   data.shipyard.quotes.splice(i,1); save();
   document.getElementById('mainContent').innerHTML = renderShipyard();
 }
@@ -1513,6 +1511,7 @@ function editShipyardHistory(i) {
     <div class="mi-label">Cost Paid</div><input class="mi" id="m-cp" value="${esc(h.cost||'')}">
     <div class="mi-label">Notes</div><input class="mi" id="m-hn" value="${esc(h.notes||'')}">
     <div class="modal-btns">
+      <button onclick="if(confirm('Remove this season?')){hideModal();removeShipyardHistory(${i})}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:10px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">🗑 Delete</button>
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="saveEditShipyardHistory(${i})">Save</button>
     </div>`);
@@ -1529,7 +1528,6 @@ function saveEditShipyardHistory(i) {
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderShipyard();
 }
 function removeShipyardHistory(i) {
-  if (!confirm('Remove this season?')) return;
   data.shipyard.history.splice(i,1); save();
   document.getElementById('mainContent').innerHTML = renderShipyard();
 }
@@ -2138,7 +2136,6 @@ function renderSchengenPersonLog(p, idx) {
       <span style="font-size:11px;color:var(--label3);flex-shrink:0;white-space:nowrap">${dateStr}</span>
       <span style="font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--label2)">${loc}${note}${dur}</span>
       <button onclick="showSchengenEditEntry(${idx},'${e.id}')" style="background:none;border:none;padding:2px 3px;cursor:pointer;font-size:12px;color:var(--label3);flex-shrink:0">✏️</button>
-      <button onclick="deleteSchengenEntry(${idx},'${e.id}')" style="background:none;border:none;padding:2px 3px;cursor:pointer;font-size:12px;color:var(--label3);flex-shrink:0">✕</button>
     </div>`;
   }).join('') || `<div style="padding:14px 10px;text-align:center;color:var(--label3);font-size:12px">No entries</div>`;
   return `<div style="min-width:0;overflow:hidden;${borderRight}">
@@ -2284,6 +2281,7 @@ function showSchengenEditEntry(personIdx, entryId) {
     ${e.type==='in'?`<div class="mi-label">Passport</div><select class="mi" id="sch-pass">${passOpts}</select>`:''}
     <div class="mi-label">${e.type==='in'?'Location':'Destination'}</div><input class="mi" id="sch-loc" value="${esc(e.location||'')}">
     <div class="modal-btns">
+      <button onclick="if(confirm('Delete this entry?')){hideModal();deleteSchengenEntry(${personIdx},'${entryId}')}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:10px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">🗑 Delete</button>
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="saveSchengenEditEntry(${personIdx},'${entryId}')">Save</button>
     </div>`);
@@ -2302,7 +2300,6 @@ function saveSchengenEditEntry(personIdx, entryId) {
 function deleteSchengenEntry(personIdx, entryId) {
   const sd = getSchengenData();
   const p = sd.persons[personIdx]; if (!p) return;
-  if (!confirm('Delete this entry?')) return;
   p.log = p.log.filter(x=>x.id!==entryId);
   save(); schengenRerender();
 }
@@ -2640,7 +2637,6 @@ function renderWatermaker() {
               <span style="flex:1"></span>
               ${hrsLabel}
               <button onclick="wmEditMicronHistory(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✏️</button>
-              <button onclick="wmDeleteMicronHistory(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✕</button>
             </div>`;
           }).join('');
         })()}
@@ -2656,7 +2652,6 @@ function renderWatermaker() {
               <span style="flex-shrink:0;color:var(--label3)">${ds}</span>
               ${r.location?`<span style="color:var(--label2);flex:1">${esc(r.location)}</span>`:'<span style="flex:1"></span>'}
               <button onclick="wmEditCharcoalHistory(${i})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✏️</button>
-              <button onclick="wmDeleteCharcoalHistory(${i})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✕</button>
             </div>`;
           }).join('')}
     </div>
@@ -2856,6 +2851,7 @@ function wmEditMicronHistory(i) {
     <div class="mi-label">Location</div><input class="mi" id="wmh-l" value="${esc(r.location||'')}">
     <div class="mi-label">Hour meter reading</div><input class="mi" id="wmh-r" type="number" min="0" value="${r.reading||0}">
     <div class="modal-btns">
+      <button onclick="if(confirm('Delete this filter change record?')){hideModal();wmDeleteMicronHistory(${i})}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:10px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">🗑 Delete</button>
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="wmSaveEditMicronHistory(${i})">Save</button>
     </div>`);
@@ -2870,7 +2866,6 @@ function wmSaveEditMicronHistory(i) {
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
 }
 function wmDeleteMicronHistory(i) {
-  if (!confirm('Delete this filter change record?')) return;
   const wm = getWatermakerData();
   wm.micronHistory.splice(i, 1);
   save(); document.getElementById('mainContent').innerHTML = renderWatermaker();
@@ -2883,6 +2878,7 @@ function wmEditCharcoalHistory(i) {
     <div class="mi-label">Date</div><input class="mi" id="wmch-d" type="date" value="${esc(r.date||'')}">
     <div class="mi-label">Location</div><input class="mi" id="wmch-l" value="${esc(r.location||'')}">
     <div class="modal-btns">
+      <button onclick="if(confirm('Delete this charcoal change record?')){hideModal();wmDeleteCharcoalHistory(${i})}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:10px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">🗑 Delete</button>
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="wmSaveEditCharcoalHistory(${i})">Save</button>
     </div>`);
@@ -2895,7 +2891,6 @@ function wmSaveEditCharcoalHistory(i) {
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
 }
 function wmDeleteCharcoalHistory(i) {
-  if (!confirm('Delete this charcoal change record?')) return;
   const wm = getWatermakerData();
   wm.charcoalHistory.splice(i, 1);
   save(); document.getElementById('mainContent').innerHTML = renderWatermaker();
@@ -2990,7 +2985,6 @@ function renderLpg() {
       ${h.pricePerKg?`<span style="color:var(--label3);flex-shrink:0">€${Number(h.pricePerKg).toFixed(2)}/kg</span>${priceBadge}`:''}
       <span style="flex:1"></span>
       <button onclick="lpgEditHistory(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✏️</button>
-      <button onclick="lpgDeleteHistory(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✕</button>
     </div>`;
   }).join('');
 
@@ -3050,6 +3044,7 @@ function lpgFillModal(entry, idx) {
     <div id="lpg-total" style="font-size:12px;color:var(--label3);margin:6px 0 4px;text-align:right"></div>
     <div class="mi-label">Notes (optional)</div><input class="mi" id="lpg-notes" value="${esc(e.notes||'')}">
     <div class="modal-btns">
+      ${isEdit?`<button onclick="if(confirm('Delete this refill entry?')){hideModal();lpgDeleteHistory(${idx})}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:10px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">🗑 Delete</button>`:''}
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="lpgSaveFill(${isEdit?idx:'null'})">${isEdit?'Save':'Add Refill'}</button>
     </div>`);
@@ -3081,7 +3076,6 @@ function lpgSaveFill(idx) {
 function lpgAddFill() { lpgFillModal(null, null); }
 function lpgEditHistory(i) { const lpg = getLpgData(); lpgFillModal(lpg.history[i], i); }
 function lpgDeleteHistory(i) {
-  if (!confirm('Delete this refill entry?')) return;
   const lpg = getLpgData(); lpg.history.splice(i,1);
   save(); document.getElementById('mainContent').innerHTML = renderLpg();
 }
@@ -3263,7 +3257,6 @@ function renderProvisions() {
         </div>
         ${badge}
         <button onclick="provEdit(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:12px;color:var(--label3)">✏️</button>
-        <button onclick="provDelete(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:13px;color:var(--label3)">✕</button>
       </div>`;
     }).join('');
     return `<div class="card" style="margin-bottom:10px">
@@ -3417,6 +3410,7 @@ function provItemModal(item, idx, lockedCat) {
     <div class="mi-label">Minimum quantity</div><input class="mi" id="pv-min" type="number" min="0" value="${e.minQty||0}">
     <div class="mi-label">Unit (optional)</div><input class="mi" id="pv-unit" placeholder="bottles, cans, rolls…" value="${esc(e.unit||'')}">
     <div class="modal-btns">
+      ${isEdit?`<button onclick="if(confirm('Delete this item?')){hideModal();provDelete(${idx})}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:10px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">🗑 Delete</button>`:''}
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="provSave(${isEdit?idx:'null'})">${isEdit?'Save':'Add Item'}</button>
     </div>`);
@@ -3448,7 +3442,6 @@ function provSave(idx) {
 }
 
 function provDelete(idx) {
-  if (!confirm('Delete this item?')) return;
   const prov = getProvisionsData();
   prov.items.splice(idx, 1);
   save(); document.getElementById('mainContent').innerHTML = renderProvisions();
@@ -3610,7 +3603,6 @@ function renderParts() {
               <div class="p-meta">${meta}</div>
             </div>
             <button class="btn btn-s btn-xs no-print" onclick="showEditPart(${idx})" style="margin-right:4px">✏️</button>
-            <button class="btn btn-d btn-xs no-print" onclick="removePart(${idx})">✕</button>
           </div>`;
         }).join('') || '<div style="padding:16px;color:var(--label3)">No parts — tap + Add Part to get started</div>'}
       </div>
@@ -3624,7 +3616,6 @@ function adjQty(i, delta) {
   save(); document.getElementById('mainContent').innerHTML = renderParts();
 }
 function removePart(i) {
-  if (!confirm('Remove this part?')) return;
   data.spareParts.splice(i,1); save();
   document.getElementById('mainContent').innerHTML = renderParts();
 }
@@ -3693,6 +3684,7 @@ function showEditPart(idx) {
   showModal('Edit Part', `
     ${_partModalFields(p)}
     <div class="modal-btns">
+      <button onclick="if(confirm('Remove this part?')){hideModal();removePart(${idx})}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:10px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">🗑 Delete</button>
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="saveEditedPart(${idx})">Save</button>
     </div>`);
@@ -3880,7 +3872,8 @@ function renderUpgradeItem(s, item, idx) {
           onkeydown="if(event.key==='Enter')saveUpgradeItemEdit('${sid}','${iid}')">
       </div>
       <button class="btn btn-p btn-xs" onclick="saveUpgradeItemEdit('${sid}','${iid}')">Save</button>
-      <button class="btn btn-s btn-xs" onclick="ui.upgEdit=null;upgRerender()">✕</button>
+      <button class="btn btn-s btn-xs" onclick="ui.upgEdit=null;upgRerender()">Cancel</button>
+      <button onclick="if(confirm('Remove this item?')){ui.upgEdit=null;deleteUpgradeItem('${sid}','${iid}')}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:8px;padding:4px 10px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">🗑</button>
     </div>`;
   }
   // Normal row
@@ -3901,8 +3894,6 @@ function renderUpgradeItem(s, item, idx) {
     <div style="display:flex;gap:2px;flex-shrink:0">
       <button onclick="ui.upgEdit={iid:'${iid}'};upgRerender();setTimeout(()=>document.getElementById('ueit')?.focus(),40)"
         style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);border-radius:4px;line-height:1">✏️</button>
-      <button onclick="ui.upgConfirmDel='${iid}';upgRerender()"
-        style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);border-radius:4px;line-height:1">✕</button>
     </div>
   </div>`;
 }
@@ -4051,7 +4042,6 @@ function renderSystemCard(s) {
         </div>
         <div style="display:flex;align-items:center;gap:4px">
           <button onclick="event.stopPropagation();editSystem('${s.id}')" style="background:none;border:none;padding:5px;cursor:pointer;font-size:14px;color:var(--label3);border-radius:6px;line-height:1" title="Edit">✏️</button>
-          <button onclick="event.stopPropagation();removeSystem('${s.id}')" style="background:none;border:none;padding:5px;cursor:pointer;font-size:14px;color:var(--label3);border-radius:6px;line-height:1" title="Delete">✕</button>
           <span style="color:var(--label3);margin-left:2px">${open?'▲':'▼'}</span>
         </div>
       </div>
@@ -4116,7 +4106,6 @@ function saveSystem() {
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderSystems();
 }
 function removeSystem(id) {
-  if (!confirm('Remove this system?')) return;
   data.systems = data.systems.filter(s=>s.id!==id); save();
   document.getElementById('mainContent').innerHTML = renderSystems();
 }
@@ -4144,6 +4133,7 @@ function editSystem(id) {
     <div class="mi-label">Manual URL</div><input class="mi" id="es-url" value="${esc(s.manualUrl||'')}">
     <div class="mi-label">Notes</div><input class="mi" id="es-nt" value="${esc(s.notes||'')}">
     <div class="modal-btns">
+      <button onclick="if(confirm('Remove this system?')){hideModal();removeSystem('${id}')}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:10px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">🗑 Delete</button>
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="saveEditSystem('${id}')">Save</button>
     </div>`);
@@ -4289,7 +4279,8 @@ function renderWinterSection(sid, season, archived) {
           <input type="checkbox" id="wedit-star" ${isImp?'checked':''}> Mark as important ⚠️
         </label>
         <button class="btn btn-p btn-xs" onclick="saveWinterItemEdit('${sid}',${i})">Save</button>
-        <button class="wact" onclick="ui.winterEditItem=null;winterRerender()">✕</button>
+        <button class="wact" onclick="ui.winterEditItem=null;winterRerender()">Cancel</button>
+        <button onclick="if(confirm('Remove this item?')){ui.winterEditItem=null;deleteWinterItem('${sid}',${i})}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:8px;padding:4px 10px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">🗑</button>
       </div>`;
     }
     const isImp = !!item.asterisk || item.text?.endsWith(' ⚠️');
@@ -4297,7 +4288,6 @@ function renderWinterSection(sid, season, archived) {
     const ts = item.checked ? 'text-decoration:line-through;color:var(--label3)' : isImp ? 'color:var(--label2)' : '';
     const acts = archived ? '' : `<div style="display:flex;gap:1px;flex-shrink:0">
       <button class="wact" onclick="startWinterEdit('${sid}',${i})" title="Edit">✏️</button>
-      <button class="wact" onclick="deleteWinterItem('${sid}',${i})" title="Delete">✕</button>
     </div>`;
     return grpHdr + `<div class="wrow">
       <div class="wbox${item.checked?' on':''}" onclick="toggleWinterItem('${sid}',${i})">
@@ -4369,7 +4359,6 @@ function saveWinterItemEdit(sid, idx) {
 }
 
 function deleteWinterItem(sid, idx) {
-  if (!confirm('Remove this item?')) return;
   const season = getWinterData().seasons[getWinterData().currentSeason];
   if (!season||season.archived) return;
   season.sections?.[sid]?.items?.splice(idx, 1);
@@ -4678,9 +4667,9 @@ function renderTLStamps(log, archived) {
       <td><select id="tles-t" class="fi" style="font-size:12px;padding:4px 6px"><option ${s.type==='Arrival'?'selected':''}>Arrival</option><option ${s.type==='Departure'?'selected':''}>Departure</option><option ${s.type==='Stamp'?'selected':''}>Stamp</option></select></td>
       <td><input id="tles-a" class="fi" style="min-width:80px;font-size:12px;padding:4px 6px" value="${esc(s.authority||'')}"></td>
       <td><input id="tles-n" class="fi" style="min-width:60px;font-size:12px;padding:4px 6px" value="${esc(s.notes||'')}"></td>
-      <td style="white-space:nowrap"><button class="btn btn-p btn-xs" onclick="saveTLStampEdit('${s.id}')">Save</button> <button class="btn btn-s btn-xs" onclick="ui.tlEditStampId=null;document.getElementById('mainContent').innerHTML=renderDocuments()">✕</button></td></tr>`;
+      <td style="white-space:nowrap;display:flex;gap:4px;align-items:center"><button class="btn btn-p btn-xs" onclick="saveTLStampEdit('${s.id}')">Save</button> <button class="btn btn-s btn-xs" onclick="ui.tlEditStampId=null;document.getElementById('mainContent').innerHTML=renderDocuments()">Cancel</button><button onclick="if(confirm('Remove this stamp?')){ui.tlEditStampId=null;deleteTLStamp('${s.id}')}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:7px;padding:3px 8px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">🗑</button></td></tr>`;
     const typeCls = s.type==='Arrival'?'b-green':s.type==='Departure'?'b-red':'b-orange';
-    const acts = archived ? '' : `<button onclick="startTLStampEdit('${s.id}')" style="background:none;border:none;padding:4px;cursor:pointer;font-size:13px;color:var(--label3)">✏️</button><button onclick="deleteTLStamp('${s.id}')" style="background:none;border:none;padding:4px;cursor:pointer;font-size:13px;color:var(--label3)">✕</button>`;
+    const acts = archived ? '' : `<button onclick="startTLStampEdit('${s.id}')" style="background:none;border:none;padding:4px;cursor:pointer;font-size:13px;color:var(--label3)">✏️</button>`;
     return `<tr><td style="white-space:nowrap;font-size:13px">${esc(fmtDateEU(s.date))}</td><td style="font-size:13px">${esc(s.port)}</td>
       <td><span class="badge ${typeCls}" style="font-size:10px">${esc(s.type)}</span></td>
       <td style="font-size:12px;color:var(--label2)">${esc(s.authority||'')}</td>
@@ -4755,7 +4744,6 @@ function _renderTransitLog() {
       <div style="font-size:11px;color:var(--label3);flex-shrink:0;white-space:nowrap">${esc(dates)}</div>
       <div style="font-size:11px;color:var(--label3);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(note.length>40?note.slice(0,40)+'…':note)}</div>
       <button onclick="showEditArchivedTL('${id}')" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✏️</button>
-      <button onclick="deleteArchivedTL('${id}')" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✕</button>
     </div>`;
   }).join('');
 
@@ -4787,7 +4775,6 @@ function saveTLStamp() {
   save(); hideModal(); document.getElementById('mainContent').innerHTML=renderDocuments();
 }
 function deleteTLStamp(id) {
-  if (!confirm('Remove this stamp?')) return;
   const wd=getTLData(), log=wd.logs[wd.currentLog]; if (!log) return;
   log.stamps=(log.stamps||[]).filter(s=>s.id!==id);
   save(); document.getElementById('mainContent').innerHTML=renderDocuments();
@@ -4832,6 +4819,7 @@ function showEditArchivedTL(logId) {
     <div class="mi-label">Customs Authority</div><input class="mi" id="tla-authority" value="${esc(l.customsAuthority||'')}">
     <div class="mi-label">Notes</div><input class="mi" id="tla-notes" value="${esc(l.otherNotes||'')}">
     <div class="modal-btns">
+      <button onclick="if(confirm('Delete this archived transit log?')){hideModal();deleteArchivedTL('${logId}')}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:10px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">🗑 Delete</button>
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="saveEditArchivedTL('${logId}')">Save</button>
     </div>`);
@@ -4848,7 +4836,6 @@ function saveEditArchivedTL(logId) {
   save(); hideModal(); document.getElementById('mainContent').innerHTML=renderDocuments();
 }
 function deleteArchivedTL(logId) {
-  if (!confirm('Delete this archived transit log?')) return;
   const wd=getTLData();
   delete wd.logs[logId];
   save(); document.getElementById('mainContent').innerHTML=renderDocuments();
