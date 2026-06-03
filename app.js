@@ -121,7 +121,7 @@ let data = {};
 let ui = {
   tab:'documents', docSub:'vessel', maintEngine:'port',
   photoSub:'vesselDoc', crewOpen:null, sysOpen:null, sysTab:'All',
-  partsSearch:'', partsFilter:'All', alertsOpen:false, maintShowAll:false,
+  partsSearch:'', partsFilter:'All', alertsOpen:false, maintShowAll:false, maintTaskFilter:'All',
   provisionsSub:'all'
 };
 let _photoCtx = null; // {section, index} for upload
@@ -1568,6 +1568,82 @@ function maintTaskKeywords(taskId) {
   }[taskId] || [];
 }
 
+const MAINT_CANONICAL_TASKS = [
+  'Engine oil change','Oil filter change','Gear oil change','Impeller replacement',
+  'Diesel fuel filter change','Coolant change','Belt inspection / tensioning','Belt replacement',
+  'Raw water pump replacement','Heat exchanger service','Saildrive service',
+  'Valve clearance','Cleaned raw water strainer',
+];
+const MAINT_TASK_MAP = {
+  'Engine oil PT/STBD + filter':'Engine oil change',
+  'Engine oil PT/STBD':'Engine oil change',
+  'Engine oil & filter PT/STBD':'Engine oil change',
+  'Engine oil & filter - winterising':'Engine oil change',
+  '50hr service PT/STBD':'Engine oil change',
+  'Engine filters PT/STBD':'Oil filter change',
+  'First & second fuel filters PT/STBD':'Oil filter change',
+  'Gear oil PT/STBD':'Gear oil change',
+  'Gear oil - whole exchange':'Gear oil change',
+  'Changed gear oil PT/STBD':'Gear oil change',
+  'Gear oil STBD/Port':'Gear oil change',
+  'Gear oil PT/STBD - 2 times full':'Gear oil change',
+  'Impeller PT/STBD':'Impeller replacement',
+  'Impeller only STBD':'Impeller replacement',
+  'Replaced impeller both sides - both were good':'Impeller replacement',
+  'Impeller changed PT/STBD':'Impeller replacement',
+  'Diesel fuel filters PT/STBD':'Diesel fuel filter change',
+  'Diesel fuel filters':'Diesel fuel filter change',
+  'Secondary diesel filters':'Diesel fuel filter change',
+  'Racor fuel water filter Separ':'Diesel fuel filter change',
+  'Seaform filter priming':'Diesel fuel filter change',
+  'Yanmar coolant':'Coolant change',
+  'New Yanmar coolant':'Coolant change',
+  'Yanmar coolant - whole change':'Coolant change',
+  'Inspect and adjust belt tensioning':'Belt inspection / tensioning',
+  'Inspect & adjust belt tension':'Belt inspection / tensioning',
+  'Belt replacement PT':'Belt replacement',
+  'Belts changed PT/STBD':'Belt replacement',
+  'Replace belts':'Belt replacement',
+  'Water pump replacement - leak in port engine':'Raw water pump replacement',
+  'New STBD water pump':'Raw water pump replacement',
+  'Replaced STBD raw water pump':'Raw water pump replacement',
+  'Water pump lip seal PT/STBD':'Raw water pump replacement',
+  'Clean heat exchanger':'Heat exchanger service',
+  'Heat exchanger service':'Heat exchanger service',
+  'New saildrive shafts PT/STBD':'Saildrive service',
+  'Exchange new saildrive thru hulls':'Saildrive service',
+  'Saildrive internal anodes':'Saildrive service',
+};
+function normalizeMaintTask(t) { return MAINT_TASK_MAP[t] || t; }
+function getMaintTaskDropdown(currentTask, pfx) {
+  const isCustom = !!currentTask && !MAINT_CANONICAL_TASKS.includes(currentTask);
+  const opts = MAINT_CANONICAL_TASKS.map(t =>
+    `<option value="${esc(t)}" ${currentTask===t?'selected':''}>${esc(t)}</option>`
+  ).join('');
+  return `<select class="mi" id="${pfx}-task-sel" onchange="maintTaskSelChange('${pfx}')">
+    ${opts}
+    <option value="__custom__" ${isCustom?'selected':''}>+ Custom task…</option>
+  </select>
+  <input class="mi" id="${pfx}-task-txt" placeholder="Describe task" value="${isCustom?esc(currentTask):''}" style="display:${isCustom?'block':'none'};margin-top:6px">`;
+}
+function maintTaskSelChange(pfx) {
+  const sel = document.getElementById(pfx+'-task-sel');
+  const txt = document.getElementById(pfx+'-task-txt');
+  if (!sel||!txt) return;
+  txt.style.display = sel.value==='__custom__' ? 'block' : 'none';
+  if (sel.value==='__custom__') txt.focus();
+}
+function getMaintTaskValue(pfx) {
+  const sel = document.getElementById(pfx+'-task-sel');
+  if (!sel) return '';
+  return sel.value==='__custom__'
+    ? (document.getElementById(pfx+'-task-txt')?.value.trim()||'')
+    : sel.value;
+}
+function setMaintFilter(t) {
+  ui.maintTaskFilter = t;
+  document.getElementById('mainContent').innerHTML = renderMaintenance();
+}
 function getMaintLog() { return data.maintenance?.log || []; }
 
 function lastMaintEntry(taskId, eid) {
@@ -1811,29 +1887,39 @@ function renderMaintenance() {
     </div>`;
   // ── Log ──
   const log = getMaintLog();
-  const logRows = log.map((e,i) => {
-    const num = i + 1;
+  const logFilter = ui.maintTaskFilter || 'All';
+  const indexedLog = log.map((e, origIdx) => ({e, origIdx}));
+  const filtered = logFilter === 'All' ? indexedLog : indexedLog.filter(({e}) => e.task === logFilter);
+  const tasksWithEntries = MAINT_CANONICAL_TASKS.filter(t => log.some(e => e.task === t));
+  const customTasksWithEntries = [...new Set(log.map(e => e.task))].filter(t => !MAINT_CANONICAL_TASKS.includes(t));
+  const allFilterTasks = [...tasksWithEntries, ...customTasksWithEntries];
+  const filterPills = allFilterTasks.length > 0 ? `<div class="subtab-bar" style="margin-bottom:10px">
+    <div class="pill ${logFilter==='All'?'active':''}" onclick="ui.maintTaskFilter='All';document.getElementById('mainContent').innerHTML=renderMaintenance()">All</div>
+    ${allFilterTasks.map(t => `<div class="pill ${logFilter===t?'active':''}" onclick="setMaintFilter(this.dataset.task)" data-task="${esc(t)}">${esc(t)}</div>`).join('')}
+  </div>` : '';
+  const logRows = filtered.map(({e, origIdx}, fi) => {
     const engBadges = isCat ? (e.engines||[]).map(eid =>
       `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--label3);margin-left:4px">${eLbl[eid]||eid}</span>`
     ).join('') : '';
     return `<tr>
-      <td style="color:var(--label3);font-size:11px;white-space:nowrap">${num}</td>
+      <td style="color:var(--label3);font-size:11px;white-space:nowrap">${fi+1}</td>
       <td style="white-space:nowrap">${esc(e.date)}</td>
       <td style="white-space:nowrap">${esc(String(e.hours))}</td>
       <td>${esc(e.task)}${engBadges}</td>
       <td>${esc(e.cost||'')}</td>
       <td>${esc(e.notes||'')}</td>
       <td style="white-space:nowrap">
-        <button class="btn btn-s btn-xs" onclick="editMaintEntry(${i})" style="margin-right:4px">✏</button>
-        <button class="btn btn-d btn-xs" onclick="removeMaintEntry(${i})">✕</button>
+        <button class="btn btn-s btn-xs" onclick="editMaintEntry(${origIdx})" style="margin-right:4px">✏</button>
+        <button class="btn btn-d btn-xs" onclick="removeMaintEntry(${origIdx})">✕</button>
       </td>
     </tr>`;
-  }).join('') || '<tr><td colspan="7" style="color:var(--label3);padding:12px">No entries yet</td></tr>';
+  }).join('') || `<tr><td colspan="7" style="color:var(--label3);padding:12px">${logFilter==='All'?'No entries yet':'No entries for this task'}</td></tr>`;
   const logHtml = `
     <div class="sec-hd">Maintenance Log</div>
     <div class="btn-row">
       <button class="btn btn-p btn-sm" onclick="showAddMaintEntry()">+ Add entry</button>
     </div>
+    ${filterPills}
     <div class="card"><div style="overflow-x:auto">
       <table class="tbl"><thead><tr><th>#</th><th>Date</th><th>Hours</th><th>Task</th><th>Cost</th><th>Notes</th><th></th></tr></thead>
       <tbody>${logRows}</tbody></table>
@@ -1846,10 +1932,13 @@ function showAddMaintEntry() {
   const portH = data.maintenance?.engines?.port?.hours || 0;
   const stbdH = data.maintenance?.engines?.starboard?.hours || 0;
   const defH  = isCat ? Math.max(portH, stbdH) : portH;
+  const lastTask = getMaintLog()[0]?.task || MAINT_CANONICAL_TASKS[0];
+  const defTask = MAINT_CANONICAL_TASKS.includes(lastTask) ? lastTask : MAINT_CANONICAL_TASKS[0];
   showModal('Add Maintenance Entry', `
     <div class="mi-label">Date</div><input class="mi" id="m-ld" type="date" value="${new Date().toISOString().slice(0,10)}">
     <div class="mi-label">Engine Hours</div><input class="mi" id="m-lh" type="number" value="${defH}" placeholder="Engine hours">
-    <div class="mi-label">Task Performed</div><input class="mi" id="m-lt" placeholder="e.g. Oil change, Impeller">
+    <div class="mi-label">Task Performed</div>
+    ${getMaintTaskDropdown(defTask, 'm')}
     ${isCat ? `<div class="mi-label">Engine</div>
     <div style="display:flex;gap:16px;margin-bottom:12px">
       <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="m-ep" checked> Port</label>
@@ -1875,7 +1964,7 @@ function saveMaintEntry() {
     id: uid(),
     date:  document.getElementById('m-ld').value,
     hours: document.getElementById('m-lh').value,
-    task:  document.getElementById('m-lt').value,
+    task:  getMaintTaskValue('m'),
     cost:  document.getElementById('m-lc').value || '',
     notes: document.getElementById('m-ln').value || '',
     engines
@@ -1910,7 +1999,8 @@ function editMaintEntry(i) {
   showModal('Edit Maintenance Entry', `
     <div class="mi-label">Date</div><input class="mi" id="me-ld" type="date" value="${esc(e.date||'')}">
     <div class="mi-label">Engine Hours</div><input class="mi" id="me-lh" type="number" value="${esc(String(e.hours||''))}">
-    <div class="mi-label">Task Performed</div><input class="mi" id="me-lt" value="${esc(e.task||'')}">
+    <div class="mi-label">Task Performed</div>
+    ${getMaintTaskDropdown(e.task||'', 'me')}
     ${isCat ? `<div class="mi-label">Engine</div>
     <div style="display:flex;gap:16px;margin-bottom:12px">
       <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="me-ep" ${portChk}> Port</label>
@@ -1933,7 +2023,7 @@ function saveEditMaintEntry(i) {
   if (!engines.length) { showToast('Select at least one engine', true); return; }
   e.date    = document.getElementById('me-ld').value;
   e.hours   = document.getElementById('me-lh').value;
-  e.task    = document.getElementById('me-lt').value;
+  e.task    = getMaintTaskValue('me');
   e.cost    = document.getElementById('me-lc').value || '';
   e.notes   = document.getElementById('me-ln').value || '';
   e.engines = engines;
@@ -5102,6 +5192,7 @@ function migrateData() {
   let dirty = false;
   try { (data.spareParts || []).forEach(p => { const n = normCat(p.category); if (n !== p.category) { p.category = n; dirty = true; } }); } catch(e) { console.warn('migrate spareParts', e); }
   try { if (migrateToSingleLog()) dirty = true; } catch(e) { console.warn('migrateToSingleLog', e); }
+  try { (data.maintenance?.log||[]).forEach(e => { const n=normalizeMaintTask(e.task); if(n!==e.task){e.task=n;dirty=true;} }); } catch(e) { console.warn('migrateMaintTasks',e); }
   // Seed belt history if not already present
   if (!data.maintenance) data.maintenance = { engines:{}, sched:{}, log:[] };
   if (!data.maintenance.log) data.maintenance.log = [];
