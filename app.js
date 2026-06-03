@@ -3171,6 +3171,9 @@ function prefillLpgData() {
 // ═══════════════════════════════════════════════════════════
 
 let _provDragId = null, _provTouchState = null;
+let _partsDragId = null, _partsTouchState = null;
+let _sysDragId = null, _sysTouchState = null;
+let _winDragId = null, _winDragSid = null, _winTouchState = null;
 const PROV_CATS = [
   {id:'all',        label:'All'},
   {id:'food',       label:'🥫 Food'},
@@ -3557,6 +3560,70 @@ function prefillSchengenData() {
   return true;
 }
 
+function partsDragStart(e, id) {
+  if (e.target.closest('button,input,select,a')) { e.preventDefault(); return; }
+  _partsDragId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', id);
+  setTimeout(() => document.querySelector(`[data-parts-id="${id}"]`)?.classList.add('prov-dragging'), 0);
+}
+function partsDragOver(e, id) {
+  if (!_partsDragId || _partsDragId === id) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  e.currentTarget.classList.add('prov-drag-over');
+}
+function partsDragLeave(e) { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('prov-drag-over'); }
+function partsDrop(e, targetId) {
+  e.preventDefault();
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  const fromId = _partsDragId; _partsDragId = null;
+  _partsDoReorder(fromId, targetId);
+}
+function partsDragEnd() {
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  _partsDragId = null;
+}
+function partsTouchStart(e, id) {
+  e.preventDefault();
+  const touch = e.touches[0], row = e.currentTarget.closest('[data-parts-id]'); if (!row) return;
+  const rect = row.getBoundingClientRect(), clone = row.cloneNode(true);
+  Object.assign(clone.style, {position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',opacity:'0.85',zIndex:'9999',pointerEvents:'none',outline:'2px dashed var(--blue)',borderRadius:'4px',background:'var(--surface)',boxShadow:'0 4px 16px rgba(0,0,0,.18)',transition:'none'});
+  document.body.appendChild(clone); row.style.opacity = '0.3';
+  _partsTouchState = {id, row, clone, offsetY: touch.clientY - rect.top, over: null};
+  document.addEventListener('touchmove', _partsTouchMove, {passive:false});
+  document.addEventListener('touchend', _partsTouchEnd);
+}
+function _partsTouchMove(e) {
+  e.preventDefault(); if (!_partsTouchState) return;
+  const touch = e.touches[0], {clone, offsetY} = _partsTouchState;
+  clone.style.top = (touch.clientY - offsetY) + 'px';
+  clone.style.display = 'none';
+  const under = document.elementFromPoint(touch.clientX, touch.clientY);
+  clone.style.display = '';
+  const targetRow = under?.closest('[data-parts-id]');
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  if (targetRow && targetRow !== _partsTouchState.row) { targetRow.classList.add('prov-drag-over'); _partsTouchState.over = targetRow; }
+  else { _partsTouchState.over = null; }
+}
+function _partsTouchEnd() {
+  document.removeEventListener('touchmove', _partsTouchMove); document.removeEventListener('touchend', _partsTouchEnd);
+  if (!_partsTouchState) return;
+  const {id, row, clone, over} = _partsTouchState; _partsTouchState = null;
+  clone.remove(); row.style.opacity = '';
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  if (over) _partsDoReorder(id, over.dataset.partsId);
+}
+function _partsDoReorder(fromId, toId) {
+  if (!fromId || !toId || fromId === toId) return;
+  const parts = data.spareParts || [];
+  const fromIdx = parts.findIndex(p => p.id === fromId);
+  if (fromIdx === -1 || parts.findIndex(p => p.id === toId) === -1) return;
+  const [moved] = parts.splice(fromIdx, 1);
+  parts.splice(parts.findIndex(p => p.id === toId), 0, moved);
+  save(); document.getElementById('mainContent').innerHTML = renderParts();
+}
+
 function renderParts() {
   const parts = data.spareParts || [];
   const q = ui.partsSearch.toLowerCase();
@@ -3592,7 +3659,8 @@ function renderParts() {
             ? `<a href="${esc(p.storeUrl)}" target="_blank" rel="noopener" style="color:var(--blue)">${esc(p.location||'Shop')}</a>`
             : esc(p.location||'');
           const meta = [p.pn?esc(p.pn):null, esc(normCat(p.category)), storeDisplay||null, `€${p.unitPrice||0}`].filter(Boolean).join(' · ');
-          return `<div class="part-row">
+          return `<div class="part-row" data-parts-id="${p.id}" draggable="true" ondragstart="partsDragStart(event,'${p.id}')" ondragover="partsDragOver(event,'${p.id}')" ondragleave="partsDragLeave(event)" ondrop="partsDrop(event,'${p.id}')" ondragend="partsDragEnd()">
+            <span class="prov-grip" ontouchstart="partsTouchStart(event,'${p.id}')">⠿</span>
             <div class="qty-wrap">
               <button class="qb" onclick="adjQty(${idx},-1)">−</button>
               <div class="qn ${low?'low':''}">${p.qty||0}</div>
@@ -3997,6 +4065,70 @@ const SYS_GROUPS = [
 ];
 const SYS_ALL_CATS = SYS_GROUPS.filter(g=>g.cats).flatMap(g=>g.cats);
 
+function sysDragStart(e, id) {
+  if (e.target.closest('button,input,select,textarea,a')) { e.preventDefault(); return; }
+  _sysDragId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', id);
+  setTimeout(() => document.querySelector(`[data-sys-id="${id}"]`)?.classList.add('prov-dragging'), 0);
+}
+function sysDragOver(e, id) {
+  if (!_sysDragId || _sysDragId === id) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  e.currentTarget.classList.add('prov-drag-over');
+}
+function sysDragLeave(e) { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('prov-drag-over'); }
+function sysDrop(e, targetId) {
+  e.preventDefault();
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  const fromId = _sysDragId; _sysDragId = null;
+  _sysDoReorder(fromId, targetId);
+}
+function sysDragEnd() {
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  _sysDragId = null;
+}
+function sysTouchStart(e, id) {
+  e.preventDefault(); e.stopPropagation();
+  const touch = e.touches[0], row = e.currentTarget.closest('[data-sys-id]'); if (!row) return;
+  const rect = row.getBoundingClientRect(), clone = row.cloneNode(true);
+  Object.assign(clone.style, {position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',opacity:'0.85',zIndex:'9999',pointerEvents:'none',outline:'2px dashed var(--blue)',borderRadius:'4px',background:'var(--surface)',boxShadow:'0 4px 16px rgba(0,0,0,.18)',transition:'none'});
+  document.body.appendChild(clone); row.style.opacity = '0.3';
+  _sysTouchState = {id, row, clone, offsetY: touch.clientY - rect.top, over: null};
+  document.addEventListener('touchmove', _sysTouchMove, {passive:false});
+  document.addEventListener('touchend', _sysTouchEnd);
+}
+function _sysTouchMove(e) {
+  e.preventDefault(); if (!_sysTouchState) return;
+  const touch = e.touches[0], {clone, offsetY} = _sysTouchState;
+  clone.style.top = (touch.clientY - offsetY) + 'px';
+  clone.style.display = 'none';
+  const under = document.elementFromPoint(touch.clientX, touch.clientY);
+  clone.style.display = '';
+  const targetRow = under?.closest('[data-sys-id]');
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  if (targetRow && targetRow !== _sysTouchState.row) { targetRow.classList.add('prov-drag-over'); _sysTouchState.over = targetRow; }
+  else { _sysTouchState.over = null; }
+}
+function _sysTouchEnd() {
+  document.removeEventListener('touchmove', _sysTouchMove); document.removeEventListener('touchend', _sysTouchEnd);
+  if (!_sysTouchState) return;
+  const {id, row, clone, over} = _sysTouchState; _sysTouchState = null;
+  clone.remove(); row.style.opacity = '';
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  if (over) _sysDoReorder(id, over.dataset.sysId);
+}
+function _sysDoReorder(fromId, toId) {
+  if (!fromId || !toId || fromId === toId) return;
+  const systems = data.systems || [];
+  const fromIdx = systems.findIndex(s => s.id === fromId);
+  if (fromIdx === -1 || systems.findIndex(s => s.id === toId) === -1) return;
+  const [moved] = systems.splice(fromIdx, 1);
+  systems.splice(systems.findIndex(s => s.id === toId), 0, moved);
+  save(); document.getElementById('mainContent').innerHTML = renderSystems();
+}
+
 function renderSystems() {
   const systems = data.systems || [];
   if (!ui.sysTab) ui.sysTab = 'All';
@@ -4033,8 +4165,9 @@ function renderSystemCard(s) {
   const open = ui.sysOpen === s.id;
   const wExp = expiryBadge(s.warrantyExpiry, 90);
   return `
-    <div class="sys-card">
+    <div class="sys-card" data-sys-id="${s.id}" draggable="true" ondragstart="sysDragStart(event,'${s.id}')" ondragover="sysDragOver(event,'${s.id}')" ondragleave="sysDragLeave(event)" ondrop="sysDrop(event,'${s.id}')" ondragend="sysDragEnd()">
       <div class="sys-hdr" onclick="ui.sysOpen=ui.sysOpen==='${s.id}'?null:'${s.id}';document.getElementById('mainContent').innerHTML=renderSystems()">
+        <span class="prov-grip" ontouchstart="sysTouchStart(event,'${s.id}')" style="margin-right:4px">⠿</span>
         <div class="sys-icon">⚡</div>
         <div style="flex:1">
           <div style="font-size:15px;font-weight:600">${esc(s.make?s.make+' ':'')}${esc(s.model)}</div>
@@ -4240,6 +4373,75 @@ function nextWinterName(name) {
 
 function winterRerender() { document.getElementById('mainContent').innerHTML = renderWinterization(); }
 
+function winDragStart(e, id, sid) {
+  if (e.target.closest('button,input,select,label')) { e.preventDefault(); return; }
+  _winDragId = id; _winDragSid = sid;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', id);
+  setTimeout(() => document.querySelector(`[data-win-id="${id}"]`)?.classList.add('prov-dragging'), 0);
+}
+function winDragOver(e, id, sid) {
+  if (!_winDragId || _winDragId === id || _winDragSid !== sid) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  e.currentTarget.classList.add('prov-drag-over');
+}
+function winDragLeave(e) { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('prov-drag-over'); }
+function winDrop(e, id, sid) {
+  e.preventDefault();
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  const fromId = _winDragId; _winDragId = null; _winDragSid = null;
+  _winDoReorder(fromId, id, sid);
+}
+function winDragEnd() {
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  _winDragId = null; _winDragSid = null;
+}
+function winTouchStart(e, id, sid) {
+  e.preventDefault(); e.stopPropagation();
+  const touch = e.touches[0], row = e.currentTarget.closest('[data-win-id]'); if (!row) return;
+  const rect = row.getBoundingClientRect(), clone = row.cloneNode(true);
+  Object.assign(clone.style, {position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',opacity:'0.85',zIndex:'9999',pointerEvents:'none',outline:'2px dashed var(--blue)',borderRadius:'4px',background:'var(--surface)',boxShadow:'0 4px 16px rgba(0,0,0,.18)',transition:'none'});
+  document.body.appendChild(clone); row.style.opacity = '0.3';
+  _winTouchState = {id, sid, row, clone, offsetY: touch.clientY - rect.top, over: null};
+  document.addEventListener('touchmove', _winTouchMove, {passive:false});
+  document.addEventListener('touchend', _winTouchEnd);
+}
+function _winTouchMove(e) {
+  e.preventDefault(); if (!_winTouchState) return;
+  const touch = e.touches[0], {clone, offsetY} = _winTouchState;
+  clone.style.top = (touch.clientY - offsetY) + 'px';
+  clone.style.display = 'none';
+  const under = document.elementFromPoint(touch.clientX, touch.clientY);
+  clone.style.display = '';
+  const targetRow = under?.closest('[data-win-id]');
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  if (targetRow && targetRow !== _winTouchState.row && targetRow.dataset.winSid === _winTouchState.sid) {
+    targetRow.classList.add('prov-drag-over'); _winTouchState.over = targetRow;
+  } else { _winTouchState.over = null; }
+}
+function _winTouchEnd() {
+  document.removeEventListener('touchmove', _winTouchMove); document.removeEventListener('touchend', _winTouchEnd);
+  if (!_winTouchState) return;
+  const {id, sid, row, clone, over} = _winTouchState; _winTouchState = null;
+  clone.remove(); row.style.opacity = '';
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  if (over) _winDoReorder(id, over.dataset.winId, sid);
+}
+function _winDoReorder(fromId, toId, sid) {
+  if (!fromId || !toId || fromId === toId) return;
+  const wd = getWinterData();
+  const season = wd.seasons[ui.winterSeasonId || wd.currentSeason];
+  if (!season) return;
+  const items = season.sections?.[sid]?.items;
+  if (!items) return;
+  const fromIdx = items.findIndex(it => it.id === fromId);
+  if (fromIdx === -1 || items.findIndex(it => it.id === toId) === -1) return;
+  const [moved] = items.splice(fromIdx, 1);
+  items.splice(items.findIndex(it => it.id === toId), 0, moved);
+  save(); winterRerender();
+}
+
 function renderWinterSection(sid, season, archived) {
   const def  = WINTER_DEFS[sid];
   const sec  = season.sections?.[sid] || {items:[]};
@@ -4289,7 +4491,10 @@ function renderWinterSection(sid, season, archived) {
     const acts = archived ? '' : `<div style="display:flex;gap:1px;flex-shrink:0">
       <button class="wact" onclick="startWinterEdit('${sid}',${i})" title="Edit">✏️</button>
     </div>`;
-    return grpHdr + `<div class="wrow">
+    const winDragAttrs = archived ? '' : ` data-win-id="${item.id}" data-win-sid="${sid}" draggable="true" ondragstart="winDragStart(event,'${item.id}','${sid}')" ondragover="winDragOver(event,'${item.id}','${sid}')" ondragleave="winDragLeave(event)" ondrop="winDrop(event,'${item.id}','${sid}')" ondragend="winDragEnd()"`;
+    const winGrip = archived ? '' : `<span class="prov-grip" ontouchstart="winTouchStart(event,'${item.id}','${sid}')">⠿</span>`;
+    return grpHdr + `<div class="wrow"${winDragAttrs}>
+      ${winGrip}
       <div class="wbox${item.checked?' on':''}" onclick="toggleWinterItem('${sid}',${i})">
         ${item.checked?'<svg width="11" height="9" viewBox="0 0 11 9"><polyline points="1,4.5 4,7.5 10,1" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
       </div>
