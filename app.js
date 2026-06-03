@@ -122,7 +122,7 @@ let ui = {
   tab:'documents', docSub:'vessel', maintEngine:'port',
   photoSub:'vesselDoc', crewOpen:null, sysOpen:null, sysTab:'All',
   partsSearch:'', partsFilter:'All', alertsOpen:false, maintShowAll:false, maintTaskFilter:'All',
-  provisionsSub:'all'
+  provisionsSub:'all', tlDetailId:null
 };
 let _photoCtx = null; // {section, index} for upload
 
@@ -4988,11 +4988,49 @@ function renderTLStamps(log, archived) {
     <tbody>${rows}</tbody></table></div>`;
 }
 
+function frTLReadOnly(label, value) {
+  if (!value && value !== 0) return '';
+  return `<div class="fr"><div class="fl">${esc(label)}</div><div class="fv">${esc(value)}</div></div>`;
+}
+function showTLDetail(logId) { ui.tlDetailId = logId; document.getElementById('mainContent').innerHTML = renderDocuments(); }
+function clearTLDetail() { ui.tlDetailId = null; document.getElementById('mainContent').innerHTML = renderDocuments(); }
+function renderTLDetail(logId) {
+  const wd = getTLData(), l = wd.logs[logId];
+  if (!l) return '';
+  const docFields = [
+    ['Document Number',l.docNumber],['Issue Date',l.issueDate],['Valid From',l.validFrom],
+    ['Valid Until',l.validUntil],['Customs Authority',l.customsAuthority],['Validity Type',l.validityType],
+    ['Prev. Documents Count',l.prevDocCount],['Other Notes',l.otherNotes],['Provisions & Bonded Stores',l.provisions],
+  ].map(([k,v])=>frTLReadOnly(k,v)).join('');
+  const vesselFields = [
+    ['Vessel Name',l.vesselName],['Flag',l.flag],['Port of Registry',l.portOfRegistry],
+    ['Registration Number',l.regNumber],['Call Sign',l.callSign],['Type of Vessel',l.vesselType],
+    ['Gross Tonnage (GT)',l.gt],['Engine',l.engine],['Length (LOA)',l.loa],
+    ['Year Built',l.yearBuilt],['Year of First Registration',l.yearFirstReg],
+    ['Owner Name',l.ownerName],['Holder/User',l.holderName],['Address',l.address],
+    ['Telephone',l.telephone],['Email',l.email],['AFM/TIN',l.afm],['ID / Passport',l.idNumber],
+  ].map(([k,v])=>frTLReadOnly(k,v)).join('');
+  const docCard = docFields ? `<div class="card" style="margin-bottom:12px"><div class="card-hd">📋 Document Info</div><div class="card-body">${docFields}</div></div>` : '';
+  const vesselCard = vesselFields ? `<div class="card" style="margin-bottom:12px"><div class="card-hd">🚢 Vessel & Owner</div><div class="card-body">${vesselFields}</div></div>` : '';
+  const stampsCard = `<div class="card" style="margin-bottom:12px"><div class="card-hd">🛂 Port Stamps</div>${renderTLStamps(l,true)}</div>`;
+  return `<div style="animation:tl-slide .2s ease;padding:4px 0">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <button onclick="clearTLDetail()" style="background:none;border:none;padding:4px 0;cursor:pointer;font-size:14px;font-weight:600;color:var(--blue);font-family:var(--font)">← Back</button>
+      <span style="font-size:15px;font-weight:700">${esc(fmtTLSeason(l.season))}</span>
+      <span style="background:var(--label3);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px">Archived</span>
+      <span style="flex:1"></span>
+      <button onclick="showEditArchivedTL('${logId}')" style="background:var(--surface2);border:1.5px solid var(--sep);border-radius:10px;padding:5px 12px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">✏️ Edit</button>
+    </div>
+    ${docCard}${vesselCard}${stampsCard}
+  </div>`;
+}
+
 function renderTransitLog() {
   try { return _renderTransitLog(); } catch(e) { console.error('renderTransitLog:', e); return `<div style="padding:20px;color:var(--red);font-size:13px">Transit Log error: ${esc(e.message)}<br><small style="color:var(--label3)">${esc(e.stack||'')}</small></div>`; }
 }
 function fmtTLSeason(s) { const m=String(s||'').match(/^(\d{4})-(\d{4})$/); return m?m[1]+'/'+m[2].slice(-2):s; }
 function _renderTransitLog() {
+  if (ui.tlDetailId) return renderTLDetail(ui.tlDetailId);
   const wd = getTLData();
   if (!ui.tlOpen) ui.tlOpen = {s1:true, s2:true, s3:true};
   const cur = wd.logs[wd.currentLog]; if (!cur) return '';
@@ -5045,12 +5083,12 @@ function _renderTransitLog() {
   const pastRows = archived.map(([id,l])=>{
     const dates = [l.validFrom, l.validUntil].filter(Boolean).join('–');
     const note = (l.otherNotes||l.docNumber||'');
-    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--sep);overflow:hidden">
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--sep);overflow:hidden;cursor:pointer" onclick="showTLDetail('${id}')">
       <div style="font-size:12px;font-weight:700;flex-shrink:0;width:54px;white-space:nowrap">${esc(fmtTLSeason(l.season))}</div>
       <div style="font-size:12px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">${esc(l.docNumber||'—')}</div>
       <div style="font-size:11px;color:var(--label3);flex-shrink:0;white-space:nowrap">${esc(dates)}</div>
       <div style="font-size:11px;color:var(--label3);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(note.length>40?note.slice(0,40)+'…':note)}</div>
-      <button onclick="showEditArchivedTL('${id}')" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✏️</button>
+      <button onclick="event.stopPropagation();showEditArchivedTL('${id}')" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✏️</button>
     </div>`;
   }).join('');
 
@@ -5145,6 +5183,7 @@ function saveEditArchivedTL(logId) {
 function deleteArchivedTL(logId) {
   const wd=getTLData();
   delete wd.logs[logId];
+  if (ui.tlDetailId === logId) ui.tlDetailId = null;
   save(); document.getElementById('mainContent').innerHTML=renderDocuments();
 }
 

@@ -266,6 +266,9 @@ select.fi{-webkit-appearance:none}
 .prov-dragging{opacity:.35!important;outline:2px dashed var(--blue);border-radius:3px}
 .prov-drag-over{border-top:2px solid var(--blue)!important}
 
+/* ── Transit log detail slide-in ── */
+@keyframes tl-slide{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
+
 /* ── Utils ── */
 .flex{display:flex}.items-center{align-items:center}.justify-between{justify-content:space-between}
 .gap-8{gap:8px}.gap-4{gap:4px}.mt-4{margin-top:4px}.mt-8{margin-top:8px}
