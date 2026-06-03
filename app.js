@@ -3176,6 +3176,7 @@ function prefillLpgData() {
 //  PROVISIONS TAB
 // ═══════════════════════════════════════════════════════════
 
+let _provDragId = null, _provTouchState = null;
 const PROV_CATS = [
   {id:'all',        label:'All'},
   {id:'food',       label:'🥫 Food'},
@@ -3247,8 +3248,9 @@ function renderProvisions() {
         : '';
       const qtyColor = low ? '#ef4444' : '#22c55e';
       const unitLabel = it.unit ? ` ${esc(it.unit)}` : '';
-      const dimmed = it.bought ? 'opacity:0.45;' : '';
-      return `<div style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-top:1px solid var(--sep);${dimmed}">
+      const dimmed = it.bought ? 'opacity:0.4;' : '';
+      return `<div data-prov-id="${it.id}" draggable="true" ondragstart="provDragStart(event,'${it.id}')" ondragover="provDragOver(event,'${it.id}')" ondragleave="provDragLeave(event)" ondrop="provDrop(event,'${it.id}')" ondragend="provDragEnd()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-top:1px solid var(--sep);${dimmed}">
+        <span class="prov-grip" ontouchstart="provTouchStart(event,'${it.id}')">⠿</span>
         <input type="checkbox" ${it.bought?'checked':''} onchange="provToggleBought(${origIdx},this.checked)" style="width:17px;height:17px;flex-shrink:0;cursor:pointer;accent-color:var(--blue)">
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:600;${it.bought?'color:var(--label3);':'color:var(--label);'}">${esc(it.name)}</div>
@@ -3314,6 +3316,88 @@ function provMarkBought(id, checked) {
   const prov = getProvisionsData();
   const it = prov.items.find(x => x.id === id);
   if (it) { it.qty = it.minQty; save(); document.getElementById('mainContent').innerHTML = renderProvisions(); }
+}
+
+function provDragStart(e, id) {
+  if (e.target.closest('button,input,select')) { e.preventDefault(); return; }
+  _provDragId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', id);
+  setTimeout(() => document.querySelector(`[data-prov-id="${id}"]`)?.classList.add('prov-dragging'), 0);
+}
+function provDragOver(e, id) {
+  if (!_provDragId || _provDragId === id) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  e.currentTarget.classList.add('prov-drag-over');
+}
+function provDragLeave(e) {
+  if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('prov-drag-over');
+}
+function provDrop(e, targetId) {
+  e.preventDefault();
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  const fromId = _provDragId; _provDragId = null;
+  _provDoReorder(fromId, targetId);
+}
+function provDragEnd() {
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  _provDragId = null;
+}
+function provTouchStart(e, id) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const row = e.currentTarget.closest('[data-prov-id]');
+  if (!row) return;
+  const rect = row.getBoundingClientRect();
+  const clone = row.cloneNode(true);
+  Object.assign(clone.style, {position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',
+    opacity:'0.85',zIndex:'9999',pointerEvents:'none',outline:'2px dashed var(--blue)',
+    borderRadius:'4px',background:'var(--surface)',boxShadow:'0 4px 16px rgba(0,0,0,.18)',transition:'none'});
+  document.body.appendChild(clone);
+  row.style.opacity = '0.3';
+  _provTouchState = {id, row, clone, offsetY: touch.clientY - rect.top, over: null};
+  document.addEventListener('touchmove', _provTouchMove, {passive:false});
+  document.addEventListener('touchend', _provTouchEnd);
+}
+function _provTouchMove(e) {
+  e.preventDefault();
+  if (!_provTouchState) return;
+  const touch = e.touches[0];
+  const {clone, offsetY} = _provTouchState;
+  clone.style.top = (touch.clientY - offsetY) + 'px';
+  clone.style.display = 'none';
+  const under = document.elementFromPoint(touch.clientX, touch.clientY);
+  clone.style.display = '';
+  const targetRow = under?.closest('[data-prov-id]');
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  if (targetRow && targetRow !== _provTouchState.row) {
+    targetRow.classList.add('prov-drag-over');
+    _provTouchState.over = targetRow;
+  } else { _provTouchState.over = null; }
+}
+function _provTouchEnd() {
+  document.removeEventListener('touchmove', _provTouchMove);
+  document.removeEventListener('touchend', _provTouchEnd);
+  if (!_provTouchState) return;
+  const {id, row, clone, over} = _provTouchState;
+  _provTouchState = null;
+  clone.remove(); row.style.opacity = '';
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  if (over) _provDoReorder(id, over.dataset.provId);
+}
+function _provDoReorder(fromId, toId) {
+  if (!fromId || !toId || fromId === toId) return;
+  const prov = getProvisionsData();
+  const fromIdx = prov.items.findIndex(it => it.id === fromId);
+  const toIdx   = prov.items.findIndex(it => it.id === toId);
+  if (fromIdx === -1 || toIdx === -1) return;
+  if (prov.items[fromIdx].category !== prov.items[toIdx].category) return;
+  const [moved] = prov.items.splice(fromIdx, 1);
+  prov.items.splice(prov.items.findIndex(it => it.id === toId), 0, moved);
+  save();
+  document.getElementById('mainContent').innerHTML = renderProvisions();
 }
 
 function provItemModal(item, idx, lockedCat) {

@@ -260,6 +260,12 @@ select.fi{-webkit-appearance:none}
   main{padding:0;max-width:none}
 }
 
+/* ── Provisions drag-and-drop ── */
+.prov-grip{cursor:grab;color:var(--label3);font-size:16px;flex-shrink:0;padding:0 4px;touch-action:none;user-select:none;-webkit-user-select:none;line-height:1}
+.prov-grip:active{cursor:grabbing}
+.prov-dragging{opacity:.35!important;outline:2px dashed var(--blue);border-radius:3px}
+.prov-drag-over{border-top:2px solid var(--blue)!important}
+
 /* ── Utils ── */
 .flex{display:flex}.items-center{align-items:center}.justify-between{justify-content:space-between}
 .gap-8{gap:8px}.gap-4{gap:4px}.mt-4{margin-top:4px}.mt-8{margin-top:8px}
