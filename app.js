@@ -592,18 +592,18 @@ function completeSetup() {
 // ═══════════════════════════════════════════════════════════
 
 const TABS = [
-  {id:'documents', icon:'📄', label:'Boat Docs'},
-  {id:'shipyard',    icon:'⚓', label:'Shipyard'},
-  {id:'watermaker',  icon:'💧', label:'Water Maker'},
-  {id:'lpg',         icon:'🔥', label:'LPG'},
-  {id:'provisions',  icon:'🛒', label:'Provisions'},
-  {id:'maint',       icon:'🔧', label:'Engine Maintenance'},
-  {id:'upgrades',  icon:'🔧', label:'Upgrades & Repairs'},
-  {id:'schengen',  icon:'🛂', label:'Schengen'},
-  {id:'parts',     icon:'🔩', label:'Spare Parts'},
-  {id:'systems',   icon:'🔌', label:'Systems'},
-  {id:'winter',    icon:'❄️', label:'Winterize'},
-  {id:'settings',  icon:'⚙️', label:'Settings'},
+  {id:'documents',  icon:'📄', label:'Boat Docs'},
+  {id:'provisions', icon:'🛒', label:'Provisions'},
+  {id:'watermaker', icon:'💧', label:'Water Maker'},
+  {id:'lpg',        icon:'🔥', label:'LPG'},
+  {id:'maint',      icon:'🔧', label:'Engine Maintenance'},
+  {id:'schengen',   icon:'🛂', label:'Schengen'},
+  {id:'shipyard',   icon:'⚓', label:'Shipyard'},
+  {id:'winter',     icon:'❄️', label:'Winterize'},
+  {id:'upgrades',   icon:'🔧', label:'Upgrades & Repairs'},
+  {id:'parts',      icon:'🔩', label:'Spare Parts'},
+  {id:'systems',    icon:'🔌', label:'Systems'},
+  {id:'settings',   icon:'⚙️', label:'Settings'},
 ];
 
 function renderApp() {
