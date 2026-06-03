@@ -1852,9 +1852,11 @@ function renderMaintenance() {
       return `<div class="card">
         <div class="card-hd">${isCat?eLbl[eid]+' ':''}Engine Hours</div>
         <div class="hours-box">
-          <div class="hours-num">${h}</div><div class="hours-lbl">hours</div>
+          <div class="hours-num" id="hnum-${eid}">${h}</div><div class="hours-lbl">hours</div>
           <div class="hours-edit">
-            <input class="h-input" type="number" value="${h}" min="0" onblur="setHours('${eid}',this.value)">
+            <input class="h-input" type="number" value="${h}" min="0"
+              oninput="var el=document.getElementById('hnum-${eid}');if(el)el.textContent=this.value||0"
+              onblur="setHours('${eid}',this.value)">
           </div>
         </div>
       </div>`;
@@ -1925,6 +1927,16 @@ function renderMaintenance() {
       <tbody>${logRows}</tbody></table>
     </div></div>`;
   return hoursHtml + comingUpHtml + logHtml;
+}
+
+function setHours(eid, val) {
+  const v = Math.max(0, parseInt(val) || 0);
+  if (!data.maintenance) data.maintenance = {engines:{}, sched:{}, log:[]};
+  if (!data.maintenance.engines) data.maintenance.engines = {};
+  if (!data.maintenance.engines[eid]) data.maintenance.engines[eid] = {hours:0};
+  data.maintenance.engines[eid].hours = v;
+  save();
+  document.getElementById('mainContent').innerHTML = renderMaintenance();
 }
 
 function showAddMaintEntry() {
