@@ -542,7 +542,7 @@ function renderSetup(setupEmail = '') {
           <div class="hull-sub">Port + Starboard</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px;background:var(--surface);border-radius:12px;border:0.5px solid var(--sep);"><input type="checkbox" id="privacyConsent" onchange="var b=document.getElementById('setupSubmitBtn');if(b)b.disabled=!this.checked;" style="width:22px;height:22px;flex-shrink:0;cursor:pointer;display:inline-block!important;visibility:visible!important;appearance:checkbox!important;-webkit-appearance:checkbox!important;"><span style="font-size:14px;color:var(--label);line-height:1.4;">I have read and agree to the <button type="button" ontouchstart="event.preventDefault();showPrivacyPolicy();" onclick="showPrivacyPolicy();" style="background:none;border:none;color:#185FA5;font-family:var(--font);font-size:14px;cursor:pointer;padding:0;line-height:inherit;vertical-align:baseline;">Privacy Policy</button></span></div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px;background:var(--surface);border-radius:12px;border:0.5px solid var(--sep);"><input type="checkbox" id="privacyConsent" onchange="var b=document.getElementById('setupSubmitBtn');if(b)b.disabled=!this.checked;" style="width:22px;height:22px;flex-shrink:0;cursor:pointer;display:inline-block!important;visibility:visible!important;appearance:checkbox!important;-webkit-appearance:checkbox!important;"><span style="font-size:14px;color:var(--label);line-height:1.4;">I have read and agree to the <button type="button" ontouchstart="event.preventDefault();showPrivacyPolicy();" onclick="showPrivacyPolicy();" style="background:none;border:none;color:#185FA5;font-family:var(--font);font-size:14px;cursor:pointer;padding:0;line-height:inherit;vertical-align:baseline;">Privacy Policy</button> and <button type="button" ontouchstart="event.preventDefault();showTermsOfUse();" onclick="showTermsOfUse();" style="background:none;border:none;color:#185FA5;font-family:var(--font);font-size:14px;cursor:pointer;padding:0;line-height:inherit;vertical-align:baseline;">Terms of Use</button></span></div>
       <button class="setup-go" id="setupSubmitBtn" onclick="completeSetup()" disabled>Set Up My Boat →</button>
       <button onclick="renderLoginScreen()"
         style="width:100%;margin-top:14px;border:none;background:none;font-family:var(--font);
@@ -6582,9 +6582,9 @@ function showPrivacyPolicy() {
   div.innerHTML = `<div style="background:#fff;border-radius:16px 16px 0 0;padding:24px;max-height:80vh;overflow-y:auto;width:100%;max-width:500px;">
     <h2 style="margin-bottom:12px;font-size:18px;">Privacy Policy</h2>
     <p style="font-size:13px;line-height:1.7;color:#444;">
-      <b>What this app is</b><br>Oroboro Boat Manager is a personal boat management tool for sailors. Not a commercial service.<br><br>
-      <b>What data we collect</b><br>Your email (stored as a hash we cannot read), boat info, maintenance logs. No tracking, no ads.<br><br>
-      <b>How data is stored</b><br>All data is AES-256 encrypted on your device before transmission. The encryption key is derived from your PIN and never leaves your device. Data is stored in a cloud backend managed by the app developer. Because all data is encrypted before leaving your device, it cannot be read by anyone — including us — without your PIN.<br><br>
+      <b>What this app is</b><br>Oroboro Boat Manager is a personal boat management tool for sailors. Not a commercial service. Currently in beta.<br><br>
+      <b>What data we collect</b><br>Your email (stored as a hash we cannot read), boat name, maintenance logs, and document details you choose to enter. No tracking, no ads.<br><br>
+      <b>How data is stored</b><br>All data is AES-256 encrypted on your device before transmission. The encryption key is derived from your PIN and never leaves your device. Data is stored in a cloud backend managed by the app developer. Because all data is encrypted before leaving your device, it cannot be read by anyone — including us — without your PIN. During the beta period, the developer may access anonymized usage data to improve the app.<br><br>
       <b>Who can access your data</b><br>Only you with your PIN.<br><br>
       <b>Your GDPR rights</b><br>Access, deletion, and portability — all available in Settings.<br><br>
       <b>Disclaimer</b><br>This app is provided as a tool to help you organise your boat management and track your Schengen days. It is not legal advice. Schengen rules are complex and subject to change — always verify your status with official sources before making entry decisions. The developer accepts no liability for overstays, fines, or legal consequences arising from use of this app.<br><br>
@@ -6592,6 +6592,27 @@ function showPrivacyPolicy() {
     </p>
     <p style="font-size:11px;color:#888;margin-top:8px;text-align:center">© 2024–2026 Francesco Pugliano. All rights reserved.</p>
     <button onclick="document.getElementById('ppOverlay').remove()" style="width:100%;padding:14px;background:#185FA5;color:white;border:none;border-radius:12px;font-size:16px;font-weight:500;margin-top:16px;cursor:pointer;">Close</button>
+  </div>`;
+  document.body.appendChild(div);
+  div.addEventListener('click', function(e) { if(e.target===div) div.remove(); });
+}
+function showTermsOfUse() {
+  const existing = document.getElementById('touOverlay');
+  if (existing) { existing.remove(); return; }
+  const div = document.createElement('div');
+  div.id = 'touOverlay';
+  div.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:flex-end;justify-content:center;';
+  div.innerHTML = `<div style="background:#fff;border-radius:16px 16px 0 0;padding:24px;max-height:80vh;overflow-y:auto;width:100%;max-width:500px;">
+    <h2 style="margin-bottom:12px;font-size:18px;">Terms of Use</h2>
+    <p style="font-size:13px;line-height:1.7;color:#444;">
+      By using this app you agree to the following:<br><br>
+      This app is provided as-is, without warranty of any kind. Use it at your own risk. The developer is not responsible for data loss, inaccuracies, or any consequences arising from use of this app — including but not limited to Schengen overstays, customs fines, or legal issues.<br><br>
+      This is a beta product. Features may change, data may be migrated, and the service may be interrupted without notice.<br><br>
+      You are responsible for verifying all information with official sources before making legal or financial decisions.<br><br>
+      This app is for personal use only. You may not resell, redistribute, or commercialize it in any form.
+    </p>
+    <p style="font-size:11px;color:#888;margin-top:8px;text-align:center">© 2024–2026 Francesco Pugliano. All rights reserved.</p>
+    <button onclick="document.getElementById('touOverlay').remove()" style="width:100%;padding:14px;background:#185FA5;color:white;border:none;border-radius:12px;font-size:16px;font-weight:500;margin-top:16px;cursor:pointer;">Close</button>
   </div>`;
   document.body.appendChild(div);
   div.addEventListener('click', function(e) { if(e.target===div) div.remove(); });
@@ -6700,6 +6721,8 @@ function renderSettings() {
     </div>
     <div style="text-align:center;padding:16px 0 8px">
       <button onclick="showPrivacyPolicy()" style="background:none;border:none;color:var(--label3);font-family:var(--font);font-size:13px;cursor:pointer;text-decoration:underline">Privacy Policy</button>
+      <span style="color:var(--label3);font-size:13px"> · </span>
+      <button onclick="showTermsOfUse()" style="background:none;border:none;color:var(--label3);font-family:var(--font);font-size:13px;cursor:pointer;text-decoration:underline">Terms of Use</button>
     </div>`;
 }
 
