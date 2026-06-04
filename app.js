@@ -5109,6 +5109,186 @@ function renderTLDetail(logId) {
   </div>`;
 }
 
+// ── Transit Log gauge & timeline helpers ───────────────────────
+function parseTLDate(str) {
+  if (!str) return null;
+  const eu = String(str).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (eu) return new Date(+eu[3], +eu[2]-1, +eu[1]);
+  return parseISODate(str);
+}
+function tlDaysUntil(str) {
+  const d = parseTLDate(str);
+  if (!d || isNaN(d.getTime())) return null;
+  const now = new Date(); now.setHours(0,0,0,0);
+  return Math.round((d - now) / 86400000);
+}
+function tlFmtDate(d) {
+  if (!d || isNaN(d.getTime())) return '—';
+  return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+}
+function tlFrozenDays(log) {
+  const fl = (log.freezeLog||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+  let frozen = 0, haulDate = null;
+  for (const e of fl) {
+    if (e.type==='hauled') { haulDate = e.date; }
+    else if (e.type==='relaunched' && haulDate) {
+      const h = parseISODate(haulDate), r = parseISODate(e.date);
+      if (h && r && r > h) frozen += Math.round((r - h) / 86400000);
+      haulDate = null;
+    }
+  }
+  return frozen;
+}
+function tlCircleGauge(days, maxDays, color) {
+  const r = 28, cx = 36, cy = 36, circ = Math.round(2 * Math.PI * r);
+  const pct = days === null ? 0 : Math.min(1, Math.max(0, days / maxDays));
+  const dashoffset = Math.round(circ * (1 - pct));
+  const txt = days === null ? '—' : String(Math.max(0, days));
+  const fs = txt.length > 3 ? '11' : '17';
+  return `<svg width="72" height="72" viewBox="0 0 72 72" style="display:block;margin:0 auto">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#e5e7eb" stroke-width="7"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="7"
+      stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${dashoffset}"
+      transform="rotate(-90 ${cx} ${cy})"/>
+    <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle"
+      font-size="${fs}" font-weight="800" fill="${color}" font-family="var(--font)">${esc(txt)}</text>
+    <text x="${cx}" y="${cy+15}" text-anchor="middle" font-size="8" fill="#9ca3af" font-family="var(--font)">days</text>
+  </svg>`;
+}
+function renderTLGauges(cur) {
+  // Gauge 1 — Boat validity
+  const frozen = tlFrozenDays(cur);
+  const boatRaw = tlDaysUntil(cur.validUntil);
+  const boatDays = boatRaw === null ? null : boatRaw - frozen;
+  const boatColor = boatDays===null?'#9ca3af':boatDays>180?'#22C55E':boatDays>90?'#F59E0B':'#EF4444';
+  const frozenNote = frozen>0 ? `<div style="font-size:10px;color:var(--label3);text-align:center;margin-top:3px">${frozen}d frozen deducted</div>` : '';
+  const g1 = `<div style="padding:10px 4px;text-align:center">
+    <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:5px">Boat</div>
+    ${tlCircleGauge(boatDays,365,boatColor)}${frozenNote}</div>`;
+
+  // Gauge 2 — User validity (6 months from userStartDate or validUntil, whichever sooner)
+  const startDate = parseTLDate(cur.userStartDate||cur.issueDate||cur.validFrom||'');
+  const validUntilDate = parseTLDate(cur.validUntil);
+  let userDays = null;
+  if (startDate) {
+    const sixMo = new Date(startDate); sixMo.setDate(sixMo.getDate()+180);
+    const userExp = validUntilDate ? (sixMo < validUntilDate ? sixMo : validUntilDate) : sixMo;
+    const now = new Date(); now.setHours(0,0,0,0);
+    userDays = Math.round((userExp - now)/86400000);
+  }
+  const userColor = userDays===null?'#9ca3af':userDays>60?'#22C55E':userDays>30?'#F59E0B':'#EF4444';
+  const g2 = `<div style="padding:10px 4px;text-align:center;border-left:1px solid var(--sep);border-right:1px solid var(--sep)">
+    <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:5px">User</div>
+    ${tlCircleGauge(userDays,180,userColor)}
+    <div style="font-size:10px;color:var(--label3);margin-top:3px">€30 to change</div></div>`;
+
+  // Gauge 3 — Schengen (live from data.schengen)
+  const holderKey = (cur.holderName||'').trim().toLowerCase();
+  const schengenMatch = holderKey ? (data.schengen?.persons||[]).find(p=>(p.name||'').trim().toLowerCase()===holderKey) : null;
+  let g3;
+  if (!schengenMatch) {
+    g3 = `<div style="padding:10px 4px;text-align:center">
+      <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:5px">Schengen</div>
+      <div style="height:72px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#9ca3af">—</div>
+      <div style="font-size:10px;color:var(--blue);cursor:pointer;margin-top:3px" onclick="showTab('schengen')">Set up in Schengen tab</div></div>`;
+  } else {
+    const isEU = schengenMatch.passports?.[schengenMatch.activePassport||0]?.eu === true;
+    if (isEU) {
+      g3 = `<div style="padding:10px 4px;text-align:center">
+        <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:5px">Schengen</div>
+        <svg width="72" height="72" viewBox="0 0 72 72" style="display:block;margin:0 auto">
+          <circle cx="36" cy="36" r="28" fill="none" stroke="#22C55E" stroke-width="7"/>
+          <text x="36" y="36" text-anchor="middle" dominant-baseline="middle" font-size="10" font-weight="700" fill="#22C55E" font-family="var(--font)">EU</text>
+        </svg>
+        <div style="font-size:10px;color:#22C55E;font-weight:600;margin-top:3px">No limit</div></div>`;
+    } else {
+      const {days:schUsed} = calcSchengenDays(schengenMatch.log);
+      const schRem = 90 - schUsed;
+      const schColor = schRem>45?'#22C55E':schRem>20?'#F59E0B':'#EF4444';
+      g3 = `<div style="padding:10px 4px;text-align:center">
+        <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:5px">Schengen</div>
+        ${tlCircleGauge(schRem,90,schColor)}
+        <div style="font-size:10px;color:var(--label3);margin-top:3px">${schUsed}/90 used</div></div>`;
+    }
+  }
+  return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;overflow:hidden;margin-bottom:10px">${g1}${g2}${g3}</div>`;
+}
+function renderTLAlertBar(cur) {
+  const issues = [];
+  const frozen = tlFrozenDays(cur);
+  const boatDays = tlDaysUntil(cur.validUntil) !== null ? tlDaysUntil(cur.validUntil) - frozen : null;
+  if (boatDays !== null && boatDays <= 180) issues.push(boatDays<=90?`🔴 Boat TL expires in ${boatDays}d`:`🟡 Boat TL expires in ${boatDays}d`);
+  const startDate = parseTLDate(cur.userStartDate||cur.issueDate||cur.validFrom||'');
+  if (startDate) {
+    const sixMo = new Date(startDate); sixMo.setDate(sixMo.getDate()+180);
+    const vud = parseTLDate(cur.validUntil);
+    const ue = vud ? (sixMo<vud?sixMo:vud) : sixMo;
+    const now = new Date(); now.setHours(0,0,0,0);
+    const ud = Math.round((ue-now)/86400000);
+    if (ud <= 60) issues.push(ud<=30?`🔴 User validity expires in ${ud}d`:`🟡 User validity expires in ${ud}d`);
+  }
+  const hk = (cur.holderName||'').trim().toLowerCase();
+  const sm = hk ? (data.schengen?.persons||[]).find(p=>(p.name||'').trim().toLowerCase()===hk) : null;
+  if (sm && !sm.passports?.[sm.activePassport||0]?.eu) {
+    const {days:su} = calcSchengenDays(sm.log);
+    const sr = 90-su;
+    if (sr <= 45) issues.push(sr<=0?`🔴 Schengen OVERSTAY by ${Math.abs(sr)}d`:sr<=20?`🔴 Schengen ${sr}d remaining`:`🟡 Schengen ${sr}d remaining`);
+  }
+  if (!issues.length) return '';
+  const hasRed = issues.some(i=>i.startsWith('🔴'));
+  return `<div style="margin-bottom:10px;padding:10px 14px;background:${hasRed?'rgba(239,68,68,.08)':'rgba(245,158,11,.08)'};border:1.5px solid ${hasRed?'#EF4444':'#F59E0B'};border-radius:10px;font-size:13px;color:${hasRed?'#EF4444':'#D97706'};font-weight:600">${issues.join(' · ')}</div>`;
+}
+function renderTLCurrentUser(cur) {
+  const startDate = parseTLDate(cur.userStartDate||cur.issueDate||cur.validFrom||'');
+  const vud = parseTLDate(cur.validUntil);
+  let expiryStr = '—';
+  if (startDate) {
+    const sixMo = new Date(startDate); sixMo.setDate(sixMo.getDate()+180);
+    expiryStr = tlFmtDate(vud ? (sixMo<vud?sixMo:vud) : sixMo);
+  }
+  return `<div style="margin-bottom:10px;background:rgba(245,158,11,.08);border:1.5px solid #F59E0B;border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:11px;font-weight:700;color:#D97706;margin-bottom:2px">Current User</div>
+      <div style="font-size:15px;font-weight:700;color:var(--label)">${esc(cur.holderName||'—')}</div>
+      <div style="font-size:12px;color:var(--label3);margin-top:2px">Valid until ${esc(expiryStr)}</div>
+    </div>
+    <button onclick="showTLChangeUser()" style="background:#F59E0B;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;white-space:nowrap">Change user →</button>
+  </div>`;
+}
+function renderTLFreezeLog(cur) {
+  const fl = (cur.freezeLog||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const dotColor = {issued:'#9ca3af',hauled:'#3B82F6',relaunched:'#22C55E',userChanged:'#F59E0B'};
+  const typeLabel = {issued:'Issued',hauled:'Hauled out',relaunched:'Relaunched',userChanged:'User changed'};
+  const rows = fl.map((e,i) => {
+    const dot = dotColor[e.type]||'#9ca3af';
+    const isLast = i === fl.length-1;
+    return `<div style="display:flex;align-items:flex-start;gap:10px">
+      <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;padding-top:2px">
+        <div style="width:11px;height:11px;border-radius:50%;background:${dot}"></div>
+        ${isLast?'':'<div style="width:2px;flex:1;min-height:18px;background:var(--sep);margin:2px 0"></div>'}
+      </div>
+      <div style="flex:1;min-width:0;padding-bottom:${isLast?'0':'10px'}">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:700;color:${dot}">${esc(typeLabel[e.type]||e.type)}</span>
+          <span style="font-size:12px;color:var(--label3)">${esc(fmtDateEU(e.date))}</span>
+          ${e.location?`<span style="font-size:12px;color:var(--label2)">· ${esc(e.location)}</span>`:''}
+        </div>
+        ${e.notes?`<div style="font-size:12px;color:var(--label3);margin-top:1px">${esc(e.notes)}</div>`:''}
+      </div>
+      <button onclick="showEditFreezeEntry('${e.id}')" style="background:none;border:none;padding:4px 2px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✏️</button>
+    </div>`;
+  }).join('');
+  return `<div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px">
+      <span style="font-size:14px;font-weight:700">⏱ Freeze / Relaunch History</span>
+      <button class="btn btn-s btn-sm" onclick="showAddFreezeEntry()">+ Add</button>
+    </div>
+    <div style="border-top:1px solid var(--sep);padding:10px 16px">
+      ${fl.length===0?`<div style="text-align:center;padding:12px 0;color:var(--label3);font-size:13px">No entries — add haul-out dates and user changes here</div>`:rows}
+    </div>
+  </div>`;
+}
+
 function renderTransitLog() {
   try { return _renderTransitLog(); } catch(e) { console.error('renderTransitLog:', e); return `<div style="padding:20px;color:var(--red);font-size:13px">Transit Log error: ${esc(e.message)}<br><small style="color:var(--label3)">${esc(e.stack||'')}</small></div>`; }
 }
@@ -5163,7 +5343,6 @@ function _renderTransitLog() {
   const archived = Object.entries(wd.logs)
     .filter(([id,l])=>l.archived)
     .sort((a,b)=>b[1].season.localeCompare(a[1].season));
-
   const pastRows = archived.map(([id,l])=>{
     const dates = [l.validFrom, l.validUntil].filter(Boolean).join('–');
     const note = (l.otherNotes||l.docNumber||'');
@@ -5175,12 +5354,15 @@ function _renderTransitLog() {
       <button onclick="event.stopPropagation();showEditArchivedTL('${id}')" style="background:none;border:none;padding:4px 5px;cursor:pointer;font-size:13px;color:var(--label3);flex-shrink:0">✏️</button>
     </div>`;
   }).join('');
-
   const pastSection = archived.length
     ? `<div class="sec-hd">Past transit logs</div><div class="card">${pastRows}</div>`
     : '';
 
   return activeHdr
+    + renderTLGauges(cur)
+    + renderTLAlertBar(cur)
+    + renderTLCurrentUser(cur)
+    + renderTLFreezeLog(cur)
     + tlSection(1,'📋 Document Info',s1)
     + tlSection(2,'🚢 Vessel & Owner',s2)
     + tlSection(3,'🛂 Port Stamps (Δελτίο Κίνησης)',renderTLStamps(cur,false))
@@ -5269,6 +5451,101 @@ function deleteArchivedTL(logId) {
   delete wd.logs[logId];
   if (ui.tlDetailId === logId) ui.tlDetailId = null;
   save(); document.getElementById('mainContent').innerHTML=renderDocuments();
+}
+
+function showAddFreezeEntry() {
+  showModal('Add Entry', `
+    <div class="mi-label">Type</div>
+    <select class="mi" id="fe-type">
+      <option value="issued">Issued</option>
+      <option value="hauled">Hauled out</option>
+      <option value="relaunched">Relaunched</option>
+      <option value="userChanged">User changed</option>
+    </select>
+    <div class="mi-label">Date</div>
+    <input class="mi" id="fe-date" type="date" value="${new Date().toISOString().slice(0,10)}">
+    <div class="mi-label">Location</div>
+    <input class="mi" id="fe-loc" placeholder="e.g. Kilada Marina">
+    <div class="mi-label">Notes</div>
+    <input class="mi" id="fe-notes" placeholder="Optional">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveFreezeEntry()">Add</button>
+    </div>`);
+}
+function saveFreezeEntry() {
+  const wd=getTLData(), log=wd.logs[wd.currentLog]; if (!log) return;
+  if (!log.freezeLog) log.freezeLog=[];
+  log.freezeLog.push({id:uid(), type:document.getElementById('fe-type').value,
+    date:document.getElementById('fe-date').value, location:document.getElementById('fe-loc').value,
+    notes:document.getElementById('fe-notes').value});
+  save(); hideModal(); document.getElementById('mainContent').innerHTML=renderDocuments();
+}
+function showEditFreezeEntry(id) {
+  const wd=getTLData(), log=wd.logs[wd.currentLog]; if (!log) return;
+  const e=(log.freezeLog||[]).find(x=>x.id===id); if (!e) return;
+  showModal('Edit Entry', `
+    <div class="mi-label">Type</div>
+    <select class="mi" id="fe-type">
+      <option value="issued" ${e.type==='issued'?'selected':''}>Issued</option>
+      <option value="hauled" ${e.type==='hauled'?'selected':''}>Hauled out</option>
+      <option value="relaunched" ${e.type==='relaunched'?'selected':''}>Relaunched</option>
+      <option value="userChanged" ${e.type==='userChanged'?'selected':''}>User changed</option>
+    </select>
+    <div class="mi-label">Date</div>
+    <input class="mi" id="fe-date" type="date" value="${esc(e.date||'')}">
+    <div class="mi-label">Location</div>
+    <input class="mi" id="fe-loc" value="${esc(e.location||'')}" placeholder="e.g. Kilada Marina">
+    <div class="mi-label">Notes</div>
+    <input class="mi" id="fe-notes" value="${esc(e.notes||'')}" placeholder="Optional">
+    <div class="modal-btns">
+      <button onclick="if(confirm('Delete this entry?')){hideModal();deleteFreezeEntry('${id}')}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:10px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">🗑 Delete</button>
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveEditFreezeEntry('${id}')">Save</button>
+    </div>`);
+}
+function saveEditFreezeEntry(id) {
+  const wd=getTLData(), log=wd.logs[wd.currentLog]; if (!log) return;
+  const e=(log.freezeLog||[]).find(x=>x.id===id); if (!e) return;
+  e.type=document.getElementById('fe-type').value;
+  e.date=document.getElementById('fe-date').value;
+  e.location=document.getElementById('fe-loc').value;
+  e.notes=document.getElementById('fe-notes').value;
+  save(); hideModal(); document.getElementById('mainContent').innerHTML=renderDocuments();
+}
+function deleteFreezeEntry(id) {
+  const wd=getTLData(), log=wd.logs[wd.currentLog]; if (!log) return;
+  log.freezeLog=(log.freezeLog||[]).filter(x=>x.id!==id);
+  save(); document.getElementById('mainContent').innerHTML=renderDocuments();
+}
+function showTLChangeUser() {
+  showModal('Change User', `
+    <div class="mi-label">New Holder / User Name</div>
+    <input class="mi" id="cu-name" placeholder="Full name" autofocus>
+    <div class="mi-label">Date of Change</div>
+    <input class="mi" id="cu-date" type="date" value="${new Date().toISOString().slice(0,10)}">
+    <div class="mi-label">Fee Paid</div>
+    <input class="mi" id="cu-fee" value="€30" placeholder="€30">
+    <div class="mi-label">Notes</div>
+    <input class="mi" id="cu-notes" placeholder="Optional">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveTLChangeUser()">Save</button>
+    </div>`);
+}
+function saveTLChangeUser() {
+  const wd=getTLData(), log=wd.logs[wd.currentLog]; if (!log) return;
+  const name=document.getElementById('cu-name').value.trim();
+  if (!name) { showToast('Enter the new user name', true); return; }
+  const date=document.getElementById('cu-date').value;
+  const fee=document.getElementById('cu-fee').value||'€30';
+  const notes=document.getElementById('cu-notes').value;
+  if (!log.freezeLog) log.freezeLog=[];
+  log.freezeLog.push({id:uid(), type:'userChanged', date, location:'',
+    notes:`Changed to ${name} · ${fee}${notes?' · '+notes:''}`});
+  log.holderName=name;
+  log.userStartDate=date;
+  save(); hideModal(); document.getElementById('mainContent').innerHTML=renderDocuments();
 }
 
 function prefillCustomsOwnerData() {
