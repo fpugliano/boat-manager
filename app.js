@@ -1764,6 +1764,52 @@ function deleteSchedHistEntry(taskId, eid, idx) {
   document.getElementById('mainContent').innerHTML = renderMaintenance();
 }
 
+function renderMaintGauges() {
+  const log      = getMaintLog();
+  const eids     = getEngines();
+  const curHours = eids.length ? Math.max(...eids.map(eid => data.maintenance?.engines?.[eid]?.hours || 0)) : 0;
+
+  function lastH(...tasks) {
+    const entries = log.filter(e => tasks.includes(e.task));
+    if (!entries.length) return null;
+    return Math.max(...entries.map(e => parseFloat(e.hours) || 0));
+  }
+
+  function gauge(title, lastHours, interval, greenT, amberT) {
+    const due     = lastHours !== null ? lastHours + interval : null;
+    const rem     = due !== null ? due - curHours : null;
+    const overdue = rem !== null && rem <= 0;
+    const pct     = rem === null ? 0 : overdue ? 1 : Math.min(1, rem / interval);
+    const color   = rem === null  ? '#9ca3af'
+                  : rem >= greenT ? '#22C55E'
+                  : rem >= amberT ? '#F59E0B'
+                  : '#EF4444';
+    const num      = rem === null ? '—' : String(Math.max(0, Math.round(rem)));
+    const dueLabel = due !== null ? `Due: ${Math.round(due)}h` : 'No data';
+    const L      = 163; // π × r(52)
+    const offset = Math.round(L * (1 - pct));
+    return `
+      <div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px 10px;text-align:center">
+        <div style="font-size:10px;font-weight:700;color:var(--label2);line-height:1.3;margin-bottom:4px">${title}</div>
+        <svg viewBox="0 0 130 82" style="width:100%;display:block">
+          <path d="M 13 72 A 52 52 0 0 1 117 72" fill="none" stroke="#e5e7eb" stroke-width="10" stroke-linecap="round"/>
+          <path d="M 13 72 A 52 52 0 0 1 117 72" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${L}" stroke-dashoffset="${offset}"/>
+          <text x="65" y="55" text-anchor="middle" font-size="22" font-weight="800" fill="${color}" font-family="var(--font)">${num}</text>
+          <text x="65" y="70" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="var(--font)">hrs left</text>
+        </svg>
+        <div style="font-size:11px;color:var(--label3);margin-top:-2px">${dueLabel}</div>
+      </div>`;
+  }
+
+  return `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      ${gauge('Engine Oil + Filter', lastH('Engine oil change'), 150, 50, 20)}
+      ${gauge('Gear Oil', lastH('Gear oil change'), 150, 50, 20)}
+      ${gauge('Fuel Filters', lastH('Diesel fuel filter change', 'Diesel fuel filter change — Primary (Racor)'), 250, 80, 30)}
+      ${gauge('Lip Seal', lastH('Saildrive lip seal replacement'), 800, 200, 100)}
+    </div>`;
+}
+
 function renderMaintenance() {
   const isCat = data.meta.hullType === 'catamaran';
   const eids  = getEngines();
@@ -1849,7 +1895,7 @@ function renderMaintenance() {
       <table class="tbl"><thead><tr><th>#</th><th>Date</th><th>Hours</th><th>Task</th><th>Cost</th><th>Notes</th><th></th></tr></thead>
       <tbody>${logRows}</tbody></table>
     </div></div>`;
-  return hoursHtml + comingUpHtml + logHtml;
+  return hoursHtml + renderMaintGauges() + comingUpHtml + logHtml;
 }
 
 function setHours(eid, val) {
