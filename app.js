@@ -10,7 +10,7 @@ const VERIFY_KEY   = 'bm_verify';     // encrypted canary for password verificat
 const ATTEMPTS_KEY = 'bm_attempts';   // {count, lockUntil}
 const BACKUP_TS    = 'bm_last_backup';// timestamp of last manual backup
 const logoSrc = (typeof OROBORO_LOGO !== 'undefined') ? OROBORO_LOGO : '';
-const STORAGE_WORKER_URL = 'https://boat-manager-storage.[WORKER-URL].workers.dev';
+const STORAGE_WORKER_URL = (typeof OWNER_STORAGE_URL !== 'undefined') ? OWNER_STORAGE_URL : '';
 const EMAIL_KEY     = 'bm_email';
 const HINT_KEY      = 'bm_hint';
 const UPGRADES_DATA_VERSION = 2;
@@ -3276,16 +3276,11 @@ function prefillLpgData() {
   if (!data.lpg) data.lpg = {};
   const dAgo = n => { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); };
   if (email === OWNER_EMAIL) {
-    data.lpg = {bottles:[
-      {id:'b1', kg:11, full:true},
-      {id:'b2', kg:11, full:false},
-      {id:'b3', kg:11, full:false}
-    ], history:[
-      {id:'lpg001', date:'2026-06-01', location:'Syros',  bottles:2, kg:11, pricePerKg:2.10, notes:''},
-      {id:'lpg002', date:'2026-04-15', location:'Kilada', bottles:3, kg:11, pricePerKg:1.85, notes:''},
-      {id:'lpg003', date:'2025-08-22', location:'Paros',  bottles:2, kg:11, pricePerKg:1.60, notes:''},
-      {id:'lpg004', date:'2025-06-10', location:'Leros',  bottles:2, kg:11, pricePerKg:1.20, notes:''}
-    ]};
+    const odLpg = (typeof OROBORO_DATA !== 'undefined') ? (OROBORO_DATA.lpg || {}) : {};
+    data.lpg = {
+      bottles: odLpg.bottles || [{id:'b1',kg:11,full:true},{id:'b2',kg:11,full:false},{id:'b3',kg:11,full:false}],
+      history: odLpg.history || []
+    };
   } else {
     data.lpg = {bottles:[
       {id:uid(), kg:11, full:true},
@@ -3886,32 +3881,15 @@ function prefillShipyardData() {
 function prefillSchengenData() {
   const email = localStorage.getItem(EMAIL_KEY);
   if (email === OWNER_EMAIL) {
-    // Owner: seed Francesco + Yuka with real data
     const fp = data.schengen?.persons?.[0];
     const euOk = fp?.passports?.some(pp => pp.flag === '🇪🇺' && pp.eu === true);
     const usOk = fp?.passports?.some(pp => pp.flag === '🇺🇸' && pp.eu === false);
     if (fp?.name && euOk && usOk) return false;
-    data.schengen = { persons: [
-      { name:'Francesco', activePassport:0,
-        passports:[
-          {flag:'🇺🇸', country:'United States',  eu:false},
-          {flag:'🇪🇺', country:'European Union', eu:true},
-          {flag:'🇯🇵', country:'Japan',          eu:false}
-        ],
-        log:[
-          {id:uid(), type:'in',  date:'2025-10-15', passport:'🇺🇸', location:'Greece (Kilada)'},
-          {id:uid(), type:'out', date:'2026-01-26', passport:'',    location:'Turkey (Didim)'},
-          {id:uid(), type:'in',  date:'2026-04-24', passport:'🇺🇸', location:'Greece (Syros)'}
-        ]
-      },
-      { name:'Yuka', activePassport:0,
-        passports:[
-          {flag:'🇺🇸', country:'United States', eu:false},
-          {flag:'🇯🇵', country:'Japan',         eu:false}
-        ],
-        log:[]
-      }
-    ]};
+    const odPersons = (typeof OROBORO_DATA !== 'undefined') ? (OROBORO_DATA.schengen?.persons || []) : [];
+    if (!odPersons.length) return false;
+    data.schengen = { persons: odPersons.map(p => ({
+      ...p, log: (p.log || []).map(e => ({...e, id:uid()}))
+    }))};
     return true;
   }
   // Non-owner: seed example travellers if empty
@@ -4168,63 +4146,11 @@ function getUpgradesData() {
   if (!data.upgrades || !data.upgrades.seasons || (isOwner && data.upgrades.seasons.length < 5)) {
     const mk = (text, cost, done) => ({id:uid(), text, cost:cost||'', checked:!!done});
     if (isOwner) {
-      data.upgrades = { version: UPGRADES_DATA_VERSION, seasons:[
-        {id:uid(), name:'2022/2023', location:'Didim', items:[
-          mk('Flexible solar panel replaced','',true),
-          mk('Fixed gelcoat under soft solar panel','',true),
-          mk('Painted antifouling on hulls','',true)
-        ]},
-        {id:uid(), name:'2023/2024', location:'Kilada', items:[
-          mk('Saloon big stbd window panel replaced','',true),
-          mk('Anchor winch motor rebuild','',true),
-          mk('Yanmar engine alternators rebuild','',true),
-          mk('New helm station dodger cover','',true),
-          mk('New jib sheets green and red','',true),
-          mk('New anchor chain from Italy','',true),
-          mk('Saildrive shafts stbd and port replaced','',true)
-        ]},
-        {id:uid(), name:'2024/2025', location:'Leros', items:[
-          mk('Upgraded saloon cushions sponges','',true),
-          mk('Placed a new water inlet/outlet port','',true),
-          mk('Replaced trampoline line','',true),
-          mk('Placed new water tank gauges','',true),
-          mk('Replaced the water heaters','',true),
-          mk('Fixed stbd hull gelcoat from the accident Nisiros','',true),
-          mk('Fixed small gelcoat holes','',true),
-          mk('Replaced saloon small port window panel','',true),
-          mk('Fixed some stitches on the jib','',true),
-          mk('Repainted keel with sika','',true),
-          mk('Stainless solar panel scratch brushed up','',true),
-          mk('Saildrive paint','',true),
-          mk('Changed solenoid Lewmar winch port side','',true),
-          mk('Changed foot step of Lewmar winch port side','',true),
-          mk('Added extra 200Ah lithium battery and hub','',true),
-          mk('Painted the bathroom door frame (humidity damage from winter in marina)','',true)
-        ]},
-        {id:uid(), name:'2025/2026', location:'Kilada', items:[
-          mk('Watermaker cylinder replaced','',false),
-          mk('Port head door squeaking issue fixed','',false),
-          mk('Port rudder housing and ball replaced','',false),
-          mk('Repainted antifouling on hulls','',false),
-          mk('New bridal','',false),
-          mk('All hatch frames sandblasting and repainted','',false),
-          mk('Dinghy air hole leak patched','',false),
-          mk('Sailpack zipper replaced','',false),
-          mk('New fridge and housing structure added','',false),
-          mk('Stern shore line reels rebuilt and painted','',false),
-          mk('Dinghy davit motor cleaned','',false),
-          mk('Top starboard deck sika patched','',false),
-          mk('Flexible solar panels replaced (warranty)','',false),
-          mk('Flexible solar panel gelcoat patched','',false),
-          mk('Regluing the starboard aft window panel','',false),
-          mk('Engine gauge replaced','',false),
-          mk('Water heaters replaced under warranty','',false)
-        ]},
-        {id:uid(), name:'2026/2027', location:'', items:[
-          mk('Top deck sika replaced','',false),
-          mk('Aft dodger cover replaced','',false)
-        ]}
-      ]};
+      const odSeasons = (typeof OROBORO_DATA !== 'undefined') ? (OROBORO_DATA.upgrades?.seasons || []) : [];
+      data.upgrades = { version: UPGRADES_DATA_VERSION, seasons: odSeasons.map(s => ({
+        id: uid(), name: s.name, location: s.location,
+        items: (s.items || []).map(i => mk(i.text, i.cost, i.checked))
+      }))};
     } else {
       data.upgrades = { version: UPGRADES_DATA_VERSION, seasons:[
         {id:uid(), name:'2024/2025', location:'Example Marina', items:[
@@ -5471,21 +5397,22 @@ function deleteArchivedTL(logId) {
 function prefillCustomsOwnerData() {
   if (localStorage.getItem(EMAIL_KEY) !== OWNER_EMAIL) return false;
   if (!data.documents?.customs) return false;
+  const src = (typeof OROBORO_DATA !== 'undefined') ? (OROBORO_DATA.documents?.customs || {}) : {};
   const C = data.documents.customs;
   let dirty = false;
-  const f = (k, v) => { if (!C[k]) { C[k] = v; dirty = true; } };
-  f('applicationNumber', '795910');
-  f('applicationDate',   '20/04/2026');
-  f('entryDate',         '24/04/2026');
-  f('year',              '2026');
-  f('monthsCovered',     'April,May,June,July,August,September,October');
-  f('amountPaid',        '€231.00');
-  f('paymentCode',       '[PAYCODE-REMOVED]');
-  f('adminFeeCode',      '[FEECODE-REMOVED]');
-  f('status',            'New');
-  f('ownerPassportNumber','[PASSPORT-REMOVED]');
-  f('ownerPhone',        '[PHONE-REMOVED]');
-  f('ownerAddress',      '[ADDRESS-REMOVED]');
+  const f = (k, v) => { if (!C[k] && v) { C[k] = v; dirty = true; } };
+  f('applicationNumber',  src.applicationNumber);
+  f('applicationDate',    src.applicationDate);
+  f('entryDate',          src.entryDate);
+  f('year',               src.year);
+  f('monthsCovered',      src.monthsCovered);
+  f('amountPaid',         src.amountPaid);
+  f('paymentCode',        src.paymentCode);
+  f('adminFeeCode',       src.adminFeeCode);
+  f('status',             src.status || 'New');
+  f('ownerPassportNumber',src.ownerPassportNumber);
+  f('ownerPhone',         src.ownerPhone);
+  f('ownerAddress',       src.ownerAddress);
   return dirty;
 }
 
@@ -5494,27 +5421,24 @@ function prefillTransitLog() {
   const wd = getTLData();
   const log = wd.logs[wd.currentLog];
   if (!log || log.archived || log.docNumber) return false;
+  const src = (typeof OROBORO_DATA !== 'undefined') ? (OROBORO_DATA.transitLog || {}) : {};
   let dirty = false;
-  const f = (k,v) => { if (!log[k]) { log[k]=v; dirty=true; } };
-  f('docNumber','[DOCNUM-REMOVED]'); f('issueDate','05/05/2025');
-  f('validFrom','05/05/2025');         f('validUntil','04/11/2026');
-  f('customsAuthority','GR001236 PATMOS'); f('validityType','Limited (Ορισμένη)');
-  f('prevDocCount','0');
-  f('vesselName','OROBORO');           f('flag','US');
-  f('portOfRegistry','San Francisco'); f('regNumber','1290676');
-  f('callSign','[CALLSIGN-REMOVED]');            f('vesselType','Sail Yacht');
-  f('gt','28');                        f('engine','Yanmar 30hp Diesel');
-  f('loa','11.9m');                    f('yearBuilt','2018');
-  f('yearFirstReg','2018');            f('ownerName','[NAME-REMOVED]');
-  f('holderName','[NAME-REMOVED]'); f('address','[ADDRESS-REMOVED]');
-  f('telephone','0');                  f('email',OWNER_EMAIL);
-  f('afm','[AFM-REMOVED]');          f('idNumber','30');
-  if (!log.stamps.length) {
-    log.stamps = [
-      {id:uid(), date:'2026-05-07', port:'Porto Heli', type:'Arrival',   authority:'Syros Coast Guard', notes:''},
-      {id:uid(), date:'2026-05-09', port:'Paros',      type:'Departure', authority:'Syros Coast Guard', notes:''},
-      {id:uid(), date:'2026-05-27', port:'Syros',      type:'Departure', authority:'Syros Coast Guard', notes:'To Didim/Turkey'}
-    ];
+  const f = (k,v) => { if (!log[k] && v) { log[k]=v; dirty=true; } };
+  f('docNumber',        src.docNumber);        f('issueDate',     src.issueDate);
+  f('validFrom',        src.validFrom);        f('validUntil',    src.validUntil);
+  f('customsAuthority', src.customsAuthority); f('validityType',  'Limited (Ορισμένη)');
+  f('prevDocCount',     '0');
+  f('vesselName',       src.vesselName);       f('flag',          src.flag || 'US');
+  f('portOfRegistry',   src.portOfRegistry);   f('regNumber',     src.regNumber);
+  f('callSign',         src.callSign);         f('vesselType',    src.vesselType || 'Sail Yacht');
+  f('gt',               src.gt);              f('engine',         src.engine);
+  f('loa',              src.loa);             f('yearBuilt',      src.yearBuilt);
+  f('yearFirstReg',     src.yearFirstReg);    f('ownerName',      src.ownerName);
+  f('holderName',       src.holderName);      f('address',        src.address);
+  f('telephone',        src.telephone || '0'); f('email',         OWNER_EMAIL);
+  f('afm',              src.afm);             f('idNumber',       src.idNumber);
+  if (!log.stamps.length && src.stamps?.length) {
+    log.stamps = src.stamps.map(s => ({...s, id:uid()}));
     dirty = true;
   }
   return dirty;
@@ -6295,7 +6219,7 @@ function showPrivacyPolicy() {
       <b>How data is stored</b><br>All data is AES-256 encrypted on your device before transmission. The encryption key is derived from your PIN and never leaves your device.<br><br>
       <b>Who can access your data</b><br>Only you with your PIN.<br><br>
       <b>Your GDPR rights</b><br>Access, deletion, and portability — all available in Settings.<br><br>
-      <b>Contact:</b> [EMAIL-REMOVED]@gmail.com
+      <b>Contact:</b> ${typeof OWNER_EMAIL !== 'undefined' ? OWNER_EMAIL : ''}
     </p>
     <button onclick="document.getElementById('ppOverlay').remove()" style="width:100%;padding:14px;background:#185FA5;color:white;border:none;border-radius:12px;font-size:16px;font-weight:500;margin-top:16px;cursor:pointer;">Close</button>
   </div>`;
