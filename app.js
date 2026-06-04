@@ -3716,14 +3716,21 @@ function prefillNewUserSampleData() {
   }
 
   // ── Schengen ──
-  // entry dAgo(50) + exit dAgo(6) → Math.round(44 days)+1 = 45 days used
+  // Demonstrates the rolling 180-day window: Dec–Feb (60d) + Mar–Apr (30d) = 90d limit,
+  // then a Jun entry that is an overstay. Dates are anchored to current year at runtime.
   if (!data.schengen?.persons?.some(p => p.name)) {
+    const yr = new Date().getFullYear();
+    const dt = (y, m, d) => `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     data.schengen = {persons:[{
-      name:'Example Crew Member', activePassport:0,
+      name:'Test Traveler', activePassport:0,
       passports:[{flag:'🇺🇸', country:'United States', eu:false}],
       log:[
-        {id:uid(), type:'in',  date:dAgo(50), passport:'🇺🇸', location:'Greece (Example port)'},
-        {id:uid(), type:'out', date:dAgo(6),  passport:'',    location:'Turkey (Example port)'},
+        {id:uid(), type:'in',  date:dt(yr-1,12,10), passport:'🇺🇸', location:'Gibraltar'},
+        {id:uid(), type:'out', date:dt(yr,2,7),      passport:'',    location:'Gibraltar',          notes:'60 days — fine so far'},
+        {id:uid(), type:'in',  date:dt(yr,3,20),     passport:'🇺🇸', location:'Palma de Mallorca'},
+        {id:uid(), type:'out', date:dt(yr,4,19),     passport:'',    location:'Palma de Mallorca', notes:'30 days — 90 days total used in rolling window'},
+        {id:uid(), type:'in',  date:dt(yr,6,4),      passport:'🇺🇸', location:'Sardinia',          notes:'Overstay — rolling 180-day window already has 90 days used'},
+        {id:uid(), type:'out', date:dt(yr,6,18),     passport:'',    location:'Sardinia',           notes:'14 days overstay'},
       ]
     }]};
     dirty = true;
@@ -5558,6 +5565,15 @@ async function createPIN() {
     const key  = await deriveKey(pin, salt);
     cryptoKey  = key;
     localStorage.setItem(VERIFY_KEY, await aesEncrypt(key, 'BM_VERIFIED'));
+    try { prefillNewUserSampleData(); } catch(e) { console.warn('prefillNewUser', e); }
+    try { prefillCustomsOwnerData();  } catch(e) { console.warn('prefillCustoms', e); }
+    try { prefillTransitLog();        } catch(e) { console.warn('prefillTransitLog', e); }
+    try { prefillUpgradesData();      } catch(e) { console.warn('prefillUpgrades', e); }
+    try { prefillSchengenData();      } catch(e) { console.warn('prefillSchengen', e); }
+    try { prefillShipyardData();      } catch(e) { console.warn('prefillShipyard', e); }
+    try { prefillWatermakerData();    } catch(e) { console.warn('prefillWatermaker', e); }
+    try { prefillLpgData();           } catch(e) { console.warn('prefillLpg', e); }
+    try { prefillProvisionsData();    } catch(e) { console.warn('prefillProvisions', e); }
     await save();
     pushToCloud();
     startActivityTracking();
