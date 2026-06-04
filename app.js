@@ -2098,7 +2098,7 @@ function renderSchengenPersonStatus(p, idx) {
   const lastLogEntry = [...(p.log||[])].sort((a,b)=>a.date.localeCompare(b.date)).pop();
   const borderRight = idx === 0 ? 'border-right:1px solid var(--sep);' : '';
   const passportBtns = (p.passports||[]).map((pp, pi) => {
-    const CC = {'European Union':'EU','United States':'US','Japan':'JP','United Kingdom':'GB','Australia':'AU'};
+    const CC = {'European Union':'EU','United States':'US','Japan':'JP','United Kingdom':'UK','Australia':'AU','New Zealand':'NZ','Canada':'CA'};
     const label = [pp.flag, pp.country ? (CC[pp.country] || pp.country.slice(0,2).toUpperCase()) : ''].filter(Boolean).join(' ') || '?';
     const active = pi === activePassIdx;
     return `<button onclick="setSchengenPassport(${idx},${pi})" style="background:${active?'var(--blue)':'var(--surface2)'};color:${active?'#fff':'var(--label)'};border:1.5px solid ${active?'var(--blue)':'var(--sep)'};border-radius:8px;padding:3px 6px;font-size:11px;cursor:pointer;line-height:1.4;font-family:var(--font);white-space:nowrap">${label}</button>`;
@@ -2108,7 +2108,7 @@ function renderSchengenPersonStatus(p, idx) {
     : `<span style="background:${inStatus?'var(--green)':'var(--sep)'};color:${inStatus?'#fff':'var(--label2)'};font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">${inStatus?'In Schengen':'Outside'}</span>`;
   const seamanWarning = seamanActive ? `<div style="margin:6px 0 8px;padding:8px 10px;background:rgba(245,158,11,.12);border:1px solid #F59E0B;border-radius:8px">
     <div style="font-size:11px;font-weight:700;color:#D97706;margin-bottom:2px">Register passport entry before flying</div>
-    <div style="font-size:11px;color:#D97706">You entered Greece on a Seaman's Book. Visit customs/immigration to add a passport entry stamp before departing by air.</div>
+    <div style="font-size:11px;color:#D97706">You entered Greece on a Seaman's Book. Visit immigration to add a passport entry stamp before departing by air.</div>
   </div>` : '';
   return `<div style="padding:14px 10px;min-width:0;overflow:hidden;${borderRight}">
     <div style="font-size:13px;font-weight:700;margin-bottom:6px">${esc(p.name||'—')}</div>
@@ -2281,7 +2281,7 @@ function showSchengenCheckIn(personIdx) {
           <div style="font-size:11px;color:var(--label3);margin-top:1px">Greece only · does not count Schengen days</div>
         </div>
       </label>
-      <div id="sch-seaman-warn" style="display:none;margin-top:8px;padding:8px 10px;background:rgba(245,158,11,.12);border:1px solid #F59E0B;border-radius:8px;font-size:12px;color:#D97706;font-weight:500">⚠ Before flying out of Greece, visit customs/immigration to register a passport entry stamp.</div>
+      <div id="sch-seaman-warn" style="display:none;margin-top:8px;padding:8px 10px;background:rgba(245,158,11,.12);border:1px solid #F59E0B;border-radius:8px;font-size:12px;color:#D97706;font-weight:500">⚠ Before flying out of Greece, visit immigration to register a passport entry stamp.</div>
     </div>
     <div class="mi-label">Location / Country</div><input class="mi" id="sch-loc" placeholder="e.g. Greece (Athens)">
     <div class="modal-btns">
@@ -2440,6 +2440,29 @@ function schAddPassport(personIdx) {
   while (temp.firstChild) container.appendChild(temp.firstChild);
 }
 
+function schAddTraveller() {
+  const container = document.getElementById('sch-persons-container');
+  if (!container) return;
+  const i = _schPi.length;
+  _schPi.push(0);
+  const div = document.createElement('div');
+  div.style.cssText = 'background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:16px;margin-bottom:12px;overflow:hidden';
+  div.innerHTML = `
+    <div id="sch-namerow-${i}" style="display:none;align-items:center;gap:8px;margin-bottom:12px">
+      <span id="sch-namedisplay-${i}" style="font-size:16px;font-weight:700;flex:1;color:var(--label)">Person ${i+1}</span>
+      <button onclick="schEditName(${i})" style="background:none;border:none;cursor:pointer;font-size:15px;color:var(--label3);padding:2px 4px;font-family:var(--font)">✏️</button>
+    </div>
+    <div id="sch-nameedit-${i}" style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <input id="sch-nameinput-${i}" class="fi" style="flex:1;font-size:15px;font-weight:600" value="" placeholder="Person name">
+      <button onclick="schConfirmName(${i})" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--green);padding:2px 4px;font-family:var(--font);font-weight:700">✓</button>
+    </div>
+    <div style="font-size:12px;color:var(--label3);margin-bottom:8px">Passports <span style="font-style:italic">(tap to change)</span></div>
+    <div id="sch-passports-${i}"></div>
+    <button onclick="schAddPassport(${i})" style="font-size:13px;color:var(--blue);background:none;border:none;cursor:pointer;padding:4px 0;font-family:var(--font)">+ Add passport</button>`;
+  container.appendChild(div);
+  setTimeout(() => document.getElementById(`sch-nameinput-${i}`)?.focus(), 30);
+}
+
 function schRemovePassport(i, pi) {
   const row = document.getElementById(`sch-prow-${i}-${pi}`);
   const other = document.getElementById(`sch-pother-${i}-${pi}`);
@@ -2478,7 +2501,8 @@ function showSchengenEdit() {
       </div>`;
   }).join('');
   showModal('Edit Travellers', `
-    ${personsHtml}
+    <div id="sch-persons-container">${personsHtml}</div>
+    <button onclick="schAddTraveller()" style="font-size:14px;color:var(--blue);background:none;border:none;cursor:pointer;padding:8px 0 4px;font-family:var(--font);display:block;width:100%;text-align:left">+ Add traveller</button>
     <div class="modal-btns" style="margin-top:4px">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="saveSchengenEdit()">Save</button>
@@ -2508,6 +2532,26 @@ function saveSchengenEdit() {
     p.passports = newPassports;
     if ((p.activePassport||0) >= p.passports.length) p.activePassport = 0;
   });
+  for (let i = sd.persons.length; i < _schPi.length; i++) {
+    const nameInput = document.getElementById(`sch-nameinput-${i}`);
+    const name = (nameInput?.value || '').trim();
+    if (!name) continue;
+    const newPassports = [];
+    const total = _schPi[i];
+    for (let pi = 0; pi < total; pi++) {
+      const row = document.getElementById(`sch-prow-${i}-${pi}`);
+      if (!row || row.dataset.deleted === '1') continue;
+      const sel = document.getElementById(`sch-psel-${i}-${pi}`)?.value || 'other';
+      let pp;
+      if (sel === 'other') {
+        pp = {flag:'', country:document.getElementById(`sch-potherval-${i}-${pi}`)?.value.trim()||'', eu:document.getElementById(`sch-peu-${i}-${pi}`)?.checked||false};
+      } else {
+        pp = {...(SCHENGEN_PASSPORT_MAP[sel]||{flag:'', country:'', eu:false})};
+      }
+      newPassports.push(pp);
+    }
+    sd.persons.push({name, passports: newPassports, activePassport: 0, trips: []});
+  }
   schengenDedup(sd);
   save(); hideModal(); schengenRerender();
 }
@@ -5676,7 +5720,7 @@ function renderClearance() {
   if (boatDays!==null&&boatDays<=180) issues.push(boatDays<=90?`🔴 Boat TL ${boatDays}d`:`🟡 Boat TL ${boatDays}d`);
   if (userDays!==null&&userDays<=60)  issues.push(userDays<=30?`🔴 User ${userDays}d`:`🟡 User ${userDays}d`);
   if (etFuture<=3) issues.push(etFuture<=0?`🔴 eTEPAY expired`:`🟡 eTEPAY ${etFuture} month${etFuture!==1?'s':''}`);
-  if (seamanActive) issues.push(`🟡 Seaman's Book entry detected — visit customs before flying out of Greece`);
+  if (seamanActive) issues.push(`🟡 Seaman's Book entry detected — visit immigration before flying out of Greece`);
   else if (!isEU&&schRem!==null&&schRem<=45) issues.push(schRem<=0?`🔴 Schengen OVERSTAY ${Math.abs(schRem)}d`:schRem<=20?`🔴 Schengen ${schRem}d`:`🟡 Schengen ${schRem}d`);
   const alertBar = issues.length ? `<div style="margin-bottom:12px;padding:10px 14px;background:${isRed?'rgba(239,68,68,.08)':'rgba(245,158,11,.08)'};border:1.5px solid ${isRed?'#EF4444':'#F59E0B'};border-radius:10px;font-size:13px;color:${isRed?'#EF4444':'#D97706'};font-weight:600">${issues.join(' · ')}</div>` : '';
 
