@@ -6590,6 +6590,7 @@ function showPrivacyPolicy() {
       <b>Disclaimer</b><br>This app is provided as a tool to help you organise your boat management and track your Schengen days. It is not legal advice. Schengen rules are complex and subject to change — always verify your status with official sources before making entry decisions. The developer accepts no liability for overstays, fines, or legal consequences arising from use of this app.<br><br>
       <b>Contact:</b> ${typeof OWNER_EMAIL !== 'undefined' ? OWNER_EMAIL : ''}
     </p>
+    <p style="font-size:11px;color:#888;margin-top:8px;text-align:center">© 2024–2026 Francesco Pugliano. All rights reserved.</p>
     <button onclick="document.getElementById('ppOverlay').remove()" style="width:100%;padding:14px;background:#185FA5;color:white;border:none;border-radius:12px;font-size:16px;font-weight:500;margin-top:16px;cursor:pointer;">Close</button>
   </div>`;
   document.body.appendChild(div);
