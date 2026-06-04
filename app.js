@@ -405,7 +405,8 @@ function handleJsonImport(input) {
     try {
       const json = JSON.parse(e.target.result);
       if (typeof json !== 'object' || Array.isArray(json) || json === null) throw new Error('Expected a JSON object');
-      const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2','shipyard','systems','watermaker','lpg','provisions'];
+      console.log('IMPORT DEBUG:', Object.keys(json));
+      const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2','shipyard','systems','watermaker','lpg','provisions','schengen','winterization','upgrades'];
       if (!KNOWN.some(k => k in json)) throw new Error('No recognised fields found (expected: documents, crew, maintenance, transitLog, etc.)');
 
       // Handle maintenance separately — flat import format (engineHours, log[])
@@ -433,9 +434,39 @@ function handleJsonImport(input) {
         }
       }
 
+      // Handle schengen — merge persons by name, append unknown ones
+      if (json.schengen?.persons) {
+        if (!data.schengen) data.schengen = { persons: [] };
+        if (!Array.isArray(data.schengen.persons)) data.schengen.persons = [];
+        (json.schengen.persons || []).forEach(imp => {
+          const name = (imp.name || '').trim().toLowerCase();
+          const existing = name
+            ? data.schengen.persons.find(p => (p.name || '').trim().toLowerCase() === name)
+            : null;
+          if (existing) {
+            // Merge log entries — skip duplicates matched by type+date
+            const seen = new Set((existing.log || []).map(e => e.type + '|' + e.date));
+            (imp.log || []).forEach(e => {
+              if (!seen.has(e.type + '|' + e.date)) {
+                existing.log.push({ ...e, id: uid() });
+                seen.add(e.type + '|' + e.date);
+              }
+            });
+            // Merge passports — skip duplicates by flag
+            if (Array.isArray(imp.passports)) {
+              const existFlags = new Set((existing.passports || []).map(pp => pp.flag));
+              imp.passports.forEach(pp => { if (!existFlags.has(pp.flag)) existing.passports.push(pp); });
+            }
+          } else {
+            data.schengen.persons.push({ ...imp, log: (imp.log || []).map(e => ({ ...e, id: uid() })) });
+          }
+        });
+      }
+
       // Merge everything else (documents, crew, transitLog, spareParts, etc.)
       const rest = Object.assign({}, json);
       delete rest.maintenance;
+      delete rest.schengen;
       if (Object.keys(rest).length > 0) deepMerge(data, rest);
 
       await save();
@@ -3685,12 +3716,14 @@ function prefillNewUserSampleData() {
   }
 
   // ── Schengen ──
+  // entry dAgo(50) + exit dAgo(6) → Math.round(44 days)+1 = 45 days used
   if (!data.schengen?.persons?.some(p => p.name)) {
     data.schengen = {persons:[{
       name:'Example Crew Member', activePassport:0,
       passports:[{flag:'🇺🇸', country:'United States', eu:false}],
       log:[
-        {id:uid(), type:'in',  date:dAgo(45), passport:'🇺🇸', location:'Greece (Example port)'},
+        {id:uid(), type:'in',  date:dAgo(50), passport:'🇺🇸', location:'Greece (Example port)'},
+        {id:uid(), type:'out', date:dAgo(6),  passport:'',    location:'Turkey (Example port)'},
       ]
     }]};
     dirty = true;
