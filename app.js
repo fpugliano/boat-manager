@@ -147,12 +147,6 @@ function fmtDateEU(isoStr) {
   if (!d || isNaN(d)) return isoStr || '';
   return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
 }
-function fmtDateUS(isoStr) {
-  const d = parseISODate(isoStr);
-  if (!d || isNaN(d)) return isoStr || '';
-  return String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0') + '/' + d.getFullYear();
-}
-
 function daysUntil(dateStr) {
   if (!dateStr) return 9999;
   const d = parseISODate(dateStr) || new Date(dateStr);
@@ -182,26 +176,6 @@ function expiryBadge(dateStr, threshold=90) {
   return `<span class="badge ${cls}">${txt}</span>`;
 }
 
-function maintStatus(task, currentHours) {
-  const nextDue = task.lastDoneAt + task.interval;
-  const remaining = nextDue - currentHours;
-  if (remaining <= 0) return {color:'red', label:`${Math.abs(remaining)}h overdue`};
-  if (remaining <= task.interval * 0.2) return {color:'orange', label:`${remaining}h remaining`};
-  return {color:'green', label:`${remaining}h remaining`};
-}
-
-function calcSchengen(log) {
-  const now = new Date(); now.setHours(23,59,59,999);
-  const win = new Date(now); win.setDate(win.getDate()-180); win.setHours(0,0,0,0);
-  let days = 0;
-  (log||[]).forEach(e => {
-    const entry = parseISODate(e.entryDate); const exit = e.exitDate ? parseISODate(e.exitDate) : now;
-    const s = entry < win ? win : entry;
-    const end = exit > now ? now : exit;
-    if (s <= end) days += Math.ceil((end-s)/86400000)+1;
-  });
-  return days;
-}
 
 function initials(name) {
   return (name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
@@ -293,21 +267,6 @@ function saveField(path, value) {
 }
 
 // ── Encrypted export / import ──────────────────────────────────
-async function exportSection(section) {
-  if (!cryptoKey) return;
-  const payload = section === 'all' ? data : { [section]: data[section], meta: data.meta };
-  // Embed salt so import works cross-device with same password
-  const exportSalt = u8ToB64(b64ToU8(localStorage.getItem(SALT_KEY)));
-  const plaintext = JSON.stringify({ salt: exportSalt, payload });
-  const iv  = crypto.getRandomValues(new Uint8Array(12));
-  const ct  = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, cryptoKey, new TextEncoder().encode(plaintext));
-  const blob = new Blob([JSON.stringify({ iv: u8ToB64(iv), data: u8ToB64(new Uint8Array(ct)) })], { type:'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `BM_${section}_${new Date().toISOString().slice(0,10)}_enc.json`;
-  a.click();
-}
-
 function handleImport(input) {
   const file = input.files[0]; if (!file) return;
   const reader = new FileReader();
@@ -405,7 +364,6 @@ function handleJsonImport(input) {
     try {
       const json = JSON.parse(e.target.result);
       if (typeof json !== 'object' || Array.isArray(json) || json === null) throw new Error('Expected a JSON object');
-      console.log('IMPORT DEBUG:', Object.keys(json));
       const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2','shipyard','systems','watermaker','lpg','provisions','schengen','winterization','upgrades'];
       if (!KNOWN.some(k => k in json)) throw new Error('No recognised fields found (expected: documents, crew, maintenance, transitLog, etc.)');
 
@@ -1085,8 +1043,6 @@ function renderCrew() {
 
 function renderCrewCard(p, i) {
   const open = ui.crewOpen === p.id;
-  const sd = calcSchengen(p.schengenLog);
-  const sdColor = sd >= 90 ? 'red' : sd >= 75 ? 'orange' : 'green';
   const passExp = expiryBadge(p.passportExpiry, 180);
   const seamExp = expiryBadge(p.seamanBookExpiry, 180);
   return `
@@ -1098,7 +1054,6 @@ function renderCrewCard(p, i) {
           <div style="font-size:13px;color:var(--label3)">${esc(p.role)} · ${esc(p.nationality)}</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <span class="badge b-${sdColor}">${sd}d SCH</span>
           <span style="color:var(--label3)">${open?'▲':'▼'}</span>
         </div>
       </div>
@@ -1116,26 +1071,6 @@ function renderCrewCard(p, i) {
           ${frExpiry('crew.'+i+'.passportExpiry',p.passportExpiry,passExp,'Passport Expiry')}
           ${fr('Seaman Book No.','crew.'+i+'.seamanBookNumber',p.seamanBookNumber)}
           ${frExpiry('crew.'+i+'.seamanBookExpiry',p.seamanBookExpiry,seamExp,'Seaman Bk. Expiry')}
-        </div>
-        <div class="sec-hd" style="padding:0 16px">Schengen Log
-          <span class="badge b-${sdColor}" style="margin-left:8px">${sd} days used (180-day window)</span>
-        </div>
-        ${sd>=75?`<div class="tip" style="margin:0 16px 8px">⚠️ ${sd} Schengen days used. Limit is 90 in any 180-day rolling window. ${sd>=90?'<b>LIMIT REACHED.</b>':''}</div>`:''}
-        <div class="card" style="margin:0;border-radius:0;box-shadow:none">
-          <div class="card-hd" style="border-radius:0">Schengen Entries
-            <button class="card-hd-btn" onclick="showAddSchengen(${i})">+ Add</button>
-          </div>
-          <div style="overflow-x:auto">
-            <table class="tbl"><thead><tr><th>Entry</th><th>Exit</th><th>Country</th><th>Days</th><th></th></tr></thead>
-            <tbody>${(p.schengenLog||[]).map((e,j)=>`
-              <tr>
-                <td>${esc(fmtDateUS(e.entryDate))}</td><td>${e.exitDate?esc(fmtDateUS(e.exitDate)):'—'}</td>
-                <td>${esc(e.country)}</td>
-                <td>${e.exitDate?Math.ceil((parseISODate(e.exitDate)-parseISODate(e.entryDate))/86400000)+1:'ongoing'}</td>
-                <td><button class="btn btn-d btn-xs" onclick="removeSchengen(${i},${j})">✕</button></td>
-              </tr>`).join('') || '<tr><td colspan="5" style="color:var(--label3);padding:12px">No entries</td></tr>'}
-            </tbody></table>
-          </div>
         </div>
         <div class="btn-row">
           <button class="btn btn-d btn-sm" onclick="removeCrew(${i})">Remove ${esc(p.name)}</button>
@@ -1181,40 +1116,13 @@ function saveCrew() {
     dob: document.getElementById('m-dob').value,
     passportNumber: document.getElementById('m-pp').value,
     passportExpiry: '', seamanBookNumber: document.getElementById('m-sb').value,
-    seamanBookExpiry: '', schengenLog: []
+    seamanBookExpiry: ''
   });
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderCrew();
 }
 function removeCrew(i) {
   if (!confirm('Remove this crew member?')) return;
   data.crew.splice(i,1); save();
-  document.getElementById('mainContent').innerHTML = renderCrew();
-}
-
-function showAddSchengen(crewIdx) {
-  showModal('Add Schengen Entry', `
-    <div class="mi-label">Entry Date</div><input class="mi" id="m-en" type="date">
-    <div class="mi-label">Exit Date (leave blank if still in Schengen)</div>
-    <input class="mi" id="m-ex" type="date">
-    <div class="mi-label">Country</div><input class="mi" id="m-co" placeholder="e.g. Greece">
-    <div class="modal-btns">
-      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
-      <button class="btn btn-p" onclick="saveSchengen(${crewIdx})">Add</button>
-    </div>`);
-}
-function saveSchengen(i) {
-  const entry = document.getElementById('m-en').value;
-  if (!entry) { showToast('Entry date required',true); return; }
-  if (!data.crew[i].schengenLog) data.crew[i].schengenLog = [];
-  data.crew[i].schengenLog.push({
-    entryDate: entry,
-    exitDate: document.getElementById('m-ex').value || '',
-    country: document.getElementById('m-co').value
-  });
-  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderCrew();
-}
-function removeSchengen(ci, si) {
-  data.crew[ci].schengenLog.splice(si,1); save();
   document.getElementById('mainContent').innerHTML = renderCrew();
 }
 
@@ -1766,27 +1674,6 @@ function showUndoToast() {
   t.innerHTML = `<span>Marked done</span><button onclick="undoSchedDone()" style="background:rgba(255,255,255,.2);border:none;color:#fff;padding:4px 12px;border-radius:12px;font-family:inherit;font-size:13px;cursor:pointer;font-weight:600">Undo</button>`;
   document.body.appendChild(t);
   setTimeout(() => { t.remove(); _lastSchedUndo = null; }, 5000);
-}
-
-function renderSchedItemRow(item, eids, isCat, eLbl) {
-  const cols = eids.map(eid => {
-    const s = calcSchedStatus(item, eid);
-    const history = _schedHistory(eid, item.id);
-    const histHtml = history.slice().reverse().map(h =>
-      `<div class="maint-last-done">${fmtSchedDate(h.date)}${h.hours ? ' · '+h.hours+'h' : ''}</div>`
-    ).join('');
-    return `<div class="maint-eng-col">
-      ${isCat ? `<div class="maint-eng-lbl">${eLbl[eid]}</div>` : ''}
-      <button class="msb msb-${s.color}" onclick="markSchedDone('${item.id}','${eid}')">${esc(s.label)}</button>
-      ${histHtml}
-    </div>`;
-  }).join('');
-  return `<div class="maint-row2">
-    <div class="maint-task-name">${esc(item.task)}<span class="maint-int-lbl">${esc(item.intLabel)}</span></div>
-    <div style="display:flex;gap:6px;align-items:flex-end">${cols}
-      <button class="btn btn-s btn-xs" onclick="showEditSchedItem('${item.id}')" style="flex-shrink:0;margin-bottom:2px">✏</button>
-    </div>
-  </div>`;
 }
 
 function showEditSchedItem(taskId) {
@@ -2825,16 +2712,6 @@ function wmSaveLastChange() {
   hideModal(); document.getElementById('mainContent').innerHTML = renderWatermaker();
 }
 
-function wmEditLastChange() {
-  const wm = getWatermakerData();
-  showModal('Edit Last Filter Change Reading', `
-    <div class="mi-label">Hour meter reading when filters were last changed</div>
-    <input class="mi" id="wm-elc" type="number" min="0" value="${wm.lastChangeReading||0}" autofocus>
-    <div class="modal-btns">
-      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
-      <button class="btn btn-p" onclick="wmSaveEditLastChange()">Save</button>
-    </div>`);
-}
 function wmSaveEditLastChange() {
   const wm = getWatermakerData();
   const v = parseInt(document.getElementById('wm-elc')?.value);
@@ -5449,17 +5326,19 @@ function migrateData() {
   try { (data.spareParts || []).forEach(p => { const n = normCat(p.category); if (n !== p.category) { p.category = n; dirty = true; } }); } catch(e) { console.warn('migrate spareParts', e); }
   try { if (migrateToSingleLog()) dirty = true; } catch(e) { console.warn('migrateToSingleLog', e); }
   try { (data.maintenance?.log||[]).forEach(e => { const n=normalizeMaintTask(e.task); if(n!==e.task){e.task=n;dirty=true;} }); } catch(e) { console.warn('migrateMaintTasks',e); }
-  // Seed belt history if not already present
-  if (!data.maintenance) data.maintenance = { engines:{}, sched:{}, log:[] };
-  if (!data.maintenance.log) data.maintenance.log = [];
-  const hasBeltEntry = data.maintenance.log.some(e => e.id === 'seed_belt_920');
-  if (!hasBeltEntry) {
-    data.maintenance.log.push(
-      { id:'seed_belt_920', date:'2021-07-01', hours:'920', task:'Inspect & adjust belt tension', cost:'', notes:'Mallorca', engines:['port','starboard'] },
-      { id:'seed_belt_rep_920', date:'2021-07-01', hours:'920', task:'Replace belts', cost:'', notes:'Mallorca', engines:['port','starboard'] }
-    );
-    data.maintenance.log.sort((a,b) => b.date.localeCompare(a.date) || (parseFloat(b.hours)||0)-(parseFloat(a.hours)||0));
-    dirty = true;
+  // Seed belt history — owner only
+  if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL) {
+    if (!data.maintenance) data.maintenance = { engines:{}, sched:{}, log:[] };
+    if (!data.maintenance.log) data.maintenance.log = [];
+    const hasBeltEntry = data.maintenance.log.some(e => e.id === 'seed_belt_920');
+    if (!hasBeltEntry) {
+      data.maintenance.log.push(
+        { id:'seed_belt_920',     date:'2021-07-01', hours:'920', task:'Inspect & adjust belt tension', cost:'', notes:'Mallorca', engines:['port','starboard'] },
+        { id:'seed_belt_rep_920', date:'2021-07-01', hours:'920', task:'Replace belts',                 cost:'', notes:'Mallorca', engines:['port','starboard'] }
+      );
+      data.maintenance.log.sort((a,b) => b.date.localeCompare(a.date) || (parseFloat(b.hours)||0)-(parseFloat(a.hours)||0));
+      dirty = true;
+    }
   }
   if (dirty) save();
 }
@@ -6126,7 +6005,6 @@ async function pushToCloud() {
   const salt   = localStorage.getItem(SALT_KEY);
   const verify = localStorage.getItem(VERIFY_KEY);
   const enc    = localStorage.getItem(ENC_KEY);
-  console.log('[pushToCloud] email:', email?.slice(0,10)||'NULL', 'salt:', salt?.slice(0,10)||'NULL', 'verify:', verify?.slice(0,10)||'NULL', 'enc:', enc?.slice(0,10)||'NULL');
   if (!email || !salt || !verify || !enc) return;
   setSyncStatus('syncing');
   try {
@@ -6157,13 +6035,9 @@ async function fetchFromCloud(email) {
 
 async function pullFromCloud() {
   const email = localStorage.getItem(EMAIL_KEY);
-  console.log('[pullFromCloud] email:', email?.slice(0,10)||'NULL', 'cryptoKey:', cryptoKey?'SET':'NULL');
-  if (!email || !cryptoKey) { console.warn('pullFromCloud: no email or key'); return false; }
+  if (!email || !cryptoKey) return false;
   const importTs = localStorage.getItem('bm_just_imported');
-  if (importTs && Date.now() - parseInt(importTs) < 30000) {
-    console.log('[pullFromCloud] skipping — recent import detected');
-    return false;
-  }
+  if (importTs && Date.now() - parseInt(importTs) < 30000) return false;
   try {
     const cloud = await fetchFromCloud(email);
     const decrypted = JSON.parse(await aesDecrypt(cryptoKey, cloud.data));
