@@ -5627,7 +5627,9 @@ function renderClearance() {
 
   // ── Gauge 3: eTEPAY ──
   const etYear  = parseInt(C.year) || new Date().getFullYear();
-  const covered = (C.monthsCovered||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const covered = Array.isArray(C.monthsCovered)
+    ? C.monthsCovered
+    : (C.monthsCovered||'').split(',').map(s=>s.trim()).filter(Boolean);
   const now0    = new Date(); now0.setHours(0,0,0,0);
   let etTotal=0, etFuture=0;
   for (const m of covered) {
