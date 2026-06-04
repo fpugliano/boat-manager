@@ -582,6 +582,7 @@ function completeSetup() {
 
 const TABS = [
   {id:'documents',  icon:'📄', label:'Boat Docs'},
+  {id:'clearance',  icon:'⚓', label:'Clearance'},
   {id:'provisions', icon:'🛒', label:'Provisions'},
   {id:'watermaker', icon:'💧', label:'Water Maker'},
   {id:'lpg',        icon:'🔥', label:'LPG'},
@@ -631,8 +632,9 @@ function renderActiveTab() {
   const mc = document.getElementById('mainContent'); if (!mc) return;
   try {
     switch(ui.tab) {
-      case 'documents': mc.innerHTML = renderDocuments(); break;
-      case 'crew':      mc.innerHTML = renderCrew(); break;
+      case 'documents':  mc.innerHTML = renderDocuments(); break;
+      case 'clearance':  mc.innerHTML = renderClearance(); break;
+      case 'crew':       mc.innerHTML = renderCrew(); break;
       case 'shipyard':    mc.innerHTML = renderShipyard(); break;
       case 'watermaker':  mc.innerHTML = renderWatermaker(); break;
       case 'lpg':         mc.innerHTML = renderLpg(); break;
@@ -5241,18 +5243,24 @@ function renderTLAlertBar(cur) {
 function renderTLCurrentUser(cur) {
   const startDate = parseTLDate(cur.userStartDate||cur.issueDate||cur.validFrom||'');
   const vud = parseTLDate(cur.validUntil);
-  let expiryStr = '—';
+  let expiryStr = '—', userDays = null;
   if (startDate) {
     const sixMo = new Date(startDate); sixMo.setDate(sixMo.getDate()+180);
-    expiryStr = tlFmtDate(vud ? (sixMo<vud?sixMo:vud) : sixMo);
+    const ue = vud ? (sixMo<vud?sixMo:vud) : sixMo;
+    expiryStr = tlFmtDate(ue);
+    const now = new Date(); now.setHours(0,0,0,0);
+    userDays = Math.round((ue-now)/86400000);
   }
-  return `<div style="margin-bottom:10px;background:rgba(245,158,11,.08);border:1.5px solid #F59E0B;border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+  const bg    = userDays===null?'rgba(245,158,11,.08)':userDays>60?'rgba(34,197,94,.08)':userDays>30?'rgba(245,158,11,.08)':'rgba(239,68,68,.08)';
+  const bdr   = userDays===null?'#F59E0B':userDays>60?'#22C55E':userDays>30?'#F59E0B':'#EF4444';
+  const lblTx = userDays===null?'#D97706':userDays>60?'#15803d':userDays>30?'#D97706':'#DC2626';
+  return `<div style="margin-bottom:10px;background:${bg};border:1.5px solid ${bdr};border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
     <div style="flex:1;min-width:0">
-      <div style="font-size:11px;font-weight:700;color:#D97706;margin-bottom:2px">Current User</div>
+      <div style="font-size:11px;font-weight:700;color:${lblTx};margin-bottom:2px">Current User</div>
       <div style="font-size:15px;font-weight:700;color:var(--label)">${esc(cur.holderName||'—')}</div>
       <div style="font-size:12px;color:var(--label3);margin-top:2px">Valid until ${esc(expiryStr)}</div>
     </div>
-    <button onclick="showTLChangeUser()" style="background:#F59E0B;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;white-space:nowrap">Change user →</button>
+    <button onclick="showTLChangeUser()" style="background:${bdr};color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;white-space:nowrap">Change user →</button>
   </div>`;
 }
 function renderTLFreezeLog(cur) {
@@ -5546,6 +5554,152 @@ function saveTLChangeUser() {
   log.holderName=name;
   log.userStartDate=date;
   save(); hideModal(); document.getElementById('mainContent').innerHTML=renderDocuments();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CLEARANCE TAB
+// ═══════════════════════════════════════════════════════════
+function renderClearance() {
+  const FULL_MO = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const wd  = getTLData();
+  const cur = wd.logs[wd.currentLog];
+  const C   = data.documents?.customs || {};
+
+  // ── Gauge 1: TL Boat ──
+  const frozen   = cur ? tlFrozenDays(cur) : 0;
+  const boatRaw  = cur ? tlDaysUntil(cur.validUntil) : null;
+  const boatDays = boatRaw !== null ? boatRaw - frozen : null;
+  const boatColor= boatDays===null?'#9ca3af':boatDays>180?'#22C55E':boatDays>90?'#F59E0B':'#EF4444';
+
+  // ── Gauge 2: User ──
+  const startDate = cur ? parseTLDate(cur.userStartDate||cur.issueDate||cur.validFrom||'') : null;
+  const vud       = cur ? parseTLDate(cur.validUntil) : null;
+  let userDays = null, userExpStr = '—';
+  if (startDate) {
+    const sixMo = new Date(startDate); sixMo.setDate(sixMo.getDate()+180);
+    const ue = vud ? (sixMo<vud?sixMo:vud) : sixMo;
+    const now = new Date(); now.setHours(0,0,0,0);
+    userDays = Math.round((ue-now)/86400000);
+    userExpStr = tlFmtDate(ue);
+  }
+  const userColor= userDays===null?'#9ca3af':userDays>60?'#22C55E':userDays>30?'#F59E0B':'#EF4444';
+
+  // ── Gauge 3: eTEPAY ──
+  const etYear  = parseInt(C.year) || new Date().getFullYear();
+  const covered = (C.monthsCovered||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const now0    = new Date(); now0.setHours(0,0,0,0);
+  let etTotal=0, etFuture=0;
+  for (const m of covered) {
+    const mi = FULL_MO.indexOf(m); if (mi===-1) continue;
+    etTotal++;
+    if (new Date(etYear, mi, 1) > now0) etFuture++;
+  }
+  const etColor   = etFuture>3?'#22C55E':etFuture>0?'#F59E0B':'#EF4444';
+  const etPaidStr = tlFmtDate(parseTLDate(C.validUntil));
+
+  // ── Gauge 4: Schengen ──
+  const holderKey = (cur?.holderName||'').trim().toLowerCase();
+  const schMatch  = holderKey ? (data.schengen?.persons||[]).find(p=>(p.name||'').trim().toLowerCase()===holderKey) : null;
+  const isEU      = schMatch ? schMatch.passports?.[schMatch.activePassport||0]?.eu===true : false;
+  let schRem=null, schUsed=0;
+  if (schMatch && !isEU) {
+    const {days} = calcSchengenDays(schMatch.log);
+    schUsed = days; schRem = 90-days;
+  }
+  const schColor = !schMatch?'#9ca3af':isEU?'#22C55E':schRem>45?'#22C55E':schRem>20?'#F59E0B':'#EF4444';
+
+  // ── Overall status ──
+  const isRed   = (boatDays!==null&&boatDays<=90)||(userDays!==null&&userDays<=30)||etFuture<=0||(!isEU&&schRem!==null&&schRem<=20);
+  const isAmber = !isRed&&((boatDays!==null&&boatDays<=180)||(userDays!==null&&userDays<=60)||etFuture<=3||(!isEU&&schRem!==null&&schRem<=45));
+  const statusLabel  = isRed?'Alert':isAmber?'Action needed':'All clear';
+  const statusBorder = isRed?'#EF4444':isAmber?'#F59E0B':'#22C55E';
+  const statusBg     = isRed?'rgba(239,68,68,.1)':isAmber?'rgba(245,158,11,.1)':'rgba(34,197,94,.1)';
+  const statusTxt    = isRed?'#EF4444':isAmber?'#D97706':'#15803d';
+
+  // ── Alert bar ──
+  const issues=[];
+  if (boatDays!==null&&boatDays<=180) issues.push(boatDays<=90?`🔴 Boat TL ${boatDays}d`:`🟡 Boat TL ${boatDays}d`);
+  if (userDays!==null&&userDays<=60)  issues.push(userDays<=30?`🔴 User ${userDays}d`:`🟡 User ${userDays}d`);
+  if (etFuture<=3) issues.push(etFuture<=0?`🔴 eTEPAY expired`:`🟡 eTEPAY ${etFuture} month${etFuture!==1?'s':''}`);
+  if (!isEU&&schRem!==null&&schRem<=45) issues.push(schRem<=0?`🔴 Schengen OVERSTAY ${Math.abs(schRem)}d`:schRem<=20?`🔴 Schengen ${schRem}d`:`🟡 Schengen ${schRem}d`);
+  const alertBar = issues.length ? `<div style="margin-bottom:12px;padding:10px 14px;background:${isRed?'rgba(239,68,68,.08)':'rgba(245,158,11,.08)'};border:1.5px solid ${isRed?'#EF4444':'#F59E0B'};border-radius:10px;font-size:13px;color:${isRed?'#EF4444':'#D97706'};font-weight:600">${issues.join(' · ')}</div>` : '';
+
+  // ── Gauge helper ──
+  function gaugeCell(title, days, max, color, subs) {
+    return `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px;text-align:center">
+      <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:6px">${title}</div>
+      ${tlCircleGauge(days,max,color)}
+      ${subs.map(l=>`<div style="font-size:10px;color:var(--label3);margin-top:3px;word-break:break-all">${l}</div>`).join('')}
+    </div>`;
+  }
+
+  const g1subs = [];
+  if (cur?.validUntil) g1subs.push(`Valid until ${esc(cur.validUntil)}`);
+  if (frozen>0) g1subs.push(`${frozen}d frozen`);
+
+  const g2subs = [esc(cur?.holderName||'—'), `Until ${esc(userExpStr)}`, '€30 to change'];
+
+  const g3subs = [etPaidStr!=='—'?`Paid until ${etPaidStr}`:''];
+  if (etFuture>0&&etFuture<=3) g3subs.push('Renew soon');
+  else if (etFuture===0) g3subs.push('Expired — renew now');
+
+  let g4;
+  if (!schMatch) {
+    g4 = `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px;text-align:center">
+      <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:6px">Schengen</div>
+      <div style="height:72px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#9ca3af">—</div>
+      <div style="font-size:10px;color:var(--blue);cursor:pointer;margin-top:3px" onclick="showTab('schengen')">Set up in Schengen tab</div>
+    </div>`;
+  } else if (isEU) {
+    g4 = `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px;text-align:center">
+      <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:6px">Schengen</div>
+      <svg width="72" height="72" viewBox="0 0 72 72" style="display:block;margin:0 auto">
+        <circle cx="36" cy="36" r="28" fill="none" stroke="#22C55E" stroke-width="7"/>
+        <text x="36" y="36" text-anchor="middle" dominant-baseline="middle" font-size="10" font-weight="700" fill="#22C55E" font-family="var(--font)">EU</text>
+      </svg>
+      <div style="font-size:10px;color:#22C55E;font-weight:600;margin-top:3px">No limit</div>
+    </div>`;
+  } else {
+    g4 = gaugeCell('Schengen', schRem, 90, schColor, [`${schUsed}/90 used`]);
+  }
+
+  const gaugeGrid = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+    ${gaugeCell('TL — Boat', boatDays, 365, boatColor, g1subs)}
+    ${gaugeCell('User', userDays, 180, userColor, g2subs)}
+    ${gaugeCell('eTEPAY', etFuture, Math.max(etTotal,1), etColor, g3subs)}
+    ${g4}
+  </div>`;
+
+  // ── Quick links ──
+  function qlRow(dot, label, summary, action) {
+    return `<div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--sep);cursor:pointer" onclick="${action}">
+      <div style="width:10px;height:10px;border-radius:50%;background:${dot};flex-shrink:0"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--label)">${label}</div>
+        <div style="font-size:11px;color:var(--label3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${summary}</div>
+      </div>
+      <div style="color:var(--label3);font-size:18px;line-height:1">›</div>
+    </div>`;
+  }
+  const boatSumm = boatDays!==null?`${Math.max(0,boatDays)}d remaining${frozen>0?' · '+frozen+'d frozen':''}`:cur?.validUntil||'No transit log';
+  const userSumm = userDays!==null?`${Math.max(0,userDays)}d · ${esc(cur?.holderName||'')}`:esc(cur?.holderName||'No data');
+  const etSumm   = etFuture>0?`${etFuture} month${etFuture!==1?'s':''} remaining`:'No months covered';
+  const schSumm  = !schMatch?'Not set up':isEU?'EU passport — no limit':`${Math.max(0,schRem)}d remaining · ${schUsed}/90 used`;
+  const quickLinks = `<div style="font-size:13px;font-weight:700;color:var(--label);margin-bottom:8px">Quick Links</div>
+    <div class="card" style="margin-bottom:12px;overflow:hidden">
+      ${qlRow(boatColor,'Transit Log — Boat',boatSumm,"ui.docSub='transitlog';showTab('documents')")}
+      ${qlRow(userColor,'User',userSumm,"ui.docSub='transitlog';showTab('documents')")}
+      ${qlRow(etColor,'eTEPAY',etSumm,"ui.docSub='customs';showTab('documents')")}
+      ${qlRow(schColor,'Schengen',schSumm,"showTab('schengen')")}
+    </div>`;
+
+  return `<div style="padding-bottom:80px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:17px;font-weight:700">⚓ Clearance</div>
+      <span style="background:${statusBg};border:1.5px solid ${statusBorder};color:${statusTxt};font-size:12px;font-weight:700;padding:3px 12px;border-radius:20px">${statusLabel}</span>
+    </div>
+    ${alertBar}${gaugeGrid}${quickLinks}
+  </div>`;
 }
 
 function prefillCustomsOwnerData() {
