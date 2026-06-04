@@ -5958,6 +5958,28 @@ function migrateData() {
       dirty = true;
     }
   } catch(e) { console.warn('maintLogFixV2', e); }
+  // Split Saildrive service entry at Didim 2023-04-25, 1249h into two entries — v3
+  try {
+    if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL && !data._maintLogFixed_v3) {
+      const log = data.maintenance?.log;
+      if (log) {
+        const idx = log.findIndex(e => e.date==='2023-04-25' && String(e.hours)==='1249' && e.task==='Saildrive service' && e.notes==='Didim');
+        const engines = idx !== -1 ? (log[idx].engines || ['port','starboard']) : null;
+        if (idx !== -1) { log.splice(idx, 1); dirty = true; }
+        if (!log.some(e => e.id==='seed_sd_lip_20230425'))  {
+          log.push({ id:'seed_sd_lip_20230425',   date:'2023-04-25', hours:'1249', task:'Saildrive lip seal replacement', cost:'', notes:'Didim', engines });
+          dirty = true;
+        }
+        if (!log.some(e => e.id==='seed_sd_shaft_20230425')) {
+          log.push({ id:'seed_sd_shaft_20230425', date:'2023-04-25', hours:'1249', task:'Saildrive shaft replacement',    cost:'', notes:'Didim', engines });
+          dirty = true;
+        }
+        log.sort((a,b) => b.date.localeCompare(a.date) || (parseFloat(b.hours)||0)-(parseFloat(a.hours)||0));
+      }
+      data._maintLogFixed_v3 = true;
+      dirty = true;
+    }
+  } catch(e) { console.warn('maintLogFixV3', e); }
   if (dirty) save();
 }
 
