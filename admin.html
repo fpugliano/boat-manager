@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oroboro Admin</title>
+<style>
+  body { font-family: monospace; max-width: 900px; margin: 40px auto; padding: 0 20px; color: #222; }
+  h1 { font-size: 20px; }
+  #login { margin: 40px 0; }
+  #login input { font-size: 16px; padding: 8px; width: 260px; margin-right: 8px; }
+  #login button { font-size: 16px; padding: 8px 16px; cursor: pointer; }
+  #error { color: red; margin-top: 8px; }
+  #stats { margin: 24px 0 16px; font-size: 14px; line-height: 2; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th { text-align: left; border-bottom: 2px solid #333; padding: 6px 10px; }
+  td { border-bottom: 1px solid #ddd; padding: 6px 10px; }
+  tr:hover td { background: #f5f5f5; }
+  .recent { color: green; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>Oroboro Admin</h1>
+
+<div id="login">
+  <input type="password" id="pw" placeholder="Admin password" onkeydown="if(event.key==='Enter')load()">
+  <button onclick="load()">Load</button>
+  <div id="error"></div>
+</div>
+
+<div id="results" style="display:none">
+  <div id="stats"></div>
+  <table>
+    <thead><tr><th>Signup</th><th>Last active</th><th>Boat name</th><th>Country</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<script>
+const WORKER = 'https://boat-manager-storage.fpugliano.workers.dev';
+
+async function load() {
+  const pw = document.getElementById('pw').value.trim();
+  document.getElementById('error').textContent = '';
+  if (!pw) { document.getElementById('error').textContent = 'Enter password'; return; }
+
+  try {
+    const r = await fetch(`${WORKER}/api/analytics`, {
+      headers: { 'X-Admin-Password': pw }
+    });
+    if (r.status === 403) { document.getElementById('error').textContent = 'Wrong password'; return; }
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+
+    const records = await r.json();
+    records.sort((a, b) => (b.lastActive || '').localeCompare(a.lastActive || ''));
+
+    const today = new Date();
+    const daysAgo = n => { const d = new Date(today); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+    const d7  = daysAgo(7);
+    const d30 = daysAgo(30);
+    const active7  = records.filter(r => r.lastActive >= d7).length;
+    const active30 = records.filter(r => r.lastActive >= d30).length;
+
+    document.getElementById('stats').innerHTML =
+      `Total users: <b>${records.length}</b><br>` +
+      `Active last 7 days: <b>${active7}</b><br>` +
+      `Active last 30 days: <b>${active30}</b>`;
+
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = records.map(rec => {
+      const isRecent = rec.lastActive >= d7;
+      return `<tr>
+        <td>${esc(rec.signupDate || '—')}</td>
+        <td class="${isRecent ? 'recent' : ''}">${esc(rec.lastActive || '—')}</td>
+        <td>${esc(rec.boatName || '—')}</td>
+        <td>${esc(rec.country || '—')}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('results').style.display = 'block';
+  } catch(e) {
+    document.getElementById('error').textContent = 'Error: ' + e.message;
+  }
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

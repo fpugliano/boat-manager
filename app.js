@@ -5922,6 +5922,7 @@ async function createPIN() {
     try { prefillLpgData();           } catch(e) { console.warn('prefillLpg', e); }
     try { prefillProvisionsData();    } catch(e) { console.warn('prefillProvisions', e); }
     await save();
+    trackAnalytics(true);
     pushToCloud();
     startActivityTracking();
     document.getElementById('setupOv').classList.add('hidden');
@@ -6479,6 +6480,30 @@ async function emailToKey(email) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
+let _analyticsTracked = false;
+async function trackAnalytics(isSignup) {
+  if (!STORAGE_WORKER_URL) return;
+  if (!isSignup && _analyticsTracked) return; // update lastActive once per session
+  const email = localStorage.getItem(EMAIL_KEY);
+  if (!email) return;
+  try {
+    const hash  = await emailToKey(email);
+    const today = new Date().toISOString().slice(0,10);
+    let meta = null;
+    try { meta = JSON.parse(localStorage.getItem('bm_analytics_meta') || 'null'); } catch(e) {}
+    if (isSignup || !meta) {
+      meta = { signupDate: today, boatName: data.meta?.boatName || '', country: data.meta?.flag || '' };
+      localStorage.setItem('bm_analytics_meta', JSON.stringify(meta));
+    }
+    fetch(`${STORAGE_WORKER_URL}/api/analytics/users/${hash}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...meta, lastActive: today })
+    }).catch(() => {});
+    _analyticsTracked = true;
+  } catch(e) {}
+}
+
 function setSyncStatus(status) {
   syncStatus = status;
   const dot = document.getElementById('sync-dot');
@@ -6512,6 +6537,7 @@ async function pushToCloud() {
     localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
     localStorage.removeItem('bm_just_imported');
     setSyncStatus('synced');
+    trackAnalytics(false);
   } catch(e) {
     setSyncStatus('offline');
     console.warn('Cloud sync failed', e);

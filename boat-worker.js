@@ -11,7 +11,7 @@ export default {
     const cors = {
       'Access-Control-Allow-Origin':  '*',
       'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-App-Key',
+      'Access-Control-Allow-Headers': 'Content-Type, X-App-Key, X-Admin-Password',
     };
 
     if (method === 'OPTIONS') {
@@ -61,6 +61,28 @@ export default {
       if (!uuid) return json({ error: 'Missing key' }, 400);
       await env.BOAT_DATA.delete(uuid);
       return json({ ok: true });
+    }
+
+    // PUT /api/analytics/users/:hash  — called by the app on signup and sync
+    if (method === 'PUT' && path.startsWith('/api/analytics/users/')) {
+      const hash = path.split('/api/analytics/users/')[1];
+      if (!hash) return json({ error: 'Missing key' }, 400);
+      const body = await request.json();
+      await env.BOAT_DATA.put(`analytics:users:${hash}`, JSON.stringify(body));
+      return json({ ok: true });
+    }
+
+    // GET /api/analytics  — admin-only: list all user analytics records
+    if (method === 'GET' && path === '/api/analytics') {
+      const pw = request.headers.get('X-Admin-Password');
+      if (!pw || pw !== env.ADMIN_PASSWORD) return json({ error: 'Forbidden' }, 403);
+      const list = await env.BOAT_DATA.list({ prefix: 'analytics:users:' });
+      const records = [];
+      for (const item of list.keys) {
+        const val = await env.BOAT_DATA.get(item.name);
+        if (val) records.push(JSON.parse(val));
+      }
+      return json(records);
     }
 
     return json({ error: 'Not found' }, 404);
