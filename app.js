@@ -3687,7 +3687,7 @@ function prefillNewUserSampleData() {
     const yr = new Date().getFullYear();
     const dt = (y, m, d) => `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     data.schengen = {persons:[{
-      name:'Test Traveler (Example)', activePassport:0,
+      name:'Example Owner', activePassport:0,
       passports:[{flag:'🇺🇸', country:'United States', eu:false}],
       log:[
         {id:uid(), type:'in',  date:dt(yr-1,12,10), passport:'🇺🇸', location:'Gibraltar (Example)'},
@@ -5640,7 +5640,12 @@ function renderClearance() {
 
   // ── Gauge 4: Schengen ──
   const holderKey = (cur?.holderName||'').trim().toLowerCase();
-  const schMatch  = holderKey ? (data.schengen?.persons||[]).find(p=>(p.name||'').trim().toLowerCase()===holderKey) : null;
+  const schPersons = (data.schengen?.persons||[]).filter(p=>p.name);
+  let schMatch = holderKey ? schPersons.find(p=>(p.name||'').trim().toLowerCase()===holderKey) : null;
+  if (!schMatch) {
+    if (schPersons.length === 1) { schMatch = schPersons[0]; }
+    else if (schPersons.length > 1) { schMatch = schPersons.find(p=>!p.passports?.[p.activePassport||0]?.eu) || null; }
+  }
   const isEU      = schMatch ? schMatch.passports?.[schMatch.activePassport||0]?.eu===true : false;
   let schRem=null, schUsed=0;
   if (schMatch && !isEU) {
@@ -5689,13 +5694,13 @@ function renderClearance() {
   let g4;
   if (!schMatch) {
     g4 = `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px;text-align:center">
-      <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:6px">Schengen</div>
+      <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:6px">Schengen (TL User)</div>
       <div style="height:72px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#9ca3af">—</div>
       <div style="font-size:10px;color:var(--blue);cursor:pointer;margin-top:3px" onclick="showTab('schengen')">Set up in Schengen tab</div>
     </div>`;
   } else if (isEU) {
     g4 = `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px;text-align:center">
-      <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:6px">Schengen</div>
+      <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:6px">Schengen (TL User)</div>
       <svg width="72" height="72" viewBox="0 0 72 72" style="display:block;margin:0 auto">
         <circle cx="36" cy="36" r="28" fill="none" stroke="#22C55E" stroke-width="7"/>
         <text x="36" y="36" text-anchor="middle" dominant-baseline="middle" font-size="10" font-weight="700" fill="#22C55E" font-family="var(--font)">EU</text>
@@ -5704,13 +5709,13 @@ function renderClearance() {
     </div>`;
   } else if (seamanActive) {
     g4 = `<div style="background:rgba(245,158,11,.08);border:1.5px solid #F59E0B;border-radius:14px;padding:12px 8px;text-align:center">
-      <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:6px">Schengen</div>
+      <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:6px">Schengen (TL User)</div>
       ${tlCircleGauge(schRem,90,'#F59E0B')}
       <div style="font-size:10px;color:#D97706;font-weight:700;margin-top:4px">⚓ Seaman's Book</div>
       <div style="font-size:10px;color:var(--label3);margin-top:2px">${schUsed}/90 used</div>
     </div>`;
   } else {
-    g4 = gaugeCell('Schengen', schRem, 90, schColor, [`${schUsed}/90 used`]);
+    g4 = gaugeCell('Schengen (TL User)', schRem, 90, schColor, [`${schUsed}/90 used`]);
   }
 
   const gaugeGrid = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
