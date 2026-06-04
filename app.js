@@ -6090,9 +6090,10 @@ function showPrivacyPolicy() {
     <p style="font-size:13px;line-height:1.7;color:#444;">
       <b>What this app is</b><br>Oroboro Boat Manager is a personal boat management tool for sailors. Not a commercial service.<br><br>
       <b>What data we collect</b><br>Your email (stored as a hash we cannot read), boat info, maintenance logs. No tracking, no ads.<br><br>
-      <b>How data is stored</b><br>All data is AES-256 encrypted on your device before transmission. The encryption key is derived from your PIN and never leaves your device.<br><br>
+      <b>How data is stored</b><br>All data is AES-256 encrypted on your device before transmission. The encryption key is derived from your PIN and never leaves your device. Data is stored in a cloud backend managed by the app developer. Because all data is encrypted before leaving your device, it cannot be read by anyone — including us — without your PIN.<br><br>
       <b>Who can access your data</b><br>Only you with your PIN.<br><br>
       <b>Your GDPR rights</b><br>Access, deletion, and portability — all available in Settings.<br><br>
+      <b>Disclaimer</b><br>This app is provided as a tool to help you organise your boat management and track your Schengen days. It is not legal advice. Schengen rules are complex and subject to change — always verify your status with official sources before making entry decisions. The developer accepts no liability for overstays, fines, or legal consequences arising from use of this app.<br><br>
       <b>Contact:</b> ${typeof OWNER_EMAIL !== 'undefined' ? OWNER_EMAIL : ''}
     </p>
     <button onclick="document.getElementById('ppOverlay').remove()" style="width:100%;padding:14px;background:#185FA5;color:white;border:none;border-radius:12px;font-size:16px;font-weight:500;margin-top:16px;cursor:pointer;">Close</button>
