@@ -1984,22 +1984,32 @@ function calcSchengenDays(log) {
   const todayMid = new Date(); todayMid.setHours(0,0,0,0);
   const windowStart = new Date(todayMid); windowStart.setDate(windowStart.getDate()-179);
   const sorted = [...(log||[])].sort((a,b)=>a.date.localeCompare(b.date));
-  let days = 0, inDate = null;
+  let days = 0, inDate = null, inIsSeaman = false;
   for (const e of sorted) {
-    if (e.type==='in') { inDate = parseISODate(e.date); }
+    if (e.type==='in') { inDate = parseISODate(e.date); inIsSeaman = e.seamanBook === true; }
     else if (e.type==='out' && inDate) {
-      const out = parseISODate(e.date);
-      if (!out || out > todayMid) continue; // ignore future checkouts — treat as still checked in
-      const s = inDate < windowStart ? windowStart : inDate;
-      if (s <= out) days += Math.round((out-s)/86400000)+1;
-      inDate = null;
+      if (!inIsSeaman) { // seaman's book stays don't count toward Schengen days
+        const out = parseISODate(e.date);
+        if (!out || out > todayMid) { inDate = null; inIsSeaman = false; continue; }
+        const s = inDate < windowStart ? windowStart : inDate;
+        if (s <= out) days += Math.round((out-s)/86400000)+1;
+      }
+      inDate = null; inIsSeaman = false;
     }
   }
-  if (inDate) {
+  if (inDate && !inIsSeaman) {
     const s = inDate < windowStart ? windowStart : inDate;
     if (s <= todayMid) days += Math.round((todayMid-s)/86400000)+1;
   }
   return { days, inSchengen: inDate !== null };
+}
+
+function isSeamanBookActive(log) {
+  const sorted = [...(log||[])].sort((a,b)=>a.date.localeCompare(b.date));
+  for (let i = sorted.length-1; i >= 0; i--) {
+    if (sorted[i].type === 'in') return sorted[i].seamanBook === true;
+  }
+  return false;
 }
 
 function isCurrentlyInSchengen(log) {
@@ -2078,6 +2088,7 @@ function renderSchengenPersonStatus(p, idx) {
   const remaining = 90 - days;
   const overstayed = remaining < 0;
   const inStatus = isCurrentlyInSchengen(p.log);
+  const seamanActive = isSeamanBookActive(p.log);
   const circleColor = remaining > 30 ? 'var(--green)' : remaining > 10 ? 'var(--orange)' : 'var(--red)';
   const exitBy = new Date(); exitBy.setDate(exitBy.getDate() + Math.max(0, remaining));
   const exitByStr = overstayed
@@ -2090,9 +2101,17 @@ function renderSchengenPersonStatus(p, idx) {
     const active = pi === activePassIdx;
     return `<button onclick="setSchengenPassport(${idx},${pi})" style="background:${active?'var(--blue)':'var(--surface2)'};color:${active?'#fff':'var(--label)'};border:1.5px solid ${active?'var(--blue)':'var(--sep)'};border-radius:8px;padding:3px 6px;font-size:11px;cursor:pointer;line-height:1.4;font-family:var(--font);white-space:nowrap">${label}</button>`;
   }).join('');
+  const statusBadge = seamanActive
+    ? `<span style="background:#F59E0B;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">Seaman's Book — Greece</span>`
+    : `<span style="background:${inStatus?'var(--green)':'var(--sep)'};color:${inStatus?'#fff':'var(--label2)'};font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">${inStatus?'In Schengen':'Outside'}</span>`;
+  const seamanWarning = seamanActive ? `<div style="margin:6px 0 8px;padding:8px 10px;background:rgba(245,158,11,.12);border:1px solid #F59E0B;border-radius:8px">
+    <div style="font-size:11px;font-weight:700;color:#D97706;margin-bottom:2px">Register passport entry before flying</div>
+    <div style="font-size:11px;color:#D97706">You entered Greece on a Seaman's Book. Visit customs/immigration to add a passport entry stamp before departing by air.</div>
+  </div>` : '';
   return `<div style="padding:14px 10px;min-width:0;overflow:hidden;${borderRight}">
     <div style="font-size:13px;font-weight:700;margin-bottom:6px">${esc(p.name||'—')}</div>
-    <div style="margin-bottom:8px"><span style="background:${inStatus?'var(--green)':'var(--sep)'};color:${inStatus?'#fff':'var(--label2)'};font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">${inStatus?'In Schengen':'Outside'}</span></div>
+    <div style="margin-bottom:${seamanActive?'0':'8px'}">${statusBadge}</div>
+    ${seamanWarning}
     ${isEU ? `<div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:10px">🇪🇺 EU Passport · No limit</div>` : `
       <div style="display:flex;justify-content:center;margin-bottom:8px">
         <div style="width:60px;height:60px;border-radius:50%;border:4px solid ${circleColor};display:flex;flex-direction:column;align-items:center;justify-content:center">
@@ -2153,8 +2172,14 @@ function renderSchengenPersonLog(p, idx) {
     const note = e.notes ? ` · <span style="color:var(--label3)">${esc(e.notes)}</span>` : '';
     const dur = e.type==='in' && tripDays[e.id] !== undefined
       ? ` · <span style="color:var(--label3)">${tripDays[e.id]==='ongoing'?'ongoing':tripDays[e.id]+' days'}</span>` : '';
+    const entryBadge = e.type==='in'
+      ? (e.seamanBook
+        ? `<span style="background:#F59E0B;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;flex-shrink:0">Seaman's Book</span>`
+        : `<span style="background:var(--green);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;flex-shrink:0">Passport</span>`)
+      : '';
     return `<div style="display:flex;align-items:center;gap:4px;padding:7px 10px;border-bottom:1px solid var(--sep);overflow:hidden">
       <span style="font-size:11px;font-weight:600;color:${typeColor};flex-shrink:0;white-space:nowrap">${typeLabel} ${flag}</span>
+      ${entryBadge}
       <span style="font-size:11px;color:var(--label3);flex-shrink:0;white-space:nowrap">${dateStr}</span>
       <span style="font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--label2)">${loc}${note}${dur}</span>
       <button onclick="showSchengenEditEntry(${idx},'${e.id}')" style="background:none;border:none;padding:2px 3px;cursor:pointer;font-size:12px;color:var(--label3);flex-shrink:0">✏️</button>
@@ -2235,6 +2260,9 @@ function saveSchengenAddEntry(personIdx) {
   save(); hideModal(); schengenRerender();
 }
 
+function schSeamanToggle(checked) {
+  document.getElementById('sch-seaman-warn').style.display = checked ? 'block' : 'none';
+}
 function showSchengenCheckIn(personIdx) {
   const sd = getSchengenData();
   const p = sd.persons[personIdx];
@@ -2243,6 +2271,16 @@ function showSchengenCheckIn(personIdx) {
   showModal(`Check In — ${esc(p.name||'Person '+(personIdx+1))}`, `
     <div class="mi-label">Date</div><input class="mi" id="sch-date" type="date" value="${new Date().toISOString().slice(0,10)}" autofocus>
     <div class="mi-label">Passport</div><select class="mi" id="sch-pass">${passOpts}</select>
+    <div style="margin:10px 0;padding:10px 12px;background:var(--surface2);border-radius:10px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" id="sch-seaman" onchange="schSeamanToggle(this.checked)" style="width:18px;height:18px;accent-color:#F59E0B;flex-shrink:0">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--label)">Entered on Seaman's Book</div>
+          <div style="font-size:11px;color:var(--label3);margin-top:1px">Greece only · does not count Schengen days</div>
+        </div>
+      </label>
+      <div id="sch-seaman-warn" style="display:none;margin-top:8px;padding:8px 10px;background:rgba(245,158,11,.12);border:1px solid #F59E0B;border-radius:8px;font-size:12px;color:#D97706;font-weight:500">⚠ Before flying out of Greece, visit customs/immigration to register a passport entry stamp.</div>
+    </div>
     <div class="mi-label">Location / Country</div><input class="mi" id="sch-loc" placeholder="e.g. Greece (Athens)">
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
@@ -2258,7 +2296,10 @@ function saveSchengenCheckIn(personIdx) {
   const passIdx = parseInt(document.getElementById('sch-pass')?.value)||0;
   const passport = p.passports?.[passIdx]?.flag||'';
   const location = document.getElementById('sch-loc')?.value.trim()||'';
-  p.log.push({id:uid(), type:'in', date, passport, location});
+  const seamanBook = document.getElementById('sch-seaman')?.checked || false;
+  const entry = {id:uid(), type:'in', date, passport, location};
+  if (seamanBook) entry.seamanBook = true;
+  p.log.push(entry);
   p.activePassport = passIdx;
   save(); hideModal(); schengenRerender();
 }
@@ -5606,11 +5647,12 @@ function renderClearance() {
     const {days} = calcSchengenDays(schMatch.log);
     schUsed = days; schRem = 90-days;
   }
-  const schColor = !schMatch?'#9ca3af':isEU?'#22C55E':schRem>45?'#22C55E':schRem>20?'#F59E0B':'#EF4444';
+  const seamanActive = schMatch ? isSeamanBookActive(schMatch.log) : false;
+  const schColor = !schMatch?'#9ca3af':isEU?'#22C55E':seamanActive?'#F59E0B':schRem>45?'#22C55E':schRem>20?'#F59E0B':'#EF4444';
 
   // ── Overall status ──
   const isRed   = (boatDays!==null&&boatDays<=90)||(userDays!==null&&userDays<=30)||etFuture<=0||(!isEU&&schRem!==null&&schRem<=20);
-  const isAmber = !isRed&&((boatDays!==null&&boatDays<=180)||(userDays!==null&&userDays<=60)||etFuture<=3||(!isEU&&schRem!==null&&schRem<=45));
+  const isAmber = !isRed&&((boatDays!==null&&boatDays<=180)||(userDays!==null&&userDays<=60)||etFuture<=3||seamanActive||(!isEU&&schRem!==null&&schRem<=45));
   const statusLabel  = isRed?'Alert':isAmber?'Action needed':'All clear';
   const statusBorder = isRed?'#EF4444':isAmber?'#F59E0B':'#22C55E';
   const statusBg     = isRed?'rgba(239,68,68,.1)':isAmber?'rgba(245,158,11,.1)':'rgba(34,197,94,.1)';
@@ -5621,12 +5663,13 @@ function renderClearance() {
   if (boatDays!==null&&boatDays<=180) issues.push(boatDays<=90?`🔴 Boat TL ${boatDays}d`:`🟡 Boat TL ${boatDays}d`);
   if (userDays!==null&&userDays<=60)  issues.push(userDays<=30?`🔴 User ${userDays}d`:`🟡 User ${userDays}d`);
   if (etFuture<=3) issues.push(etFuture<=0?`🔴 eTEPAY expired`:`🟡 eTEPAY ${etFuture} month${etFuture!==1?'s':''}`);
-  if (!isEU&&schRem!==null&&schRem<=45) issues.push(schRem<=0?`🔴 Schengen OVERSTAY ${Math.abs(schRem)}d`:schRem<=20?`🔴 Schengen ${schRem}d`:`🟡 Schengen ${schRem}d`);
+  if (seamanActive) issues.push(`🟡 Seaman's Book entry detected — register passport stamp at customs before flying out of Greece`);
+  else if (!isEU&&schRem!==null&&schRem<=45) issues.push(schRem<=0?`🔴 Schengen OVERSTAY ${Math.abs(schRem)}d`:schRem<=20?`🔴 Schengen ${schRem}d`:`🟡 Schengen ${schRem}d`);
   const alertBar = issues.length ? `<div style="margin-bottom:12px;padding:10px 14px;background:${isRed?'rgba(239,68,68,.08)':'rgba(245,158,11,.08)'};border:1.5px solid ${isRed?'#EF4444':'#F59E0B'};border-radius:10px;font-size:13px;color:${isRed?'#EF4444':'#D97706'};font-weight:600">${issues.join(' · ')}</div>` : '';
 
   // ── Gauge helper ──
-  function gaugeCell(title, days, max, color, subs) {
-    return `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px;text-align:center">
+  function gaugeCell(title, days, max, color, subs, cardStyle) {
+    return `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px;text-align:center;${cardStyle||''}">
       <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:6px">${title}</div>
       ${tlCircleGauge(days,max,color)}
       ${subs.map(l=>`<div style="font-size:10px;color:var(--label3);margin-top:3px;word-break:break-all">${l}</div>`).join('')}
@@ -5659,6 +5702,13 @@ function renderClearance() {
       </svg>
       <div style="font-size:10px;color:#22C55E;font-weight:600;margin-top:3px">No limit</div>
     </div>`;
+  } else if (seamanActive) {
+    g4 = `<div style="background:rgba(245,158,11,.08);border:1.5px solid #F59E0B;border-radius:14px;padding:12px 8px;text-align:center">
+      <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:6px">Schengen</div>
+      ${tlCircleGauge(schRem,90,'#F59E0B')}
+      <div style="font-size:10px;color:#D97706;font-weight:700;margin-top:4px">⚓ Seaman's Book</div>
+      <div style="font-size:10px;color:var(--label3);margin-top:2px">${schUsed}/90 used</div>
+    </div>`;
   } else {
     g4 = gaugeCell('Schengen', schRem, 90, schColor, [`${schUsed}/90 used`]);
   }
@@ -5684,7 +5734,7 @@ function renderClearance() {
   const boatSumm = boatDays!==null?`${Math.max(0,boatDays)}d remaining${frozen>0?' · '+frozen+'d frozen':''}`:cur?.validUntil||'No transit log';
   const userSumm = userDays!==null?`${Math.max(0,userDays)}d · ${esc(cur?.holderName||'')}`:esc(cur?.holderName||'No data');
   const etSumm   = etFuture>0?`${etFuture} month${etFuture!==1?'s':''} remaining`:'No months covered';
-  const schSumm  = !schMatch?'Not set up':isEU?'EU passport — no limit':`${Math.max(0,schRem)}d remaining · ${schUsed}/90 used`;
+  const schSumm  = !schMatch?'Not set up':isEU?'EU passport — no limit':seamanActive?'Seaman\'s Book entry':`${Math.max(0,schRem)}d remaining · ${schUsed}/90 used`;
   const quickLinks = `<div style="font-size:13px;font-weight:700;color:var(--label);margin-bottom:8px">Quick Links</div>
     <div class="card" style="margin-bottom:12px;overflow:hidden">
       ${qlRow(boatColor,'Transit Log — Boat',boatSumm,"ui.docSub='transitlog';showTab('documents')")}
