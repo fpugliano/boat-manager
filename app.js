@@ -2098,7 +2098,8 @@ function renderSchengenPersonStatus(p, idx) {
   const lastLogEntry = [...(p.log||[])].sort((a,b)=>a.date.localeCompare(b.date)).pop();
   const borderRight = idx === 0 ? 'border-right:1px solid var(--sep);' : '';
   const passportBtns = (p.passports||[]).map((pp, pi) => {
-    const label = [pp.flag, pp.country ? pp.country.slice(0,3) : ''].filter(Boolean).join(' ') || '?';
+    const CC = {'European Union':'EU','United States':'US','Japan':'JP','United Kingdom':'GB','Australia':'AU'};
+    const label = [pp.flag, pp.country ? (CC[pp.country] || pp.country.slice(0,2).toUpperCase()) : ''].filter(Boolean).join(' ') || '?';
     const active = pi === activePassIdx;
     return `<button onclick="setSchengenPassport(${idx},${pi})" style="background:${active?'var(--blue)':'var(--surface2)'};color:${active?'#fff':'var(--label)'};border:1.5px solid ${active?'var(--blue)':'var(--sep)'};border-radius:8px;padding:3px 6px;font-size:11px;cursor:pointer;line-height:1.4;font-family:var(--font);white-space:nowrap">${label}</button>`;
   }).join('');
