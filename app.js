@@ -2095,6 +2095,7 @@ function renderSchengenPersonStatus(p, idx) {
     ? `⚠ Overstayed by ${Math.abs(remaining)} day${Math.abs(remaining)===1?'':'s'}`
     : exitBy.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
   const exitByColor = overstayed || remaining < 30 ? 'var(--red)' : 'var(--green)';
+  const lastLogEntry = [...(p.log||[])].sort((a,b)=>a.date.localeCompare(b.date)).pop();
   const borderRight = idx === 0 ? 'border-right:1px solid var(--sep);' : '';
   const passportBtns = (p.passports||[]).map((pp, pi) => {
     const label = [pp.flag, pp.country ? pp.country.slice(0,3) : ''].filter(Boolean).join(' ') || '?';
@@ -2131,7 +2132,7 @@ function renderSchengenPersonStatus(p, idx) {
       </div>
       ${overstayed
         ? `<div style="font-size:10px;color:var(--red);margin-bottom:8px;text-align:center;font-weight:600">${exitByStr}</div>`
-        : inStatus
+        : (inStatus && lastLogEntry?.type === 'in')
           ? `<div style="font-size:10px;color:var(--label3);margin-bottom:8px;text-align:center">Exit by <span style="color:${exitByColor};font-weight:600">${exitByStr}</span></div>`
           : `<div style="font-size:10px;color:var(--label3);margin-bottom:8px;text-align:center">Next entry: up to <span style="color:var(--green);font-weight:600">${remaining}</span> days</div>`
       }`}
@@ -5649,10 +5650,14 @@ function renderClearance() {
     else if (schPersons.length > 1) { schMatch = schPersons.find(p=>!p.passports?.[p.activePassport||0]?.eu) || null; }
   }
   const isEU      = schMatch ? schMatch.passports?.[schMatch.activePassport||0]?.eu===true : false;
-  let schRem=null, schUsed=0;
+  let schRem=null, schUsed=0, schPassLabel='';
   if (schMatch && !isEU) {
     const {days} = calcSchengenDays(schMatch.log);
     schUsed = days; schRem = 90-days;
+    const recentIn = [...(schMatch.log||[])].filter(e=>e.type==='in'&&!e.seamanBook).sort((a,b)=>b.date.localeCompare(a.date))[0];
+    const schPassFlag = recentIn?.passport || '';
+    const schPassObj  = schPassFlag ? schMatch.passports?.find(pp=>pp.flag===schPassFlag) : schMatch.passports?.[schMatch.activePassport||0];
+    schPassLabel = [schPassObj?.flag, schPassObj?.country?.slice(0,3)].filter(Boolean).join(' ');
   }
   const seamanActive = schMatch ? isSeamanBookActive(schMatch.log) : false;
   const schColor = !schMatch?'#9ca3af':isEU?'#22C55E':seamanActive?'#F59E0B':schRem>45?'#22C55E':schRem>20?'#F59E0B':'#EF4444';
@@ -5714,10 +5719,10 @@ function renderClearance() {
       <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:6px">Schengen (TL User)</div>
       ${tlCircleGauge(schRem,90,'#F59E0B')}
       <div style="font-size:10px;color:#D97706;font-weight:700;margin-top:4px">⚓ Seaman's Book</div>
-      <div style="font-size:10px;color:var(--label3);margin-top:2px">${schUsed}/90 used</div>
+      <div style="font-size:10px;color:var(--label3);margin-top:2px">${schPassLabel?schPassLabel+' · ':''}${schUsed}/90 used</div>
     </div>`;
   } else {
-    g4 = gaugeCell('Schengen (TL User)', schRem, 90, schColor, [`${schUsed}/90 used`]);
+    g4 = gaugeCell('Schengen (TL User)', schRem, 90, schColor, [`${schPassLabel?schPassLabel+' · ':''}${schUsed}/90 used`]);
   }
 
   const gaugeGrid = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
