@@ -1,0 +1,7 @@
+name = "boat-manager-storage"
+main = "boat-worker.js"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "BOAT_DATA"
+id = "12b9730d5c1d4d90830ba5dd8879db32"
