@@ -1554,6 +1554,9 @@ const MAINT_TASK_MAP = {
   'New saildrive shafts PT/STBD':'Saildrive service',
   'Exchange new saildrive thru hulls':'Saildrive service',
   'Saildrive internal anodes':'Saildrive service',
+  'Added port engine coolant 400ml':'Coolant change',
+  'Added stbd engine coolant 400ml':'Coolant change',
+  'Impeller check OK':'Impeller replacement',
 };
 function normalizeMaintTask(t) { return MAINT_TASK_MAP[t] || t; }
 function getMaintTaskDropdown(currentTask, pfx) {
@@ -5878,6 +5881,83 @@ function migrateData() {
       dirty = true;
     }
   }
+  // One-time maintenance log corrections — v2 (owner only)
+  try {
+    if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL && !data._maintLogFixed_v2) {
+      if (!data.maintenance) data.maintenance = { engines:{}, sched:{}, log:[] };
+      if (!data.maintenance.log) data.maintenance.log = [];
+      const log = data.maintenance.log;
+
+      // DELETE: 2025-05-11, 1500h, Oil filter change, Inoussos — incorrect entry
+      const delIdx = log.findIndex(e => e.date==='2025-05-11' && String(e.hours)==='1500' && e.task==='Oil filter change' && e.notes==='Inoussos');
+      if (delIdx !== -1) { log.splice(delIdx, 1); dirty = true; }
+
+      // ADD: 9 missing Oil filter change entries matching their engine oil change
+      const missingOilFilters = [
+        { id:'seed_olf_20181219', date:'2018-12-19', hours:'50',   notes:'Cape Town' },
+        { id:'seed_olf_20190323', date:'2019-03-23', hours:'200',  notes:'' },
+        { id:'seed_olf_20190502', date:'2019-05-02', hours:'250',  notes:'' },
+        { id:'seed_olf_20190807', date:'2019-08-07', hours:'350',  notes:'' },
+        { id:'seed_olf_20191109', date:'2019-11-09', hours:'450',  notes:'Grenada' },
+        { id:'seed_olf_20200627', date:'2020-06-27', hours:'575',  notes:'S. Vicente' },
+        { id:'seed_olf_20210310', date:'2021-03-10', hours:'740',  notes:'Bahamas' },
+        { id:'seed_olf_20211205', date:'2021-12-05', hours:'1060', notes:'Licata' },
+        { id:'seed_olf_20221004', date:'2022-10-04', hours:'1243', notes:'Didim' },
+      ];
+      for (const s of missingOilFilters) {
+        if (!log.some(e => e.id === s.id)) {
+          log.push({ id:s.id, date:s.date, hours:s.hours, task:'Oil filter change', cost:'', notes:s.notes, engines:['port','starboard'] });
+          dirty = true;
+        }
+      }
+
+      // FIX: clear "F. Pugliano" incorrectly entered as location
+      const pugianoFixes = [
+        { date:'2019-03-23', hours:'200', task:'Engine oil change' },
+        { date:'2019-03-24', hours:'200', task:'Gear oil change' },
+        { date:'2019-05-02', hours:'250', task:'Engine oil change' },
+        { date:'2019-05-02', hours:'250', task:'Gear oil change' },
+        { date:'2019-08-07', hours:'350', task:'Engine oil change' },
+        { date:'2019-08-01', hours:'350', task:'Gear oil change' },
+        { date:'2019-07-28', hours:'320', task:'Impeller replacement' },
+        { date:'2019-06-08', hours:'300', task:'Diesel fuel filter change' },
+        { date:'2019-02-22', hours:'150', task:'Gear oil change' },
+        { date:'2018-12-19', hours:'50',  task:'Gear oil change' },
+      ];
+      for (const s of pugianoFixes) {
+        const e = log.find(e => e.date===s.date && String(e.hours)===s.hours && e.task===s.task && e.notes==='F. Pugliano');
+        if (e) { e.notes = ''; dirty = true; }
+      }
+
+      // FIX: impeller date 2024-04-13 → 2024-10-20 (1460h, Leros haul out)
+      const impeller = log.find(e => e.date==='2024-04-13' && String(e.hours)==='1460' && e.task==='Impeller replacement');
+      if (impeller) { impeller.date = '2024-10-20'; dirty = true; }
+
+      // FIX: task "Engine oil changePortStbd" → "Engine oil change", append note (2018-12-19, 50h, Cape Town)
+      const oilTaskFix = log.find(e => e.date==='2018-12-19' && String(e.hours)==='50' && e.task==='Engine oil changePortStbd');
+      if (oilTaskFix) {
+        oilTaskFix.task  = 'Engine oil change';
+        oilTaskFix.notes = (oilTaskFix.notes ? oilTaskFix.notes + ' — ' : '') + 'Port + Stbd';
+        dirty = true;
+      }
+
+      // FIX: Coolant change date 2022-12-06 → 2022-01-23 (1060h, Licata — MM/DD entry error)
+      const coolantFix = log.find(e => e.date==='2022-12-06' && String(e.hours)==='1060' && e.task==='Coolant change' && e.notes==='Licata');
+      if (coolantFix) { coolantFix.date = '2022-01-23'; dirty = true; }
+
+      // RENAME: two duplicate Diesel fuel filter entries at Didim 2022-10-04, 1243h
+      const didimFuel = log.filter(e => e.date==='2022-10-04' && String(e.hours)==='1243' && e.task==='Diesel fuel filter change' && e.notes==='Didim');
+      if (didimFuel.length >= 2) {
+        didimFuel[0].task = 'Diesel fuel filter change — Primary (Racor)';
+        didimFuel[1].task = 'Diesel fuel filter change — Secondary';
+        dirty = true;
+      }
+
+      log.sort((a,b) => b.date.localeCompare(a.date) || (parseFloat(b.hours)||0)-(parseFloat(a.hours)||0));
+      data._maintLogFixed_v2 = true;
+      dirty = true;
+    }
+  } catch(e) { console.warn('maintLogFixV2', e); }
   if (dirty) save();
 }
 
