@@ -3292,8 +3292,8 @@ function prefillLpgData() {
       {id:uid(), kg:11, full:true},
       {id:uid(), kg:11, full:false}
     ], exampleDismissed:false, history:[
-      {id:'ex_lpg1', date:dAgo(60),  location:'Example Marina', bottles:3, kg:11, pricePerKg:1.90, notes:''},
-      {id:'ex_lpg2', date:dAgo(180), location:'Another Port',   bottles:2, kg:11, pricePerKg:1.65, notes:''}
+      {id:'ex_lpg1', date:dAgo(60),  location:'Example Marina', bottles:3, kg:11, pricePerKg:1.90, notes:'Tank refill (Example)'},
+      {id:'ex_lpg2', date:dAgo(180), location:'Example Port',   bottles:2, kg:11, pricePerKg:1.65, notes:'Tank refill (Example)'}
     ]};
   }
   return true;
@@ -3590,12 +3590,12 @@ function prefillProvisionsData() {
   if (prov && prov.items?.length > 0) return false;
   if (!data.provisions) data.provisions = {};
   data.provisions = {exampleDismissed:false, items:[
-    {id:'pv_ex1', name:'Pasta',           category:'food',       location:'Galley locker', qty:2,  minQty:6, unit:'packs'},
-    {id:'pv_ex2', name:'Canned tomatoes', category:'food',       location:'Galley locker', qty:8,  minQty:4, unit:'cans'},
-    {id:'pv_ex3', name:'Olive oil',       category:'food',       location:'Galley',        qty:1,  minQty:3, unit:'bottles'},
-    {id:'pv_ex4', name:'Sunscreen SPF50', category:'toiletries', location:'Nav station',   qty:1,  minQty:3, unit:'bottles'},
-    {id:'pv_ex5', name:'Toilet paper',    category:'toiletries', location:'Aft cabin',     qty:2,  minQty:8, unit:'rolls'},
-    {id:'pv_ex6', name:'Dish soap',       category:'toiletries', location:'Galley',        qty:0,  minQty:2, unit:'bottles'},
+    {id:'pv_ex1', name:'Pasta (Example)',            category:'food',       location:'Galley locker', qty:2,  minQty:6, unit:'packs'},
+    {id:'pv_ex2', name:'Canned tomatoes (Example)',  category:'food',       location:'Galley locker', qty:8,  minQty:4, unit:'cans'},
+    {id:'pv_ex3', name:'Olive oil (Example)',        category:'food',       location:'Galley',        qty:1,  minQty:3, unit:'bottles'},
+    {id:'pv_ex4', name:'Sunscreen SPF50 (Example)', category:'toiletries', location:'Nav station',   qty:1,  minQty:3, unit:'bottles'},
+    {id:'pv_ex5', name:'Toilet paper (Example)',     category:'toiletries', location:'Aft cabin',     qty:2,  minQty:8, unit:'rolls'},
+    {id:'pv_ex6', name:'Dish soap (Example)',        category:'toiletries', location:'Galley',        qty:0,  minQty:2, unit:'bottles'},
   ]};
   return true;
 }
@@ -3606,6 +3606,56 @@ function prefillNewUserSampleData() {
 
   const dAgo = n => { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); };
   let dirty = false;
+
+  // ── Vessel Doc ──
+  if (!data.documents?.vessel?.vesselName) {
+    if (!data.documents) data.documents = JSON.parse(JSON.stringify(EMPTY_DEFAULTS.documents));
+    data.documents.vessel = {
+      vesselName:'S/V Example', officialNumber:'EX-123456', imoNumber:'EX-IMO-0001',
+      callSign:'EXMP1', hailingPort:'Example Port', flagRegistry:'Example Flag State',
+      hullMaterial:'GRP Fiberglass', boatType:'Sailing Catamaran (Example)',
+      grossTonnage:'14', netTonnage:'12', loa:'12.0m', breadth:'6.5m', depth:'1.2m',
+      yearCompleted:'2015', placeBuilt:'Example Country',
+      owners:'Example Owner', managingOwner:'Example Owner',
+      issueDate:'2020-01-15', expiryDate:'2030-01-15',
+      engine:'Example Diesel 30hp (×2)', registrationHistory:[]
+    };
+    dirty = true;
+  }
+
+  // ── Insurance ──
+  if (!data.documents?.insurance?.insurer) {
+    if (!data.documents) data.documents = JSON.parse(JSON.stringify(EMPTY_DEFAULTS.documents));
+    data.documents.insurance = {
+      insurer:'Example Insurance Co (Example)', policyNumber:'EX-POLICY-001',
+      certNumber:'EX-CERT-001', issueDate:'2025-01-01', expiryDate:'2026-01-01',
+      premium:'1,200',
+      maxPersonalInjury:'€500,000 per person (Example)',
+      maxMaterial:'€300,000 per accident (Example)',
+      maxPollution:'€150,000 per accident (Example)',
+      renewalHistory:[]
+    };
+    dirty = true;
+  }
+
+  // ── eTEPAY / Customs ──
+  if (!data.documents?.customs?.holderName && !data.documents?.customs?.clearanceNumber) {
+    if (!data.documents) data.documents = JSON.parse(JSON.stringify(EMPTY_DEFAULTS.documents));
+    data.documents.customs = {
+      holderName:'Example Owner', address:'123 Example Street, Example City',
+      email:'owner@example.com', afm:'EX-TAX-001',
+      customsOffice:'GR003102 - Syros', clearanceNumber:'EX-CLEAR-0001',
+      paymentRef:'EX-PAY-0001', validUntil:'2026-11-01',
+      applicationNumber:'EX-APP-0001', applicationDate:'01/04/2025', entryDate:'01/04/2025',
+      year:'2025', monthsCovered:'April,May,June,July,August,September,October',
+      amountPaid:'€0 (Example)', paymentCode:'EX-RF-00000000001',
+      adminFeeCode:'EX-FEE-00000000001', status:'New',
+      ownerPassportNumber:'EX-PASS-001', ownerPhone:'+1 555 0100',
+      ownerAddress:'123 Example Street, Example City (Example)',
+      renewalHistory:[]
+    };
+    dirty = true;
+  }
 
   // ── Boat Docs / Transit Log ──
   if (!data.transitLog) data.transitLog = {};
@@ -3649,19 +3699,19 @@ function prefillNewUserSampleData() {
   // ── Provisions ──
   if (!data.provisions?.items?.length) {
     data.provisions = {exampleDismissed:false, items:[
-      {id:uid(), name:'Pasta',        category:'food',       location:'Galley locker', qty:4,  minQty:6, unit:'packs'},
-      {id:uid(), name:'Olive oil',    category:'food',       location:'Galley',        qty:2,  minQty:3, unit:'bottles'},
-      {id:uid(), name:'Tomato sauce', category:'food',       location:'Galley locker', qty:6,  minQty:4, unit:'cans'},
-      {id:uid(), name:'Rice',         category:'food',       location:'Galley locker', qty:3,  minQty:4, unit:'packs'},
-      {id:uid(), name:'Canned tuna',  category:'food',       location:'Galley locker', qty:8,  minQty:6, unit:'cans'},
-      {id:uid(), name:'Water 6L',     category:'drinks',     location:'Cockpit locker',qty:6,  minQty:4, unit:'bottles'},
-      {id:uid(), name:'Wine',         category:'drinks',     location:'Galley locker', qty:3,  minQty:2, unit:'bottles'},
-      {id:uid(), name:'Beer',         category:'drinks',     location:'Fridge',        qty:12, minQty:6, unit:'cans'},
-      {id:uid(), name:'Soap',         category:'toiletries', location:'Heads',         qty:3,  minQty:2, unit:'bars'},
-      {id:uid(), name:'Shampoo',      category:'toiletries', location:'Heads',         qty:2,  minQty:2, unit:'bottles'},
-      {id:uid(), name:'Dish soap',    category:'toiletries', location:'Galley',        qty:2,  minQty:2, unit:'bottles'},
-      {id:uid(), name:'Sunscreen',    category:'misc',       location:'Nav station',   qty:2,  minQty:2, unit:'bottles'},
-      {id:uid(), name:'Batteries AA', category:'misc',       location:'Nav station',   qty:8,  minQty:4, unit:'pcs'},
+      {id:uid(), name:'Pasta (Example)',         category:'food',       location:'Galley locker',  qty:4,  minQty:6, unit:'packs'},
+      {id:uid(), name:'Olive oil (Example)',     category:'food',       location:'Galley',         qty:2,  minQty:3, unit:'bottles'},
+      {id:uid(), name:'Tomato sauce (Example)',  category:'food',       location:'Galley locker',  qty:6,  minQty:4, unit:'cans'},
+      {id:uid(), name:'Rice (Example)',          category:'food',       location:'Galley locker',  qty:3,  minQty:4, unit:'packs'},
+      {id:uid(), name:'Canned tuna (Example)',   category:'food',       location:'Galley locker',  qty:8,  minQty:6, unit:'cans'},
+      {id:uid(), name:'Water 6L (Example)',      category:'drinks',     location:'Cockpit locker', qty:6,  minQty:4, unit:'bottles'},
+      {id:uid(), name:'Wine (Example)',          category:'drinks',     location:'Galley locker',  qty:3,  minQty:2, unit:'bottles'},
+      {id:uid(), name:'Beer (Example)',          category:'drinks',     location:'Fridge',         qty:12, minQty:6, unit:'cans'},
+      {id:uid(), name:'Soap (Example)',          category:'toiletries', location:'Heads',          qty:3,  minQty:2, unit:'bars'},
+      {id:uid(), name:'Shampoo (Example)',       category:'toiletries', location:'Heads',          qty:2,  minQty:2, unit:'bottles'},
+      {id:uid(), name:'Dish soap (Example)',     category:'toiletries', location:'Galley',         qty:2,  minQty:2, unit:'bottles'},
+      {id:uid(), name:'Sunscreen (Example)',     category:'misc',       location:'Nav station',    qty:2,  minQty:2, unit:'bottles'},
+      {id:uid(), name:'Batteries AA (Example)',  category:'misc',       location:'Nav station',    qty:8,  minQty:4, unit:'pcs'},
     ]};
     dirty = true;
   }
@@ -3685,7 +3735,7 @@ function prefillNewUserSampleData() {
         {id:uid(), kg:11, full:false},
       ],
       history:[
-        {id:uid(), date:dAgo(60), location:'Example Marina', bottles:1, kg:11, pricePerKg:1.80, notes:'Example — replace with your own'},
+        {id:uid(), date:dAgo(60), location:'Example Marina', bottles:1, kg:11, pricePerKg:1.80, notes:'Tank 1 refill (Example)'},
       ]
     };
     dirty = true;
@@ -3722,15 +3772,15 @@ function prefillNewUserSampleData() {
     const yr = new Date().getFullYear();
     const dt = (y, m, d) => `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     data.schengen = {persons:[{
-      name:'Test Traveler', activePassport:0,
+      name:'Test Traveler (Example)', activePassport:0,
       passports:[{flag:'🇺🇸', country:'United States', eu:false}],
       log:[
-        {id:uid(), type:'in',  date:dt(yr-1,12,10), passport:'🇺🇸', location:'Gibraltar'},
-        {id:uid(), type:'out', date:dt(yr,2,7),      passport:'',    location:'Gibraltar',          notes:'60 days — fine so far'},
-        {id:uid(), type:'in',  date:dt(yr,3,20),     passport:'🇺🇸', location:'Palma de Mallorca'},
-        {id:uid(), type:'out', date:dt(yr,4,19),     passport:'',    location:'Palma de Mallorca', notes:'30 days — 90 days total used in rolling window'},
-        {id:uid(), type:'in',  date:dt(yr,6,4),      passport:'🇺🇸', location:'Sardinia',          notes:'Overstay — rolling 180-day window already has 90 days used'},
-        {id:uid(), type:'out', date:dt(yr,6,18),     passport:'',    location:'Sardinia',           notes:'14 days overstay'},
+        {id:uid(), type:'in',  date:dt(yr-1,12,10), passport:'🇺🇸', location:'Gibraltar (Example)'},
+        {id:uid(), type:'out', date:dt(yr,2,7),      passport:'',    location:'Gibraltar (Example)',          notes:'60 days — fine so far (Example)'},
+        {id:uid(), type:'in',  date:dt(yr,3,20),     passport:'🇺🇸', location:'Palma de Mallorca (Example)'},
+        {id:uid(), type:'out', date:dt(yr,4,19),     passport:'',    location:'Palma de Mallorca (Example)', notes:'30 days — 90 days total used in rolling window (Example)'},
+        {id:uid(), type:'in',  date:dt(yr,6,4),      passport:'🇺🇸', location:'Sardinia (Example)',          notes:'Overstay — rolling 180-day window already has 90 days used (Example)'},
+        {id:uid(), type:'out', date:dt(yr,6,18),     passport:'',    location:'Sardinia (Example)',           notes:'14 days overstay (Example)'},
       ]
     }]};
     dirty = true;
@@ -3741,8 +3791,8 @@ function prefillNewUserSampleData() {
     if (!data.shipyard) data.shipyard = {};
     if (!data.shipyard.current) data.shipyard.current = {};
     data.shipyard.history = [
-      {id:uid(), year:'2024/2025', name:'Example Boatyard', location:'Example Marina', start:'2024-10-01', end:'2025-04-01', cost:'€2,800', notes:'Antifouling and hull inspection — Example'},
-      {id:uid(), year:'2023/2024', name:'Another Yard',     location:'Another Port',   start:'2023-10-15', end:'2024-03-15', cost:'€3,500', notes:'Full haul out and engine service — Example'},
+      {id:uid(), year:'2024/2025', name:'Example Boatyard',        location:'Example Marina', start:'2024-10-01', end:'2025-04-01', cost:'€2,800', notes:'Antifouling and hull inspection (Example)'},
+      {id:uid(), year:'2023/2024', name:'Another Example Boatyard', location:'Example Port',   start:'2023-10-15', end:'2024-03-15', cost:'€3,500', notes:'Full haul out and engine service (Example)'},
     ];
     dirty = true;
   }
@@ -3752,9 +3802,9 @@ function prefillNewUserSampleData() {
     const mk = (text, checked) => ({id:uid(), text, asterisk:false, checked:!!checked, group:null});
     data.winterization = {currentSeason:'w2526', seasons:{w2526:{
       name:'Winter 2025/26', archived:false, sections:{
-        winterize:  {items:[mk('Remove sails',true), mk('Change engine oil',true), mk('Flush raw water system'), mk('Remove impellers'), mk('Drain water tanks')]},
-        needs:      {items:[mk('Engine oil'), mk('Fuel filters'), mk('Impeller kit')]},
-        backOnBoard:{items:[mk('Connect shore power'), mk('Hoist sails'), mk('Watermaker flush')]}
+        winterize:  {items:[mk('Remove sails (Example)',true), mk('Change engine oil (Example)',true), mk('Flush raw water system (Example)'), mk('Remove impellers (Example)'), mk('Drain water tanks (Example)')]},
+        needs:      {items:[mk('Engine oil (Example)'), mk('Fuel filters (Example)'), mk('Impeller kit (Example)')]},
+        backOnBoard:{items:[mk('Connect shore power (Example)'), mk('Hoist sails (Example)'), mk('Watermaker flush (Example)')]}
       }
     }}};
     dirty = true;
@@ -3820,14 +3870,14 @@ function prefillShipyardData() {
   if (sy && (sy.history?.length || sy.quotes?.length)) return false;
   if (!data.shipyard) data.shipyard = {};
   data.shipyard.history = [
-    {id:uid(), year:'2023/2024', name:'Marina del Rey Boatyard', location:'Los Angeles', start:'2023-10-01', end:'2024-04-01', cost:'€3,200', notes:'Antifouling and hull inspection'},
-    {id:uid(), year:'2022/2023', name:'Palma Boat Services',     location:'Mallorca',    start:'2022-10-01', end:'2023-03-01', cost:'€4,800', notes:'Full haul out and keel repaint'},
-    {id:uid(), year:'2021/2022', name:'Porto Montenegro Yard',   location:'Montenegro',  start:'2021-11-01', end:'2022-04-01', cost:'€5,500', notes:'Engine service and osmosis treatment'},
+    {id:uid(), year:'2023/2024', name:'Example Boatyard',         location:'Example Port',   start:'2023-10-01', end:'2024-04-01', cost:'€3,200', notes:'Antifouling and hull inspection (Example)'},
+    {id:uid(), year:'2022/2023', name:'Another Example Boatyard', location:'Example Marina', start:'2022-10-01', end:'2023-03-01', cost:'€4,800', notes:'Full haul out and keel repaint (Example)'},
+    {id:uid(), year:'2021/2022', name:'Example Yard',             location:'Example City',   start:'2021-11-01', end:'2022-04-01', cost:'€5,500', notes:'Engine service and osmosis treatment (Example)'},
   ];
   data.shipyard.quotes = [
-    {id:uid(), name:'Marina del Rey Boatyard', location:'Los Angeles',    price:'€3,200', notes:'Includes pressure wash and antifouling', selected:false},
-    {id:uid(), name:'Pacific Yacht Services',  location:'San Diego',      price:'€2,950', notes:'No travel lift fee',                     selected:false},
-    {id:uid(), name:'Bay Marine Works',        location:'San Francisco',  price:'€3,800', notes:'Premium yard, full refit available',     selected:false},
+    {id:uid(), name:'Example Boatyard',         location:'Example Port',   price:'€3,200', notes:'Includes pressure wash and antifouling (Example)', selected:false},
+    {id:uid(), name:'Another Example Boatyard', location:'Example Marina', price:'€2,950', notes:'No travel lift fee (Example)',                     selected:false},
+    {id:uid(), name:'Example Yard',             location:'Example City',   price:'€3,800', notes:'Premium yard, full refit available (Example)',     selected:false},
   ];
   if (!data.shipyard.current) data.shipyard.current = {};
   return true;
