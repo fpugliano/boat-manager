@@ -1964,38 +1964,34 @@ function renderMaintenance() {
     else { va=vb=0; }
     return (va<vb?-1:va>vb?1:0)*(logSort.dir==='asc'?1:-1);
   }) : filtered;
-  function sHdr(col, label, extraStyle) {
-    const active = logSort?.col === col;
-    const arrow  = active ? (logSort.dir==='asc' ? ' ▲' : ' ▼') : '';
-    return `<th style="cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden;padding:7px 4px;${extraStyle||''}" onclick="setMaintLogSort('${col}')">${label}${arrow}</th>`;
+  function hdrCol(col, label, style) {
+    const arrow = logSort?.col===col ? (logSort.dir==='asc' ? ' ▲' : ' ▼') : '';
+    return `<div onclick="setMaintLogSort('${col}')" style="cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden;padding:7px 0;font-size:11px;font-weight:700;${style}">${label}${arrow}</div>`;
   }
   const bLbl = {port:'PT', starboard:'STB'};
   const logRows = display.map(({e, origIdx}) => {
     const eid = e.id || '';
     const dp = e.date ? (() => { const [y,m,d]=e.date.split('-'); return `${+m}/${+d}/${y.slice(2)}`; })() : '';
     const engBadges = isCat ? (e.engines||[]).map(eng =>
-      `<span style="font-size:10px;font-weight:700;padding:1px 4px;border-radius:4px;background:var(--surface2);color:var(--label3);margin-left:3px;flex-shrink:0;white-space:nowrap">${bLbl[eng]||eng}</span>`
+      `<span style="font-size:10px;font-weight:700;padding:1px 4px;border-radius:4px;background:var(--surface2);color:var(--label3);flex-shrink:0;white-space:nowrap">${bLbl[eng]||eng}</span>`
     ).join('') : '';
-    return `<tr data-maint-id="${esc(eid)}" draggable="true"
+    return `<div data-maint-id="${esc(eid)}" draggable="true"
       ondragstart="maintLogDragStart(event,'${esc(eid)}')"
       ondragover="maintLogDragOver(event,'${esc(eid)}')"
       ondragleave="maintLogDragLeave(event)"
       ondrop="maintLogDrop(event,'${esc(eid)}')"
-      ondragend="maintLogDragEnd()">
-      <td style="overflow:hidden;padding:0 4px"><span class="prov-grip" ontouchstart="maintLogTouchStart(event,'${esc(eid)}')">⠿</span></td>
-      <td style="overflow:hidden;white-space:nowrap;padding:8px 4px;font-size:11px;color:var(--label3)">${esc(dp)}</td>
-      <td style="overflow:hidden;white-space:nowrap;padding:8px 4px;font-size:11px;color:var(--label3)">${esc(String(e.hours))}h</td>
-      <td style="overflow:hidden;padding:8px 4px">
-        <div style="display:flex;align-items:center;overflow:hidden;min-width:0">
-          <span style="flex:1;min-width:0;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.task)}</span>
-          ${engBadges}
-        </div>
-      </td>
-      <td style="overflow:hidden;white-space:nowrap;padding:8px 4px;text-align:right">
-        <button class="btn btn-s btn-xs" onclick="editMaintEntry(${origIdx})">✏</button>
-      </td>
-    </tr>`;
-  }).join('') || `<tr><td colspan="5" style="color:var(--label3);padding:12px 16px;font-size:13px">${logFilter==='All'?'No entries yet':'No entries for this task'}</td></tr>`;
+      ondragend="maintLogDragEnd()"
+      style="display:flex;align-items:center;width:100%;box-sizing:border-box;padding:0 12px;border-bottom:1px solid var(--sep)">
+      <span class="prov-grip" style="width:20px;flex-shrink:0;padding:8px 0" ontouchstart="maintLogTouchStart(event,'${esc(eid)}')">⠿</span>
+      <span style="width:48px;flex-shrink:0;font-size:11px;color:var(--label3);white-space:nowrap;overflow:hidden;padding:8px 4px 8px 0">${esc(dp)}</span>
+      <span style="width:36px;flex-shrink:0;font-size:11px;color:var(--label3);white-space:nowrap;overflow:hidden;padding:8px 4px 8px 0">${esc(String(e.hours))}h</span>
+      <div style="flex:1;min-width:0;display:flex;align-items:center;gap:4px;overflow:hidden;padding:8px 4px 8px 0">
+        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:500">${esc(e.task)}</span>
+        ${engBadges}
+      </div>
+      <button class="btn btn-s btn-xs" onclick="editMaintEntry(${origIdx})" style="flex-shrink:0;padding:0;width:30px;text-align:center">✏</button>
+    </div>`;
+  }).join('') || `<div style="color:var(--label3);padding:12px 16px;font-size:13px">${logFilter==='All'?'No entries yet':'No entries for this task'}</div>`;
   const logHtml = `
     <div class="sec-hd">Maintenance Log</div>
     <div class="btn-row">
@@ -2003,23 +1999,14 @@ function renderMaintenance() {
     </div>
     ${filterPills}
     <div class="card">
-      <table style="table-layout:fixed;width:calc(100% - 24px);margin:0 12px;border-collapse:collapse;font-size:13px">
-        <colgroup>
-          <col style="width:20px">
-          <col style="width:48px">
-          <col style="width:36px">
-          <col>
-          <col style="width:34px">
-        </colgroup>
-        <thead><tr style="background:var(--surface2)">
-          <th style="overflow:hidden;padding:0 4px"></th>
-          ${sHdr('date','Date')}
-          ${sHdr('hours','Hrs')}
-          ${sHdr('task','Task')}
-          <th style="overflow:hidden;padding:0 4px"></th>
-        </tr></thead>
-        <tbody>${logRows}</tbody>
-      </table>
+      <div style="display:flex;align-items:center;width:100%;box-sizing:border-box;padding:0 12px;background:var(--surface2);border-bottom:1px solid var(--sep)">
+        <div style="width:20px;flex-shrink:0"></div>
+        ${hdrCol('date','Date','flex-shrink:0;width:48px;')}
+        ${hdrCol('hours','Hrs','flex-shrink:0;width:36px;')}
+        ${hdrCol('task','Task','flex:1;min-width:0;')}
+        <div style="width:30px;flex-shrink:0"></div>
+      </div>
+      ${logRows}
     </div>`;
   return hoursHtml + renderMaintGauges() + comingUpHtml + logHtml;
 }
