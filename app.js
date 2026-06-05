@@ -1972,7 +1972,7 @@ function renderMaintenance() {
   const bLbl = {port:'PT', starboard:'STB'};
   const logRows = display.map(({e, origIdx}) => {
     const eid = e.id || '';
-    const dp = e.date ? (() => { const [y,m,d]=e.date.split('-'); return `${m}/${d}/${y.slice(2)}`; })() : '';
+    const dp = e.date ? (() => { const [y,m,d]=e.date.split('-'); return `${+m}/${+d}/${y.slice(2)}`; })() : '';
     const engBadges = isCat ? (e.engines||[]).map(eng =>
       `<span style="font-size:10px;font-weight:700;padding:1px 4px;border-radius:4px;background:var(--surface2);color:var(--label3);margin-left:3px;flex-shrink:0;white-space:nowrap">${bLbl[eng]||eng}</span>`
     ).join('') : '';
@@ -2004,13 +2004,13 @@ function renderMaintenance() {
     </div>
     ${filterPills}
     <div class="card">
-      <table style="table-layout:fixed;width:100%;border-collapse:collapse;font-size:13px">
+      <table style="table-layout:fixed;width:calc(100% - 24px);margin:0 12px;border-collapse:collapse;font-size:13px">
         <colgroup>
           <col style="width:20px">
-          <col style="width:54px">
-          <col style="width:38px">
+          <col style="width:48px">
+          <col style="width:36px">
           <col>
-          <col style="width:60px">
+          <col style="width:58px">
         </colgroup>
         <thead><tr style="background:var(--surface2)">
           <th style="overflow:hidden;padding:0 4px"></th>
