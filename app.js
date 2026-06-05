@@ -1510,53 +1510,68 @@ function maintTaskKeywords(taskId) {
 }
 
 const MAINT_CANONICAL_TASKS = [
-  'Engine oil change','Oil filter change','Gear oil change','Impeller replacement',
-  'Diesel fuel filter change','Coolant change','Belt inspection / tensioning','Belt replacement',
-  'Raw water pump replacement','Heat exchanger service','Saildrive service',
-  'Valve clearance','Cleaned raw water strainer',
+  'Engine oil','Oil filter','Gear oil','Impeller',
+  'Fuel filters','Coolant','Engine belt',
+  'Water pump','Heat exchanger','Saildrive',
+  'Saildrive lip seals','Saildrive shaft',
+  'Valve clearance','Raw water strainer',
 ];
 const MAINT_TASK_MAP = {
-  'Engine oil PT/STBD + filter':'Engine oil change',
-  'Engine oil PT/STBD':'Engine oil change',
-  'Engine oil & filter PT/STBD':'Engine oil change',
-  'Engine oil & filter - winterising':'Engine oil change',
-  '50hr service PT/STBD':'Engine oil change',
-  'Engine filters PT/STBD':'Oil filter change',
-  'First & second fuel filters PT/STBD':'Oil filter change',
-  'Gear oil PT/STBD':'Gear oil change',
-  'Gear oil - whole exchange':'Gear oil change',
-  'Changed gear oil PT/STBD':'Gear oil change',
-  'Gear oil STBD/Port':'Gear oil change',
-  'Gear oil PT/STBD - 2 times full':'Gear oil change',
-  'Impeller PT/STBD':'Impeller replacement',
-  'Impeller only STBD':'Impeller replacement',
-  'Replaced impeller both sides - both were good':'Impeller replacement',
-  'Impeller changed PT/STBD':'Impeller replacement',
-  'Diesel fuel filters PT/STBD':'Diesel fuel filter change',
-  'Diesel fuel filters':'Diesel fuel filter change',
-  'Secondary diesel filters':'Diesel fuel filter change',
-  'Racor fuel water filter Separ':'Diesel fuel filter change',
-  'Seaform filter priming':'Diesel fuel filter change',
-  'Yanmar coolant':'Coolant change',
-  'New Yanmar coolant':'Coolant change',
-  'Yanmar coolant - whole change':'Coolant change',
+  // informal → new canonical
+  'Engine oil PT/STBD + filter':'Engine oil',
+  'Engine oil PT/STBD':'Engine oil',
+  'Engine oil & filter PT/STBD':'Engine oil',
+  'Engine oil & filter - winterising':'Engine oil',
+  '50hr service PT/STBD':'Engine oil',
+  'Engine filters PT/STBD':'Oil filter',
+  'First & second fuel filters PT/STBD':'Oil filter',
+  'Gear oil PT/STBD':'Gear oil',
+  'Gear oil - whole exchange':'Gear oil',
+  'Changed gear oil PT/STBD':'Gear oil',
+  'Gear oil STBD/Port':'Gear oil',
+  'Gear oil PT/STBD - 2 times full':'Gear oil',
+  'Impeller PT/STBD':'Impeller',
+  'Impeller only STBD':'Impeller',
+  'Replaced impeller both sides - both were good':'Impeller',
+  'Impeller changed PT/STBD':'Impeller',
+  'Diesel fuel filters PT/STBD':'Fuel filters',
+  'Diesel fuel filters':'Fuel filters',
+  'Secondary diesel filters':'Fuel filters',
+  'Racor fuel water filter Separ':'Fuel filters',
+  'Seaform filter priming':'Fuel filters',
+  'Yanmar coolant':'Coolant',
+  'New Yanmar coolant':'Coolant',
+  'Yanmar coolant - whole change':'Coolant',
   'Inspect and adjust belt tensioning':'Belt inspection / tensioning',
   'Inspect & adjust belt tension':'Belt inspection / tensioning',
-  'Belt replacement PT':'Belt replacement',
-  'Belts changed PT/STBD':'Belt replacement',
-  'Replace belts':'Belt replacement',
-  'Water pump replacement - leak in port engine':'Raw water pump replacement',
-  'New STBD water pump':'Raw water pump replacement',
-  'Replaced STBD raw water pump':'Raw water pump replacement',
-  'Water pump lip seal PT/STBD':'Raw water pump replacement',
-  'Clean heat exchanger':'Heat exchanger service',
-  'Heat exchanger service':'Heat exchanger service',
-  'New saildrive shafts PT/STBD':'Saildrive service',
-  'Exchange new saildrive thru hulls':'Saildrive service',
-  'Saildrive internal anodes':'Saildrive service',
-  'Added port engine coolant 400ml':'Coolant change',
-  'Added stbd engine coolant 400ml':'Coolant change',
-  'Impeller check OK':'Impeller replacement',
+  'Belt replacement PT':'Engine belt',
+  'Belts changed PT/STBD':'Engine belt',
+  'Replace belts':'Engine belt',
+  'Water pump replacement - leak in port engine':'Water pump',
+  'New STBD water pump':'Water pump',
+  'Replaced STBD raw water pump':'Water pump',
+  'Water pump lip seal PT/STBD':'Water pump',
+  'Clean heat exchanger':'Heat exchanger',
+  'New saildrive shafts PT/STBD':'Saildrive',
+  'Exchange new saildrive thru hulls':'Saildrive',
+  'Saildrive internal anodes':'Saildrive',
+  'Added port engine coolant 400ml':'Coolant',
+  'Added stbd engine coolant 400ml':'Coolant',
+  'Impeller check OK':'Impeller',
+  // old canonical → new canonical
+  'Engine oil change':'Engine oil',
+  'Oil filter change':'Oil filter',
+  'Gear oil change':'Gear oil',
+  'Impeller replacement':'Impeller',
+  'Diesel fuel filter change':'Fuel filters',
+  'Coolant change':'Coolant',
+  'Belt replacement':'Engine belt',
+  'Raw water pump replacement':'Water pump',
+  'Heat exchanger service':'Heat exchanger',
+  'Saildrive service':'Saildrive',
+  'Saildrive lip seal replacement':'Saildrive lip seals',
+  'Saildrive shaft replacement':'Saildrive shaft',
+  'Cleaned raw water strainer':'Raw water strainer',
 };
 function normalizeMaintTask(t) { return MAINT_TASK_MAP[t] || t; }
 function getMaintTaskDropdown(currentTask, pfx) {
@@ -1789,6 +1804,16 @@ function renderMaintGauges() {
   const log      = getMaintLog();
   const eids     = getEngines();
   const curHours = eids.length ? Math.max(...eids.map(eid => data.maintenance?.engines?.[eid]?.hours || 0)) : 0;
+  const gaugeDefs = [
+    {title:'Engine Oil + Filter', tasks:['Engine oil','Oil filter'],   interval:150, green:50,  amber:20},
+    {title:'Gear Oil',            tasks:['Gear oil'],                  interval:150, green:50,  amber:20},
+    {title:'Fuel Filters',        tasks:['Fuel filters'],              interval:250, green:80,  amber:30},
+    {title:'Lip Seals',           tasks:['Saildrive lip seals'],       interval:800, green:200, amber:100},
+  ];
+  const order = (() => {
+    const o = data.maintenance?.gaugeOrder;
+    return (Array.isArray(o) && o.length === 4) ? o : [0,1,2,3];
+  })();
 
   function lastH(...tasks) {
     const entries = log.filter(e => tasks.includes(e.task));
@@ -1796,7 +1821,7 @@ function renderMaintGauges() {
     return Math.max(...entries.map(e => parseFloat(e.hours) || 0));
   }
 
-  function gauge(title, lastHours, interval, greenT, amberT) {
+  function gauge(title, lastHours, interval, greenT, amberT, pos) {
     const due     = lastHours !== null ? lastHours + interval : null;
     const rem     = due !== null ? due - curHours : null;
     const overdue = rem !== null && rem <= 0;
@@ -1807,11 +1832,20 @@ function renderMaintGauges() {
                   : '#EF4444';
     const num      = rem === null ? '—' : String(Math.max(0, Math.round(rem)));
     const dueLabel = due !== null ? `Due: ${Math.round(due)}h` : 'No data';
-    const L      = 163; // π × r(52)
+    const L      = 163;
     const offset = Math.round(L * (1 - pct));
     return `
-      <div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px 10px;text-align:center">
-        <div style="font-size:10px;font-weight:700;color:var(--label2);line-height:1.3;margin-bottom:4px">${title}</div>
+      <div data-gauge-pos="${pos}" draggable="true"
+        ondragstart="gaugeDragStart(event,${pos})"
+        ondragover="gaugeDragOver(event,${pos})"
+        ondragleave="gaugeDragLeave(event)"
+        ondrop="gaugeDrop(event,${pos})"
+        ondragend="gaugeDragEnd()"
+        style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px 10px;text-align:center">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <div style="font-size:10px;font-weight:700;color:var(--label2);line-height:1.3">${title}</div>
+          <span class="prov-grip" style="font-size:13px;line-height:1">⠿</span>
+        </div>
         <svg viewBox="0 0 130 82" style="width:100%;display:block">
           <path d="M 13 72 A 52 52 0 0 1 117 72" fill="none" stroke="#e5e7eb" stroke-width="10" stroke-linecap="round"/>
           <path d="M 13 72 A 52 52 0 0 1 117 72" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${L}" stroke-dashoffset="${offset}"/>
@@ -1824,11 +1858,47 @@ function renderMaintGauges() {
 
   return `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-      ${gauge('Engine Oil + Filter', lastH('Engine oil change'), 150, 50, 20)}
-      ${gauge('Gear Oil', lastH('Gear oil change'), 150, 50, 20)}
-      ${gauge('Fuel Filters', lastH('Diesel fuel filter change', 'Diesel fuel filter change — Primary (Racor)'), 250, 80, 30)}
-      ${gauge('Lip Seal', lastH('Saildrive lip seal replacement'), 800, 200, 100)}
+      ${order.map((defIdx, pos) => {
+        const d = gaugeDefs[defIdx] || gaugeDefs[0];
+        return gauge(d.title, lastH(...d.tasks), d.interval, d.green, d.amber, pos);
+      }).join('')}
     </div>`;
+}
+
+let _gaugeDragPos = null;
+function gaugeDragStart(e, pos) {
+  _gaugeDragPos = pos;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(pos));
+  setTimeout(() => document.querySelector(`[data-gauge-pos="${pos}"]`)?.classList.add('prov-dragging'), 0);
+}
+function gaugeDragOver(e, pos) {
+  if (_gaugeDragPos === null || _gaugeDragPos === pos) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  e.currentTarget.classList.add('prov-drag-over');
+}
+function gaugeDragLeave(e) { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('prov-drag-over'); }
+function gaugeDrop(e, toPos) {
+  e.preventDefault();
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  const fromPos = _gaugeDragPos; _gaugeDragPos = null;
+  _gaugeDoReorder(fromPos, toPos);
+}
+function gaugeDragEnd() {
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  _gaugeDragPos = null;
+}
+function _gaugeDoReorder(fromPos, toPos) {
+  if (fromPos === null || toPos === null || fromPos === toPos) return;
+  if (!data.maintenance) data.maintenance = {engines:{}, sched:{}, log:[]};
+  const cur = (Array.isArray(data.maintenance.gaugeOrder) && data.maintenance.gaugeOrder.length===4)
+    ? [...data.maintenance.gaugeOrder] : [0,1,2,3];
+  const [moved] = cur.splice(fromPos, 1);
+  cur.splice(toPos, 0, moved);
+  data.maintenance.gaugeOrder = cur;
+  save();
+  document.getElementById('mainContent').innerHTML = renderMaintenance();
 }
 
 function renderMaintenance() {
@@ -1885,24 +1955,20 @@ function renderMaintenance() {
     <div class="pill ${logFilter==='All'?'active':''}" onclick="ui.maintTaskFilter='All';document.getElementById('mainContent').innerHTML=renderMaintenance()">All</div>
     ${allFilterTasks.map(t => `<div class="pill ${logFilter===t?'active':''}" onclick="setMaintFilter(this.dataset.task)" data-task="${esc(t)}">${esc(t)}</div>`).join('')}
   </div>` : '';
-  const _sortStates = [
-    {col:'date',  dir:'desc', label:'Date ▼'},
-    {col:'date',  dir:'asc',  label:'Date ▲'},
-    {col:'hours', dir:'desc', label:'Hours ▼'},
-    {col:'hours', dir:'asc',  label:'Hours ▲'},
-    {col:'task',  dir:'asc',  label:'Task A–Z'},
-    {col:'task',  dir:'desc', label:'Task Z–A'},
-  ];
-  const logSort  = ui.maintLogSort || _sortStates[0];
-  const sortLabel = _sortStates.find(s => s.col===logSort.col && s.dir===logSort.dir)?.label || 'Date ▼';
-  const display  = [...filtered].sort((a, b) => {
+  const logSort = ui.maintLogSort;
+  const display = logSort ? [...filtered].sort((a, b) => {
     let va, vb;
     if      (logSort.col==='date')  { va=a.e.date||'';  vb=b.e.date||''; }
     else if (logSort.col==='hours') { va=parseFloat(a.e.hours)||0; vb=parseFloat(b.e.hours)||0; }
     else if (logSort.col==='task')  { va=a.e.task||'';  vb=b.e.task||''; }
     else { va=vb=0; }
     return (va<vb?-1:va>vb?1:0)*(logSort.dir==='asc'?1:-1);
-  });
+  }) : filtered;
+  function sHdr(col, label, extraStyle) {
+    const active = logSort?.col === col;
+    const arrow  = active ? (logSort.dir==='asc' ? ' ▲' : ' ▼') : '';
+    return `<th style="cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden;padding:7px 4px;${extraStyle||''}" onclick="setMaintLogSort('${col}')">${label}${arrow}</th>`;
+  }
   const bLbl = {port:'PT', starboard:'STB'};
   const logRows = display.map(({e, origIdx}) => {
     const eid = e.id || '';
@@ -1910,32 +1976,52 @@ function renderMaintenance() {
     const engBadges = isCat ? (e.engines||[]).map(eng =>
       `<span style="font-size:10px;font-weight:700;padding:1px 4px;border-radius:4px;background:var(--surface2);color:var(--label3);margin-left:3px;flex-shrink:0;white-space:nowrap">${bLbl[eng]||eng}</span>`
     ).join('') : '';
-    return `<div data-maint-id="${esc(eid)}" draggable="true"
+    return `<tr data-maint-id="${esc(eid)}" draggable="true"
       ondragstart="maintLogDragStart(event,'${esc(eid)}')"
       ondragover="maintLogDragOver(event,'${esc(eid)}')"
       ondragleave="maintLogDragLeave(event)"
       ondrop="maintLogDrop(event,'${esc(eid)}')"
-      ondragend="maintLogDragEnd()"
-      style="display:flex;align-items:center;gap:0;padding:8px 10px;border-bottom:1px solid var(--sep)">
-      <span class="prov-grip" style="width:20px;flex-shrink:0" ontouchstart="maintLogTouchStart(event,'${esc(eid)}')">⠿</span>
-      <span style="width:52px;flex-shrink:0;font-size:11px;color:var(--label3);white-space:nowrap;overflow:hidden;margin-right:4px">${esc(dp)}</span>
-      <span style="width:38px;flex-shrink:0;font-size:11px;color:var(--label3);white-space:nowrap;overflow:hidden;margin-right:4px">${esc(String(e.hours))}h</span>
-      <span style="flex:1;min-width:0;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.task)}</span>
-      ${engBadges}
-      <button class="btn btn-s btn-xs" onclick="editMaintEntry(${origIdx})" style="width:26px;flex-shrink:0;margin-left:6px;padding:0;text-align:center">✏</button>
-      <button class="btn btn-d btn-xs" onclick="removeMaintEntry(${origIdx})" style="width:26px;flex-shrink:0;margin-left:2px;padding:0;text-align:center">✕</button>
-    </div>`;
-  }).join('') || `<div style="color:var(--label3);padding:12px 16px;font-size:13px">${logFilter==='All'?'No entries yet':'No entries for this task'}</div>`;
+      ondragend="maintLogDragEnd()">
+      <td style="overflow:hidden;padding:0 4px"><span class="prov-grip" ontouchstart="maintLogTouchStart(event,'${esc(eid)}')">⠿</span></td>
+      <td style="overflow:hidden;white-space:nowrap;padding:8px 4px;font-size:11px;color:var(--label3)">${esc(dp)}</td>
+      <td style="overflow:hidden;white-space:nowrap;padding:8px 4px;font-size:11px;color:var(--label3)">${esc(String(e.hours))}h</td>
+      <td style="overflow:hidden;padding:8px 4px">
+        <div style="display:flex;align-items:center;overflow:hidden;min-width:0">
+          <span style="flex:1;min-width:0;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.task)}</span>
+          ${engBadges}
+        </div>
+      </td>
+      <td style="overflow:hidden;white-space:nowrap;padding:8px 2px;text-align:right">
+        <button class="btn btn-s btn-xs" onclick="editMaintEntry(${origIdx})" style="margin-right:2px">✏</button>
+        <button class="btn btn-d btn-xs" onclick="removeMaintEntry(${origIdx})">✕</button>
+      </td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="5" style="color:var(--label3);padding:12px 16px;font-size:13px">${logFilter==='All'?'No entries yet':'No entries for this task'}</td></tr>`;
   const logHtml = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-      <div class="sec-hd" style="margin-bottom:0">Maintenance Log</div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button style="font-size:11px;color:var(--blue);background:none;border:none;cursor:pointer;padding:4px 6px;font-family:var(--font);white-space:nowrap" onclick="cycleMaintLogSort()">Sort: ${sortLabel}</button>
-        <button class="btn btn-p btn-sm" onclick="showAddMaintEntry()">+ Add entry</button>
-      </div>
+    <div class="sec-hd">Maintenance Log</div>
+    <div class="btn-row">
+      <button class="btn btn-p btn-sm" onclick="showAddMaintEntry()">+ Add entry</button>
     </div>
     ${filterPills}
-    <div class="card">${logRows}</div>`;
+    <div class="card">
+      <table style="table-layout:fixed;width:100%;border-collapse:collapse;font-size:13px">
+        <colgroup>
+          <col style="width:20px">
+          <col style="width:54px">
+          <col style="width:38px">
+          <col>
+          <col style="width:60px">
+        </colgroup>
+        <thead><tr style="background:var(--surface2)">
+          <th style="overflow:hidden;padding:0 4px"></th>
+          ${sHdr('date','Date')}
+          ${sHdr('hours','Hrs')}
+          ${sHdr('task','Task')}
+          <th style="overflow:hidden;padding:0 4px"></th>
+        </tr></thead>
+        <tbody>${logRows}</tbody>
+      </table>
+    </div>`;
   return hoursHtml + renderMaintGauges() + comingUpHtml + logHtml;
 }
 
@@ -6145,6 +6231,35 @@ function migrateData() {
       dirty = true;
     }
   } catch(e) { console.warn('maintLogFixV3', e); }
+  // v4: rename task names + merge duplicate fuel filter entries
+  try {
+    if (!data._maintLogFixed_v4) {
+      const log = data.maintenance?.log;
+      if (log) {
+        // Merge Primary+Secondary on same date → delete Secondary
+        const primDates = new Set(
+          log.filter(e => e.task==='Diesel fuel filter change — Primary (Racor)').map(e => e.date)
+        );
+        const toDelete = new Set(
+          log.filter(e => e.task==='Diesel fuel filter change — Secondary' && primDates.has(e.date)).map(e => e.id)
+        );
+        if (toDelete.size) {
+          for (let i = log.length - 1; i >= 0; i--) {
+            if (toDelete.has(log[i].id)) { log.splice(i, 1); dirty = true; }
+          }
+        }
+        // Rename any remaining Primary or Secondary → Fuel filters
+        log.forEach(e => {
+          if (e.task==='Diesel fuel filter change — Primary (Racor)' ||
+              e.task==='Diesel fuel filter change — Secondary') {
+            e.task = 'Fuel filters'; dirty = true;
+          }
+        });
+      }
+      data._maintLogFixed_v4 = true;
+      dirty = true;
+    }
+  } catch(e) { console.warn('maintLogFixV4', e); }
   if (dirty) save();
 }
 
