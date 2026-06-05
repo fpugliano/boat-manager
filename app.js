@@ -1815,19 +1815,15 @@ function renderMaintenance() {
   const eids  = getEngines();
   const eLbl  = {port:'Port', starboard:'Stbd', main:'Engine'};
   // ── Hours ──
-  const hoursHtml = `<div class="maint-hours-grid ${isCat?'cat':''}">
+  const hoursHtml = `<div style="display:grid;grid-template-columns:${eids.length > 1 ? '1fr 1fr' : '1fr'};gap:10px;margin-bottom:14px">
     ${eids.map(eid => {
       const h = data.maintenance?.engines?.[eid]?.hours || 0;
-      return `<div class="card">
-        <div class="card-hd">${isCat?eLbl[eid]+' ':''}Engine Hours</div>
-        <div class="hours-box">
-          <div class="hours-num" id="hnum-${eid}">${h}</div><div class="hours-lbl">hours</div>
-          <div class="hours-edit">
-            <input class="h-input" type="number" value="${h}" min="0"
-              oninput="var el=document.getElementById('hnum-${eid}');if(el)el.textContent=this.value||0"
-              onblur="setHours('${eid}',this.value)">
-          </div>
-        </div>
+      return `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px 10px;text-align:center">
+        <div style="font-size:10px;font-weight:700;color:var(--label2);line-height:1.3;margin-bottom:4px">${eLbl[eid]}</div>
+        <input type="number" value="${h}" min="0"
+          style="width:100%;text-align:center;font-size:22px;font-weight:800;color:var(--label);background:none;border:none;outline:none;font-family:var(--font);padding:4px 0;-moz-appearance:textfield;appearance:textfield"
+          onblur="setHours('${eid}',this.value)">
+        <div style="font-size:10px;color:#9ca3af;margin-top:2px">hrs</div>
       </div>`;
     }).join('')}
   </div>`;
@@ -5774,11 +5770,21 @@ function renderClearance() {
   const alertBar = issues.length ? `<div style="margin-bottom:12px;padding:10px 14px;background:${isRed?'rgba(239,68,68,.08)':'rgba(245,158,11,.08)'};border:1.5px solid ${isRed?'#EF4444':'#F59E0B'};border-radius:10px;font-size:13px;color:${isRed?'#EF4444':'#D97706'};font-weight:600">${issues.join(' · ')}</div>` : '';
 
   // ── Gauge helper ──
-  function gaugeCell(title, days, max, color, subs, cardStyle) {
-    return `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px;text-align:center;${cardStyle||''}">
-      <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:6px">${title}</div>
-      ${tlCircleGauge(days,max,color)}
-      ${subs.map(l=>`<div style="font-size:10px;color:var(--label3);margin-top:3px;word-break:break-all">${l}</div>`).join('')}
+  const CL = 101; // π × r(32)
+  function gaugeCell(title, value, max, color, subs, cardStyle, sublabel) {
+    const pct    = value === null ? 0 : Math.min(1, Math.max(0, value / max));
+    const offset = Math.round(CL * (1 - pct));
+    const num    = value === null ? '—' : String(Math.max(0, value));
+    const fs     = num.length > 3 ? '11' : '14';
+    return `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px 10px;text-align:center;${cardStyle||''}">
+      <div style="font-size:10px;font-weight:700;color:var(--label2);line-height:1.3;margin-bottom:4px">${title}</div>
+      <svg viewBox="0 0 80 44" style="width:100%;display:block">
+        <path d="M8,40 A32,32 0 0,1 72,40" fill="none" stroke="#e5e7eb" stroke-width="10" stroke-linecap="round"/>
+        <path d="M8,40 A32,32 0 0,1 72,40" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${CL}" stroke-dashoffset="${offset}"/>
+        <text x="40" y="28" text-anchor="middle" font-size="${fs}" font-weight="800" fill="${color}" font-family="var(--font)">${esc(num)}</text>
+        <text x="40" y="38" text-anchor="middle" font-size="7" fill="#9ca3af" font-family="var(--font)">${sublabel||'days'}</text>
+      </svg>
+      ${subs.filter(Boolean).map(l=>`<div style="font-size:10px;color:var(--label3);margin-top:3px;word-break:break-all">${l}</div>`).join('')}
     </div>`;
   }
 
@@ -5794,27 +5800,28 @@ function renderClearance() {
 
   let g4;
   if (!schMatch) {
-    g4 = `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px;text-align:center">
-      <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:6px">Schengen (TL User)</div>
-      <div style="height:72px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#9ca3af">—</div>
+    g4 = `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px 10px;text-align:center">
+      <div style="font-size:10px;font-weight:700;color:var(--label2);line-height:1.3;margin-bottom:4px">Schengen (TL User)</div>
+      <svg viewBox="0 0 80 44" style="width:100%;display:block">
+        <path d="M8,40 A32,32 0 0,1 72,40" fill="none" stroke="#e5e7eb" stroke-width="10" stroke-linecap="round"/>
+        <text x="40" y="28" text-anchor="middle" font-size="14" font-weight="800" fill="#9ca3af" font-family="var(--font)">—</text>
+      </svg>
       <div style="font-size:10px;color:var(--blue);cursor:pointer;margin-top:3px" onclick="showTab('schengen')">Set up in Schengen tab</div>
     </div>`;
   } else if (isEU) {
-    g4 = `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px;text-align:center">
-      <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:6px">Schengen (TL User)</div>
-      <svg width="72" height="72" viewBox="0 0 72 72" style="display:block;margin:0 auto">
-        <circle cx="36" cy="36" r="28" fill="none" stroke="#22C55E" stroke-width="7"/>
-        <text x="36" y="36" text-anchor="middle" dominant-baseline="middle" font-size="10" font-weight="700" fill="#22C55E" font-family="var(--font)">EU</text>
+    g4 = `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px 10px;text-align:center">
+      <div style="font-size:10px;font-weight:700;color:var(--label2);line-height:1.3;margin-bottom:4px">Schengen (TL User)</div>
+      <svg viewBox="0 0 80 44" style="width:100%;display:block">
+        <path d="M8,40 A32,32 0 0,1 72,40" fill="none" stroke="#e5e7eb" stroke-width="10" stroke-linecap="round"/>
+        <path d="M8,40 A32,32 0 0,1 72,40" fill="none" stroke="#22C55E" stroke-width="10" stroke-linecap="round" stroke-dasharray="101" stroke-dashoffset="0"/>
+        <text x="40" y="28" text-anchor="middle" font-size="14" font-weight="800" fill="#22C55E" font-family="var(--font)">EU</text>
       </svg>
       <div style="font-size:10px;color:#22C55E;font-weight:600;margin-top:3px">No limit</div>
     </div>`;
   } else if (seamanActive) {
-    g4 = `<div style="background:rgba(245,158,11,.08);border:1.5px solid #F59E0B;border-radius:14px;padding:12px 8px;text-align:center">
-      <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:6px">Schengen (TL User)</div>
-      ${tlCircleGauge(schRem,90,'#F59E0B')}
-      <div style="font-size:10px;color:#D97706;font-weight:700;margin-top:4px">⚓ Seaman's Book</div>
-      <div style="font-size:10px;color:var(--label3);margin-top:2px">${schPassLabel?schPassLabel+' · ':''}${schUsed}/90 used</div>
-    </div>`;
+    g4 = gaugeCell('Schengen (TL User)', schRem, 90, '#F59E0B',
+      [`⚓ Seaman's Book`, `${schPassLabel?schPassLabel+' · ':''}${schUsed}/90 used`],
+      'background:rgba(245,158,11,.08);border:1.5px solid #F59E0B;');
   } else {
     g4 = gaugeCell('Schengen (TL User)', schRem, 90, schColor, [`${schPassLabel?schPassLabel+' · ':''}${schUsed}/90 used`]);
   }
@@ -5822,7 +5829,7 @@ function renderClearance() {
   const gaugeGrid = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
     ${gaugeCell('TL — Boat', boatDays, 365, boatColor, g1subs)}
     ${gaugeCell('User', userDays, 180, userColor, g2subs)}
-    ${gaugeCell('eTEPAY', etFuture, Math.max(etTotal,1), etColor, g3subs)}
+    ${gaugeCell('eTEPAY', etFuture, Math.max(etTotal,1), etColor, g3subs, undefined, 'months')}
     ${g4}
   </div>`;
 
