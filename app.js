@@ -1890,7 +1890,7 @@ function renderMaintenance() {
   const logRows = display.map(({e, origIdx}) => {
     const eid = e.id || '';
     const engBadges = isCat ? (e.engines||[]).map(eid =>
-      `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--label3);margin-left:4px">${eLbl[eid]||eid}</span>`
+      `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--label3);margin-left:4px;flex-shrink:0">${eLbl[eid]||eid}</span>`
     ).join('') : '';
     return `<tr data-maint-id="${esc(eid)}" draggable="true"
       ondragstart="maintLogDragStart(event,'${esc(eid)}')"
@@ -1899,17 +1899,23 @@ function renderMaintenance() {
       ondrop="maintLogDrop(event,'${esc(eid)}')"
       ondragend="maintLogDragEnd()">
       <td style="padding:0 4px"><span class="prov-grip" ontouchstart="maintLogTouchStart(event,'${esc(eid)}')">⠿</span></td>
-      <td style="white-space:nowrap">${esc(e.date)}</td>
-      <td style="white-space:nowrap">${esc(String(e.hours))}</td>
-      <td><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px">${esc(e.task)}${engBadges}</div></td>
-      <td>${esc(e.cost||'')}</td>
-      <td>${esc(e.notes||'')}</td>
-      <td style="white-space:nowrap">
-        <button class="btn btn-s btn-xs" onclick="editMaintEntry(${origIdx})" style="margin-right:4px">✏</button>
+      <td style="white-space:nowrap;padding:9px 6px">${esc(e.date)}</td>
+      <td style="white-space:nowrap;padding:9px 4px">${esc(String(e.hours))}</td>
+      <td style="overflow:hidden">
+        <div style="display:flex;align-items:center;min-width:0;overflow:hidden">
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.task)}</span>
+          ${engBadges}
+        </div>
+      </td>
+      <td style="padding:9px 6px;overflow:hidden">
+        <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.notes||'')}</div>
+      </td>
+      <td style="white-space:nowrap;padding:9px 4px">
+        <button class="btn btn-s btn-xs" onclick="editMaintEntry(${origIdx})" style="margin-right:2px">✏</button>
         <button class="btn btn-d btn-xs" onclick="removeMaintEntry(${origIdx})">✕</button>
       </td>
     </tr>`;
-  }).join('') || `<tr><td colspan="7" style="color:var(--label3);padding:12px">${logFilter==='All'?'No entries yet':'No entries for this task'}</td></tr>`;
+  }).join('') || `<tr><td colspan="6" style="color:var(--label3);padding:12px">${logFilter==='All'?'No entries yet':'No entries for this task'}</td></tr>`;
   const logHtml = `
     <div class="sec-hd">Maintenance Log</div>
     <div class="btn-row">
@@ -1917,8 +1923,25 @@ function renderMaintenance() {
     </div>
     ${filterPills}
     <div class="card"><div style="overflow-x:auto">
-      <table class="tbl"><thead><tr><th></th>${sHdr('date','Date')}${sHdr('hours','Hours')}${sHdr('task','Task')}${sHdr('cost','Cost')}${sHdr('notes','Notes')}<th></th></tr></thead>
-      <tbody>${logRows}</tbody></table>
+      <table class="tbl" style="table-layout:fixed;width:100%">
+        <colgroup>
+          <col style="width:24px">
+          <col style="width:90px">
+          <col style="width:50px">
+          <col>
+          <col style="width:80px">
+          <col style="width:60px">
+        </colgroup>
+        <thead><tr>
+          <th style="padding:0 4px"></th>
+          ${sHdr('date','Date')}
+          <th style="padding:7px 4px;cursor:pointer;user-select:none;white-space:nowrap" onclick="setMaintLogSort('hours')">Hrs${logSort?.col==='hours'?(logSort.dir==='asc'?' ▲':' ▼'):''}</th>
+          ${sHdr('task','Task')}
+          ${sHdr('notes','Notes')}
+          <th style="padding:0 4px"></th>
+        </tr></thead>
+        <tbody>${logRows}</tbody>
+      </table>
     </div></div>`;
   return hoursHtml + renderMaintGauges() + comingUpHtml + logHtml;
 }
