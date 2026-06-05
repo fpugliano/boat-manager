@@ -1973,7 +1973,7 @@ function renderMaintenance() {
     const eid = e.id || '';
     const dp = e.date ? (() => { const [y,m,d]=e.date.split('-'); return `${+m}/${+d}/${y.slice(2)}`; })() : '';
     const engBadges = isCat ? (e.engines||[]).map(eng =>
-      `<span style="font-size:10px;font-weight:700;padding:1px 4px;border-radius:4px;background:var(--surface2);color:var(--label3);flex-shrink:0;white-space:nowrap">${bLbl[eng]||eng}</span>`
+      `<span style="font-size:10px;font-weight:700;padding:1px 4px;border-radius:4px;background:var(--surface2);color:var(--label3);flex-shrink:0;white-space:nowrap;margin-left:3px">${bLbl[eng]||eng}</span>`
     ).join('') : '';
     return `<div data-maint-id="${esc(eid)}" draggable="true"
       ondragstart="maintLogDragStart(event,'${esc(eid)}')"
@@ -1985,11 +1985,9 @@ function renderMaintenance() {
       <span class="prov-grip" style="width:20px;flex-shrink:0;padding:8px 0" ontouchstart="maintLogTouchStart(event,'${esc(eid)}')">⠿</span>
       <span style="width:48px;flex-shrink:0;font-size:11px;color:var(--label3);white-space:nowrap;overflow:hidden;padding:8px 4px 8px 0">${esc(dp)}</span>
       <span style="width:36px;flex-shrink:0;font-size:11px;color:var(--label3);white-space:nowrap;overflow:hidden;padding:8px 4px 8px 0">${esc(String(e.hours))}h</span>
-      <div style="flex:1;min-width:0;display:flex;align-items:center;gap:4px;overflow:hidden;padding:8px 4px 8px 0">
-        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:500">${esc(e.task)}</span>
-        ${engBadges}
-      </div>
-      <button class="btn btn-s btn-xs" onclick="editMaintEntry(${origIdx})" style="flex-shrink:0;padding:0;width:30px;text-align:center">✏</button>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:500;padding:8px 4px 8px 0">${esc(e.task)}</span>
+      ${engBadges}
+      <button class="btn btn-s btn-xs" onclick="editMaintEntry(${origIdx})" style="flex-shrink:0;padding:0;width:30px;text-align:center;margin-left:4px">✏</button>
     </div>`;
   }).join('') || `<div style="color:var(--label3);padding:12px 16px;font-size:13px">${logFilter==='All'?'No entries yet':'No entries for this task'}</div>`;
   const logHtml = `
