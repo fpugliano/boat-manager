@@ -1991,9 +1991,8 @@ function renderMaintenance() {
           ${engBadges}
         </div>
       </td>
-      <td style="overflow:hidden;white-space:nowrap;padding:8px 2px;text-align:right">
-        <button class="btn btn-s btn-xs" onclick="editMaintEntry(${origIdx})" style="margin-right:2px">✏</button>
-        <button class="btn btn-d btn-xs" onclick="removeMaintEntry(${origIdx})">✕</button>
+      <td style="overflow:hidden;white-space:nowrap;padding:8px 4px;text-align:right">
+        <button class="btn btn-s btn-xs" onclick="editMaintEntry(${origIdx})">✏</button>
       </td>
     </tr>`;
   }).join('') || `<tr><td colspan="5" style="color:var(--label3);padding:12px 16px;font-size:13px">${logFilter==='All'?'No entries yet':'No entries for this task'}</td></tr>`;
@@ -2010,7 +2009,7 @@ function renderMaintenance() {
           <col style="width:48px">
           <col style="width:36px">
           <col>
-          <col style="width:58px">
+          <col style="width:34px">
         </colgroup>
         <thead><tr style="background:var(--surface2)">
           <th style="overflow:hidden;padding:0 4px"></th>
@@ -2183,6 +2182,7 @@ function editMaintEntry(i) {
     <div class="mi-label">Cost (€)</div><input class="mi" id="me-lc" value="${esc(e.cost||'')}">
     <div class="mi-label">Notes / Location</div><input class="mi" id="me-ln" value="${esc(e.notes||'')}">
     <div class="modal-btns">
+      <button onclick="if(confirm('Remove this entry?')){hideModal();removeMaintEntry(${i})}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:10px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">🗑 Delete</button>
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="saveEditMaintEntry(${i})">Save</button>
     </div>`);
