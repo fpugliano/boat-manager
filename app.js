@@ -1983,30 +1983,72 @@ function renderMaintenance() {
       ondragend="maintLogDragEnd()"
       style="display:flex;align-items:center;width:100%;box-sizing:border-box;padding:0 12px;border-bottom:1px solid var(--sep)">
       <span class="prov-grip" style="width:20px;flex-shrink:0;padding:8px 0" ontouchstart="maintLogTouchStart(event,'${esc(eid)}')">⠿</span>
-      <span style="width:48px;flex-shrink:0;font-size:11px;color:var(--label3);white-space:nowrap;overflow:hidden;padding:8px 4px 8px 0">${esc(dp)}</span>
-      <span style="width:36px;flex-shrink:0;font-size:11px;color:var(--label3);white-space:nowrap;overflow:hidden;padding:8px 4px 8px 0">${esc(String(e.hours))}h</span>
+      <span style="width:60px;flex-shrink:0;font-size:11px;color:var(--label3);white-space:nowrap;overflow:hidden;padding:8px 4px 8px 0">${esc(dp)}</span>
+      <span style="width:42px;flex-shrink:0;font-size:11px;color:var(--label3);white-space:nowrap;overflow:hidden;padding:8px 4px 8px 0">${esc(String(e.hours))}h</span>
       <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:500;padding:8px 4px 8px 0">${esc(e.task)}</span>
       ${engBadges}
-      <button class="btn btn-s btn-xs" onclick="editMaintEntry(${origIdx})" style="flex-shrink:0;padding:0;width:30px;text-align:center;margin-left:4px">✏</button>
+      <button class="btn btn-s btn-xs" onclick="editMaintEntry(${origIdx})" style="flex-shrink:0;padding:0;width:26px;text-align:center;margin-left:4px">✏</button>
     </div>`;
   }).join('') || `<div style="color:var(--label3);padding:12px 16px;font-size:13px">${logFilter==='All'?'No entries yet':'No entries for this task'}</div>`;
   const logHtml = `
-    <div class="sec-hd">Maintenance Log</div>
-    <div class="btn-row">
-      <button class="btn btn-p btn-sm" onclick="showAddMaintEntry()">+ Add entry</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+      <div class="sec-hd" style="margin:0">Maintenance Log</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--label3)">${display.length} ${display.length===1?'entry':'entries'}</span>
+        <button onclick="printMaintLog()" style="font-size:12px;background:none;border:1.5px solid var(--sep);border-radius:8px;padding:4px 8px;cursor:pointer;font-family:var(--font);color:var(--label2);line-height:1.4">🖨 Print</button>
+        <button class="btn btn-p btn-sm" onclick="showAddMaintEntry()">+ Add entry</button>
+      </div>
     </div>
     ${filterPills}
     <div class="card">
       <div style="display:flex;align-items:center;width:100%;box-sizing:border-box;padding:0 12px;background:var(--surface2);border-bottom:1px solid var(--sep)">
         <div style="width:20px;flex-shrink:0"></div>
-        ${hdrCol('date','Date','flex-shrink:0;width:48px;')}
-        ${hdrCol('hours','Hrs','flex-shrink:0;width:36px;')}
+        ${hdrCol('date','Date','flex-shrink:0;width:60px;')}
+        ${hdrCol('hours','Hrs','flex-shrink:0;width:42px;')}
         ${hdrCol('task','Task','flex:1;min-width:0;')}
-        <div style="width:30px;flex-shrink:0"></div>
+        <div style="width:26px;flex-shrink:0"></div>
       </div>
       ${logRows}
     </div>`;
   return hoursHtml + renderMaintGauges() + comingUpHtml + logHtml;
+}
+
+function printMaintLog() {
+  const log  = getMaintLog();
+  const isCat = data.meta.hullType === 'catamaran';
+  const tl   = data.transitLog;
+  const boatName = tl?.logs?.[tl?.currentLog]?.vesselName || data.meta?.boatName || data.meta?.vesselName || 'Vessel';
+  const printDate = new Date().toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'});
+  const engLbl = {port:'Port', starboard:'Stbd'};
+  const rows = log.map(e => {
+    const engines = isCat ? (e.engines||[]).map(eng => engLbl[eng]||eng).join(', ') : '';
+    return `<tr>
+      <td>${esc(e.date||'')}</td>
+      <td>${esc(String(e.hours||''))}</td>
+      <td>${esc(e.task||'')}</td>
+      ${isCat ? `<td>${esc(engines)}</td>` : ''}
+      <td>${esc(e.notes||'')}</td>
+    </tr>`;
+  }).join('');
+  const engHeader = isCat ? '<th>Engine</th>' : '';
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <title>${esc(boatName)} — Maintenance Log</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:12px;color:#000;margin:28px}
+    h1{font-size:18px;margin:0 0 3px}
+    .sub{color:#666;font-size:11px;margin-bottom:18px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f2f2f2;text-align:left;padding:6px 8px;border-bottom:2px solid #bbb;font-size:11px;font-weight:700}
+    td{padding:5px 8px;border-bottom:1px solid #e4e4e4;vertical-align:top;font-size:12px}
+    tr:last-child td{border-bottom:none}
+  </style></head><body>
+  <h1>${esc(boatName)}</h1>
+  <div class="sub">Maintenance Log &nbsp;·&nbsp; Printed ${esc(printDate)} &nbsp;·&nbsp; ${log.length} entries</div>
+  <table><thead><tr><th>Date</th><th>Hours</th><th>Task</th>${engHeader}<th>Notes / Location</th></tr></thead>
+  <tbody>${rows}</tbody></table>
+  </body></html>`;
+  const w = window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); w.focus(); w.print(); }
 }
 
 function maintLogDragStart(e, id) {
