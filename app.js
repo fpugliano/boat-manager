@@ -1595,6 +1595,20 @@ function setMaintLogSort(col) {
   else                          ui.maintLogSort = null;
   document.getElementById('mainContent').innerHTML = renderMaintenance();
 }
+function cycleMaintLogSort() {
+  const states = [
+    {col:'date',  dir:'desc'},
+    {col:'date',  dir:'asc'},
+    {col:'hours', dir:'desc'},
+    {col:'hours', dir:'asc'},
+    {col:'task',  dir:'asc'},
+    {col:'task',  dir:'desc'},
+  ];
+  const cur = ui.maintLogSort || states[0];
+  const idx = states.findIndex(s => s.col===cur.col && s.dir===cur.dir);
+  ui.maintLogSort = states[(idx + 1) % states.length];
+  document.getElementById('mainContent').innerHTML = renderMaintenance();
+}
 function getMaintLog() { return data.maintenance?.log || []; }
 
 function lastMaintEntry(taskId, eid) {
@@ -1871,77 +1885,57 @@ function renderMaintenance() {
     <div class="pill ${logFilter==='All'?'active':''}" onclick="ui.maintTaskFilter='All';document.getElementById('mainContent').innerHTML=renderMaintenance()">All</div>
     ${allFilterTasks.map(t => `<div class="pill ${logFilter===t?'active':''}" onclick="setMaintFilter(this.dataset.task)" data-task="${esc(t)}">${esc(t)}</div>`).join('')}
   </div>` : '';
-  const logSort = ui.maintLogSort;
-  const display = logSort ? [...filtered].sort((a, b) => {
+  const _sortStates = [
+    {col:'date',  dir:'desc', label:'Date ▼'},
+    {col:'date',  dir:'asc',  label:'Date ▲'},
+    {col:'hours', dir:'desc', label:'Hours ▼'},
+    {col:'hours', dir:'asc',  label:'Hours ▲'},
+    {col:'task',  dir:'asc',  label:'Task A–Z'},
+    {col:'task',  dir:'desc', label:'Task Z–A'},
+  ];
+  const logSort  = ui.maintLogSort || _sortStates[0];
+  const sortLabel = _sortStates.find(s => s.col===logSort.col && s.dir===logSort.dir)?.label || 'Date ▼';
+  const display  = [...filtered].sort((a, b) => {
     let va, vb;
     if      (logSort.col==='date')  { va=a.e.date||'';  vb=b.e.date||''; }
     else if (logSort.col==='hours') { va=parseFloat(a.e.hours)||0; vb=parseFloat(b.e.hours)||0; }
     else if (logSort.col==='task')  { va=a.e.task||'';  vb=b.e.task||''; }
-    else if (logSort.col==='cost')  { va=parseFloat((a.e.cost||'').replace(/[^0-9.]/g,''))||0; vb=parseFloat((b.e.cost||'').replace(/[^0-9.]/g,''))||0; }
-    else if (logSort.col==='notes') { va=a.e.notes||''; vb=b.e.notes||''; }
     else { va=vb=0; }
     return (va<vb?-1:va>vb?1:0)*(logSort.dir==='asc'?1:-1);
-  }) : filtered;
-  function sHdr(col, label) {
-    const active = logSort?.col === col;
-    const arrow  = active ? (logSort.dir==='asc' ? ' ▲' : ' ▼') : '';
-    return `<th style="cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden;padding:7px 4px" onclick="setMaintLogSort('${col}')">${label}${arrow}</th>`;
-  }
-  const tdC = 'overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:9px 4px';
+  });
+  const bLbl = {port:'PT', starboard:'STB'};
   const logRows = display.map(({e, origIdx}) => {
     const eid = e.id || '';
-    const engBadges = isCat ? (e.engines||[]).map(eid =>
-      `<span style="font-size:10px;font-weight:700;padding:1px 4px;border-radius:4px;background:var(--surface2);color:var(--label3);margin-left:3px;flex-shrink:0">${eLbl[eid]||eid}</span>`
+    const dp = e.date ? (() => { const [y,m,d]=e.date.split('-'); return `${m}/${d}/${y.slice(2)}`; })() : '';
+    const engBadges = isCat ? (e.engines||[]).map(eng =>
+      `<span style="font-size:10px;font-weight:700;padding:1px 4px;border-radius:4px;background:var(--surface2);color:var(--label3);margin-left:3px;flex-shrink:0;white-space:nowrap">${bLbl[eng]||eng}</span>`
     ).join('') : '';
-    return `<tr data-maint-id="${esc(eid)}" draggable="true"
+    return `<div data-maint-id="${esc(eid)}" draggable="true"
       ondragstart="maintLogDragStart(event,'${esc(eid)}')"
       ondragover="maintLogDragOver(event,'${esc(eid)}')"
       ondragleave="maintLogDragLeave(event)"
       ondrop="maintLogDrop(event,'${esc(eid)}')"
-      ondragend="maintLogDragEnd()">
-      <td style="overflow:hidden;padding:0 4px"><span class="prov-grip" ontouchstart="maintLogTouchStart(event,'${esc(eid)}')">⠿</span></td>
-      <td style="${tdC}">${esc(e.date)}</td>
-      <td style="${tdC}">${esc(String(e.hours))}</td>
-      <td style="overflow:hidden;padding:9px 4px">
-        <div style="display:flex;align-items:center;overflow:hidden;min-width:0">
-          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.task)}</span>
-          ${engBadges}
-        </div>
-      </td>
-      <td style="${tdC}">${esc(e.notes||'')}</td>
-      <td style="overflow:hidden;white-space:nowrap;padding:9px 2px">
-        <button class="btn btn-s btn-xs" onclick="editMaintEntry(${origIdx})" style="margin-right:2px">✏</button>
-        <button class="btn btn-d btn-xs" onclick="removeMaintEntry(${origIdx})">✕</button>
-      </td>
-    </tr>`;
-  }).join('') || `<tr><td colspan="6" style="color:var(--label3);padding:12px">${logFilter==='All'?'No entries yet':'No entries for this task'}</td></tr>`;
+      ondragend="maintLogDragEnd()"
+      style="display:flex;align-items:center;gap:0;padding:8px 10px;border-bottom:1px solid var(--sep)">
+      <span class="prov-grip" style="width:20px;flex-shrink:0" ontouchstart="maintLogTouchStart(event,'${esc(eid)}')">⠿</span>
+      <span style="width:52px;flex-shrink:0;font-size:11px;color:var(--label3);white-space:nowrap;overflow:hidden;margin-right:4px">${esc(dp)}</span>
+      <span style="width:38px;flex-shrink:0;font-size:11px;color:var(--label3);white-space:nowrap;overflow:hidden;margin-right:4px">${esc(String(e.hours))}h</span>
+      <span style="flex:1;min-width:0;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.task)}</span>
+      ${engBadges}
+      <button class="btn btn-s btn-xs" onclick="editMaintEntry(${origIdx})" style="width:26px;flex-shrink:0;margin-left:6px;padding:0;text-align:center">✏</button>
+      <button class="btn btn-d btn-xs" onclick="removeMaintEntry(${origIdx})" style="width:26px;flex-shrink:0;margin-left:2px;padding:0;text-align:center">✕</button>
+    </div>`;
+  }).join('') || `<div style="color:var(--label3);padding:12px 16px;font-size:13px">${logFilter==='All'?'No entries yet':'No entries for this task'}</div>`;
   const logHtml = `
-    <div class="sec-hd">Maintenance Log</div>
-    <div class="btn-row">
-      <button class="btn btn-p btn-sm" onclick="showAddMaintEntry()">+ Add entry</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div class="sec-hd" style="margin-bottom:0">Maintenance Log</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button style="font-size:11px;color:var(--blue);background:none;border:none;cursor:pointer;padding:4px 6px;font-family:var(--font);white-space:nowrap" onclick="cycleMaintLogSort()">Sort: ${sortLabel}</button>
+        <button class="btn btn-p btn-sm" onclick="showAddMaintEntry()">+ Add entry</button>
+      </div>
     </div>
     ${filterPills}
-    <div class="card">
-      <table class="tbl" style="table-layout:fixed;width:100%">
-        <colgroup>
-          <col style="width:24px">
-          <col style="width:80px">
-          <col style="width:44px">
-          <col>
-          <col style="width:70px">
-          <col style="width:64px">
-        </colgroup>
-        <thead><tr>
-          <th style="overflow:hidden;padding:0 4px"></th>
-          ${sHdr('date','Date')}
-          <th style="overflow:hidden;white-space:nowrap;padding:7px 4px;cursor:pointer;user-select:none" onclick="setMaintLogSort('hours')">Hrs${logSort?.col==='hours'?(logSort.dir==='asc'?' ▲':' ▼'):''}</th>
-          ${sHdr('task','Task')}
-          ${sHdr('notes','Notes')}
-          <th style="overflow:hidden;padding:0 4px"></th>
-        </tr></thead>
-        <tbody>${logRows}</tbody>
-      </table>
-    </div>`;
+    <div class="card">${logRows}</div>`;
   return hoursHtml + renderMaintGauges() + comingUpHtml + logHtml;
 }
 
