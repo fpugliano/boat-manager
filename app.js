@@ -1588,6 +1588,13 @@ function setMaintFilter(t) {
   ui.maintTaskFilter = t;
   document.getElementById('mainContent').innerHTML = renderMaintenance();
 }
+function setMaintLogSort(col) {
+  const cur = ui.maintLogSort;
+  if (!cur || cur.col !== col) ui.maintLogSort = {col, dir:'asc'};
+  else if (cur.dir === 'asc')  ui.maintLogSort = {col, dir:'desc'};
+  else                          ui.maintLogSort = null;
+  document.getElementById('mainContent').innerHTML = renderMaintenance();
+}
 function getMaintLog() { return data.maintenance?.log || []; }
 
 function lastMaintEntry(taskId, eid) {
@@ -1864,15 +1871,37 @@ function renderMaintenance() {
     <div class="pill ${logFilter==='All'?'active':''}" onclick="ui.maintTaskFilter='All';document.getElementById('mainContent').innerHTML=renderMaintenance()">All</div>
     ${allFilterTasks.map(t => `<div class="pill ${logFilter===t?'active':''}" onclick="setMaintFilter(this.dataset.task)" data-task="${esc(t)}">${esc(t)}</div>`).join('')}
   </div>` : '';
-  const logRows = filtered.map(({e, origIdx}, fi) => {
+  const logSort = ui.maintLogSort;
+  const display = logSort ? [...filtered].sort((a, b) => {
+    let va, vb;
+    if      (logSort.col==='date')  { va=a.e.date||'';  vb=b.e.date||''; }
+    else if (logSort.col==='hours') { va=parseFloat(a.e.hours)||0; vb=parseFloat(b.e.hours)||0; }
+    else if (logSort.col==='task')  { va=a.e.task||'';  vb=b.e.task||''; }
+    else if (logSort.col==='cost')  { va=parseFloat((a.e.cost||'').replace(/[^0-9.]/g,''))||0; vb=parseFloat((b.e.cost||'').replace(/[^0-9.]/g,''))||0; }
+    else if (logSort.col==='notes') { va=a.e.notes||''; vb=b.e.notes||''; }
+    else { va=vb=0; }
+    return (va<vb?-1:va>vb?1:0)*(logSort.dir==='asc'?1:-1);
+  }) : filtered;
+  function sHdr(col, label) {
+    const active = logSort?.col === col;
+    const arrow  = active ? (logSort.dir==='asc' ? ' ▲' : ' ▼') : '';
+    return `<th style="cursor:pointer;user-select:none;white-space:nowrap" onclick="setMaintLogSort('${col}')">${label}${arrow}</th>`;
+  }
+  const logRows = display.map(({e, origIdx}) => {
+    const eid = e.id || '';
     const engBadges = isCat ? (e.engines||[]).map(eid =>
       `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--label3);margin-left:4px">${eLbl[eid]||eid}</span>`
     ).join('') : '';
-    return `<tr>
-      <td style="color:var(--label3);font-size:11px;white-space:nowrap">${fi+1}</td>
+    return `<tr data-maint-id="${esc(eid)}" draggable="true"
+      ondragstart="maintLogDragStart(event,'${esc(eid)}')"
+      ondragover="maintLogDragOver(event,'${esc(eid)}')"
+      ondragleave="maintLogDragLeave(event)"
+      ondrop="maintLogDrop(event,'${esc(eid)}')"
+      ondragend="maintLogDragEnd()">
+      <td style="padding:0 4px"><span class="prov-grip" ontouchstart="maintLogTouchStart(event,'${esc(eid)}')">⠿</span></td>
       <td style="white-space:nowrap">${esc(e.date)}</td>
       <td style="white-space:nowrap">${esc(String(e.hours))}</td>
-      <td>${esc(e.task)}${engBadges}</td>
+      <td><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px">${esc(e.task)}${engBadges}</div></td>
       <td>${esc(e.cost||'')}</td>
       <td>${esc(e.notes||'')}</td>
       <td style="white-space:nowrap">
@@ -1888,10 +1917,76 @@ function renderMaintenance() {
     </div>
     ${filterPills}
     <div class="card"><div style="overflow-x:auto">
-      <table class="tbl"><thead><tr><th>#</th><th>Date</th><th>Hours</th><th>Task</th><th>Cost</th><th>Notes</th><th></th></tr></thead>
+      <table class="tbl"><thead><tr><th></th>${sHdr('date','Date')}${sHdr('hours','Hours')}${sHdr('task','Task')}${sHdr('cost','Cost')}${sHdr('notes','Notes')}<th></th></tr></thead>
       <tbody>${logRows}</tbody></table>
     </div></div>`;
   return hoursHtml + renderMaintGauges() + comingUpHtml + logHtml;
+}
+
+function maintLogDragStart(e, id) {
+  if (e.target.closest('button,input,select')) { e.preventDefault(); return; }
+  _maintLogDragId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', id);
+  setTimeout(() => document.querySelector(`[data-maint-id="${id}"]`)?.classList.add('prov-dragging'), 0);
+}
+function maintLogDragOver(e, id) {
+  if (!_maintLogDragId || _maintLogDragId === id) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  e.currentTarget.classList.add('prov-drag-over');
+}
+function maintLogDragLeave(e) { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('prov-drag-over'); }
+function maintLogDrop(e, targetId) {
+  e.preventDefault();
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  const fromId = _maintLogDragId; _maintLogDragId = null;
+  _maintLogDoReorder(fromId, targetId);
+}
+function maintLogDragEnd() {
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  _maintLogDragId = null;
+}
+function maintLogTouchStart(e, id) {
+  e.preventDefault();
+  const touch = e.touches[0], row = e.currentTarget.closest('[data-maint-id]'); if (!row) return;
+  const rect = row.getBoundingClientRect(), clone = row.cloneNode(true);
+  Object.assign(clone.style, {position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',opacity:'0.85',zIndex:'9999',pointerEvents:'none',outline:'2px dashed var(--blue)',borderRadius:'4px',background:'var(--surface)',boxShadow:'0 4px 16px rgba(0,0,0,.18)',transition:'none'});
+  document.body.appendChild(clone); row.style.opacity = '0.3';
+  _maintLogTouchState = {id, row, clone, offsetY: touch.clientY - rect.top, over: null};
+  document.addEventListener('touchmove', _maintLogTouchMove, {passive:false});
+  document.addEventListener('touchend', _maintLogTouchEnd);
+}
+function _maintLogTouchMove(e) {
+  e.preventDefault(); if (!_maintLogTouchState) return;
+  const touch = e.touches[0], {clone, offsetY} = _maintLogTouchState;
+  clone.style.top = (touch.clientY - offsetY) + 'px';
+  clone.style.display = 'none';
+  const under = document.elementFromPoint(touch.clientX, touch.clientY);
+  clone.style.display = '';
+  const targetRow = under?.closest('[data-maint-id]');
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  if (targetRow && targetRow !== _maintLogTouchState.row) { targetRow.classList.add('prov-drag-over'); _maintLogTouchState.over = targetRow; }
+  else { _maintLogTouchState.over = null; }
+}
+function _maintLogTouchEnd() {
+  document.removeEventListener('touchmove', _maintLogTouchMove); document.removeEventListener('touchend', _maintLogTouchEnd);
+  if (!_maintLogTouchState) return;
+  const {id, row, clone, over} = _maintLogTouchState; _maintLogTouchState = null;
+  clone.remove(); row.style.opacity = '';
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  if (over) _maintLogDoReorder(id, over.dataset.maintId);
+}
+function _maintLogDoReorder(fromId, toId) {
+  if (!fromId || !toId || fromId === toId) return;
+  const log = getMaintLog();
+  const fromIdx = log.findIndex(e => e.id === fromId);
+  const toIdx   = log.findIndex(e => e.id === toId);
+  if (fromIdx === -1 || toIdx === -1) return;
+  const [moved] = log.splice(fromIdx, 1);
+  log.splice(log.findIndex(e => e.id === toId), 0, moved);
+  save();
+  document.getElementById('mainContent').innerHTML = renderMaintenance();
 }
 
 function setHours(eid, val) {
@@ -3311,6 +3406,7 @@ function prefillLpgData() {
 
 let _provDragId = null, _provTouchState = null;
 let _partsDragId = null, _partsTouchState = null;
+let _maintLogDragId = null, _maintLogTouchState = null;
 let _sysDragId = null, _sysTouchState = null;
 let _winDragId = null, _winDragSid = null, _winTouchState = null;
 const PROV_CATS = [
