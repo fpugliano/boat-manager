@@ -1885,12 +1885,13 @@ function renderMaintenance() {
   function sHdr(col, label) {
     const active = logSort?.col === col;
     const arrow  = active ? (logSort.dir==='asc' ? ' ▲' : ' ▼') : '';
-    return `<th style="cursor:pointer;user-select:none;white-space:nowrap" onclick="setMaintLogSort('${col}')">${label}${arrow}</th>`;
+    return `<th style="cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden;padding:7px 4px" onclick="setMaintLogSort('${col}')">${label}${arrow}</th>`;
   }
+  const tdC = 'overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:9px 4px';
   const logRows = display.map(({e, origIdx}) => {
     const eid = e.id || '';
     const engBadges = isCat ? (e.engines||[]).map(eid =>
-      `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--label3);margin-left:4px;flex-shrink:0">${eLbl[eid]||eid}</span>`
+      `<span style="font-size:10px;font-weight:700;padding:1px 4px;border-radius:4px;background:var(--surface2);color:var(--label3);margin-left:3px;flex-shrink:0">${eLbl[eid]||eid}</span>`
     ).join('') : '';
     return `<tr data-maint-id="${esc(eid)}" draggable="true"
       ondragstart="maintLogDragStart(event,'${esc(eid)}')"
@@ -1898,19 +1899,17 @@ function renderMaintenance() {
       ondragleave="maintLogDragLeave(event)"
       ondrop="maintLogDrop(event,'${esc(eid)}')"
       ondragend="maintLogDragEnd()">
-      <td style="padding:0 4px"><span class="prov-grip" ontouchstart="maintLogTouchStart(event,'${esc(eid)}')">⠿</span></td>
-      <td style="white-space:nowrap;padding:9px 6px">${esc(e.date)}</td>
-      <td style="white-space:nowrap;padding:9px 4px">${esc(String(e.hours))}</td>
-      <td style="overflow:hidden">
-        <div style="display:flex;align-items:center;min-width:0;overflow:hidden">
+      <td style="overflow:hidden;padding:0 4px"><span class="prov-grip" ontouchstart="maintLogTouchStart(event,'${esc(eid)}')">⠿</span></td>
+      <td style="${tdC}">${esc(e.date)}</td>
+      <td style="${tdC}">${esc(String(e.hours))}</td>
+      <td style="overflow:hidden;padding:9px 4px">
+        <div style="display:flex;align-items:center;overflow:hidden;min-width:0">
           <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.task)}</span>
           ${engBadges}
         </div>
       </td>
-      <td style="padding:9px 6px;overflow:hidden">
-        <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.notes||'')}</div>
-      </td>
-      <td style="white-space:nowrap;padding:9px 4px">
+      <td style="${tdC}">${esc(e.notes||'')}</td>
+      <td style="overflow:hidden;white-space:nowrap;padding:9px 2px">
         <button class="btn btn-s btn-xs" onclick="editMaintEntry(${origIdx})" style="margin-right:2px">✏</button>
         <button class="btn btn-d btn-xs" onclick="removeMaintEntry(${origIdx})">✕</button>
       </td>
@@ -1922,27 +1921,27 @@ function renderMaintenance() {
       <button class="btn btn-p btn-sm" onclick="showAddMaintEntry()">+ Add entry</button>
     </div>
     ${filterPills}
-    <div class="card"><div style="overflow-x:auto">
+    <div class="card">
       <table class="tbl" style="table-layout:fixed;width:100%">
         <colgroup>
           <col style="width:24px">
-          <col style="width:90px">
-          <col style="width:50px">
-          <col>
           <col style="width:80px">
-          <col style="width:60px">
+          <col style="width:44px">
+          <col>
+          <col style="width:70px">
+          <col style="width:64px">
         </colgroup>
         <thead><tr>
-          <th style="padding:0 4px"></th>
+          <th style="overflow:hidden;padding:0 4px"></th>
           ${sHdr('date','Date')}
-          <th style="padding:7px 4px;cursor:pointer;user-select:none;white-space:nowrap" onclick="setMaintLogSort('hours')">Hrs${logSort?.col==='hours'?(logSort.dir==='asc'?' ▲':' ▼'):''}</th>
+          <th style="overflow:hidden;white-space:nowrap;padding:7px 4px;cursor:pointer;user-select:none" onclick="setMaintLogSort('hours')">Hrs${logSort?.col==='hours'?(logSort.dir==='asc'?' ▲':' ▼'):''}</th>
           ${sHdr('task','Task')}
           ${sHdr('notes','Notes')}
-          <th style="padding:0 4px"></th>
+          <th style="overflow:hidden;padding:0 4px"></th>
         </tr></thead>
         <tbody>${logRows}</tbody>
       </table>
-    </div></div>`;
+    </div>`;
   return hoursHtml + renderMaintGauges() + comingUpHtml + logHtml;
 }
 
