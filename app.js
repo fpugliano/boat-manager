@@ -7224,11 +7224,14 @@ function _aiStep3Html(parsed) {
   const tlFields = tlData ? Object.entries(tlData).filter(([,v]) => v !== '' && v !== null && v !== undefined) : [];
   if (tlFields.length) {
     total += 1;
-    const preview = [['docNumber','Doc #'],['holderName','Holder'],['validFrom','From'],['validUntil','Until']]
-      .filter(([k]) => tlData[k]).map(([k,l]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(l)}: ${esc(docFieldVal(tlData[k]))}</div>`).join('');
+    const TL_DOC_KEYS = {docNumber:'Doc #',issueDate:'Issue Date',validFrom:'Valid From',validUntil:'Valid Until',customsAuthority:'Customs Authority',validityType:'Validity Type',prevDocsCount:'Prev Docs',otherNotes:'Notes',provisions:'Provisions'};
+    const TL_VSL_KEYS = {vesselName:'Vessel Name',flag:'Flag',portOfRegistry:'Port of Registry',registrationNumber:'Reg #',callSign:'Call Sign',vesselType:'Type',grossTonnage:'GT',engine:'Engine',lengthLOA:'LOA',yearBuilt:'Year Built',yearFirstReg:'Year First Reg',ownerName:'Owner',holderName:'Holder',address:'Address',telephone:'Tel',email:'Email',afmTin:'AFM/TIN',passportId:'ID/Passport'};
+    const docRows = tlFields.filter(([k]) => TL_DOC_KEYS[k]).map(([k,v]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(TL_DOC_KEYS[k])}: ${esc(docFieldVal(v))}</div>`).join('');
+    const vslRows = tlFields.filter(([k]) => TL_VSL_KEYS[k]).map(([k,v]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(TL_VSL_KEYS[k])}: ${esc(docFieldVal(v))}</div>`).join('');
     sections.push(`<div style="margin-bottom:12px">
       <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">📜 Transit Log — 1 record</div>
-      ${preview}
+      ${docRows?`<div style="font-size:11px;font-weight:600;color:var(--label3);margin:4px 0 2px">Document Info</div>${docRows}`:''}
+      ${vslRows?`<div style="font-size:11px;font-weight:600;color:var(--label3);margin:4px 0 2px">Vessel &amp; Owner</div>${vslRows}`:''}
     </div>`);
   }
   const cusData = parsed.documents?.customs;
@@ -7301,8 +7304,18 @@ async function aiImportApply() {
     if (tlImport && typeof tlImport === 'object') {
       const wd = getTLData(), log = wd.logs[wd.currentLog];
       if (log && !log.archived) {
-        ['docNumber','issueDate','validFrom','validUntil','customsAuthority','validityType','holderName','vesselName','flag']
+        ['docNumber','issueDate','validFrom','validUntil','customsAuthority','otherNotes','provisions',
+         'vesselName','flag','portOfRegistry','callSign','vesselType','engine','yearBuilt','yearFirstReg',
+         'ownerName','holderName','address','telephone','email']
           .forEach(k => { if (tlImport[k] !== undefined && tlImport[k] !== '') log[k] = tlImport[k]; });
+        if (tlImport.validityType === 'Unlimited') log.validityType = 'Unlimited (Αόριστη)';
+        else if (tlImport.validityType === 'Limited') log.validityType = 'Limited (Ορισμένη)';
+        if (tlImport.prevDocsCount != null && tlImport.prevDocsCount !== '') log.prevDocCount = String(tlImport.prevDocsCount);
+        if (tlImport.registrationNumber) log.regNumber   = tlImport.registrationNumber;
+        if (tlImport.grossTonnage)       log.gt          = tlImport.grossTonnage;
+        if (tlImport.lengthLOA)          log.loa         = tlImport.lengthLOA;
+        if (tlImport.afmTin)             log.afm         = tlImport.afmTin;
+        if (tlImport.passportId)         log.idNumber    = tlImport.passportId;
       }
     }
     const cusImport = p.documents?.customs;
