@@ -7149,7 +7149,7 @@ function _aiStep1Html() {
   return `
     <div style="font-size:13px;color:var(--label2);margin-bottom:10px">Paste spreadsheet data (Excel, Numbers, Google Sheets) or describe your records.</div>
     <textarea id="ai-import-ta" class="mi" style="height:150px;resize:vertical;font-size:13px;font-family:var(--font)" placeholder="Paste rows here, e.g.:\n2024-10-20  1460  Engine oil  Cape Town\nor describe: 3 oil changes in 2023…">${esc(_aiImportText)}</textarea>
-    <div style="font-size:11px;color:var(--label3);margin:6px 0 14px">What can I import? &nbsp;Maintenance log · Provisions · Spare parts · Systems · LPG · Watermaker</div>
+    <div style="font-size:11px;color:var(--label3);margin:6px 0 14px">What can I import? &nbsp;Maintenance log · Provisions · Spare parts · Transit Log · eTEPAY · Insurance</div>
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="aiImportConvert()">Convert with AI →</button>
@@ -7219,6 +7219,41 @@ function _aiStep3Html(parsed) {
       ${rows}${parsed.spareParts.length > 4 ? `<div style="font-size:11px;color:var(--label3)">…and ${parsed.spareParts.length - 4} more</div>` : ''}
     </div>`);
   }
+  function docFieldVal(v) { return Array.isArray(v) ? v.join(', ') : String(v); }
+  const tlData = parsed.documents?.transitLog;
+  const tlFields = tlData ? Object.entries(tlData).filter(([,v]) => v !== '' && v !== null && v !== undefined) : [];
+  if (tlFields.length) {
+    total += 1;
+    const preview = [['docNumber','Doc #'],['holderName','Holder'],['validFrom','From'],['validUntil','Until']]
+      .filter(([k]) => tlData[k]).map(([k,l]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(l)}: ${esc(docFieldVal(tlData[k]))}</div>`).join('');
+    sections.push(`<div style="margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">📜 Transit Log — 1 record</div>
+      ${preview}
+    </div>`);
+  }
+  const cusData = parsed.documents?.customs;
+  const cusFields = cusData ? Object.entries(cusData).filter(([,v]) => v !== '' && v !== null && v !== undefined && !(Array.isArray(v) && !v.length)) : [];
+  if (cusFields.length) {
+    total += 1;
+    const preview = [['year','Year'],['monthsCovered','Months'],['applicationNumber','App #'],['amountPaid','Amount']]
+      .filter(([k]) => cusData[k] !== undefined && cusData[k] !== '' && !(Array.isArray(cusData[k]) && !cusData[k].length))
+      .map(([k,l]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(l)}: ${esc(docFieldVal(cusData[k]))}</div>`).join('');
+    sections.push(`<div style="margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🛃 eTEPAY — 1 record</div>
+      ${preview}
+    </div>`);
+  }
+  const insData = parsed.documents?.insurance;
+  const insFields = insData ? Object.entries(insData).filter(([,v]) => v !== '' && v !== null && v !== undefined) : [];
+  if (insFields.length) {
+    total += 1;
+    const preview = [['provider','Provider'],['certificateNumber','Cert #'],['validFrom','From'],['validUntil','Until']]
+      .filter(([k]) => insData[k]).map(([k,l]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(l)}: ${esc(docFieldVal(insData[k]))}</div>`).join('');
+    sections.push(`<div style="margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🛡️ Insurance — 1 record</div>
+      ${preview}
+    </div>`);
+  }
   if (!sections.length) return `
     <div style="text-align:center;padding:24px 0">
       <div style="font-size:28px;margin-bottom:10px">🤔</div>
@@ -7263,9 +7298,45 @@ async function aiImportApply() {
         location: e.location||'', notes: e.notes||'', storeUrl:'',
       }));
     }
+    const tlImport = p.documents?.transitLog;
+    if (tlImport && typeof tlImport === 'object') {
+      const wd = getTLData(), log = wd.logs[wd.currentLog];
+      if (log && !log.archived) {
+        ['docNumber','issueDate','validFrom','validUntil','customsAuthority','validityType','holderName','vesselName','flag']
+          .forEach(k => { if (tlImport[k] !== undefined && tlImport[k] !== '') log[k] = tlImport[k]; });
+      }
+    }
+    const cusImport = p.documents?.customs;
+    if (cusImport && typeof cusImport === 'object') {
+      if (!data.documents) data.documents = {};
+      if (!data.documents.customs) data.documents.customs = {};
+      const C = data.documents.customs;
+      ['applicationNumber','applicationDate','entryDate','year','amountPaid','paymentCode','adminFeeCode','status','validUntil','holderName','customsOffice','clearanceNumber','email']
+        .forEach(k => { if (cusImport[k] !== undefined && cusImport[k] !== '') C[k] = cusImport[k]; });
+      if (cusImport.afmTin) C.afm = cusImport.afmTin;
+      if (Array.isArray(cusImport.monthsCovered) && cusImport.monthsCovered.length) C.monthsCovered = cusImport.monthsCovered.join(',');
+      else if (cusImport.monthsCovered) C.monthsCovered = cusImport.monthsCovered;
+    }
+    const insImport = p.documents?.insurance;
+    if (insImport && typeof insImport === 'object') {
+      if (!data.documents) data.documents = {};
+      if (!data.documents.insurance) data.documents.insurance = {};
+      const I = data.documents.insurance;
+      if (insImport.provider)           I.insurer    = insImport.provider;
+      if (insImport.policyNumber)       I.policyNumber   = insImport.policyNumber;
+      if (insImport.certificateNumber)  I.certNumber = insImport.certificateNumber;
+      if (insImport.validFrom)          I.issueDate  = insImport.validFrom;
+      if (insImport.validUntil)         I.expiryDate = insImport.validUntil;
+      if (insImport.premium)            I.premium    = insImport.premium;
+      if (insImport.currency)           I.currency   = insImport.currency;
+      if (insImport.notes)              I.specialNotes = insImport.notes;
+    }
     migrateData();
     await save(); await pushToCloud(); hideModal(); renderApp();
-    const total = (p.maintenance?.length||0) + (p.provisions?.length||0) + (p.spareParts?.length||0);
+    const docCount = (tlImport && Object.values(tlImport).some(v=>v) ? 1 : 0)
+      + (cusImport && Object.values(cusImport).some(v=>v) ? 1 : 0)
+      + (insImport && Object.values(insImport).some(v=>v) ? 1 : 0);
+    const total = (p.maintenance?.length||0) + (p.provisions?.length||0) + (p.spareParts?.length||0) + docCount;
     showToast(`Imported ${total} ${total===1?'entry':'entries'} via AI`);
   } catch(e) { showToast('Import failed: ' + e.message, true); }
 }

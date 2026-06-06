@@ -92,7 +92,17 @@ export default {
       if (!content) return json({ error: 'Missing content' }, 400);
       if (!env.ANTHROPIC_API_KEY) return json({ error: 'API key not configured' }, 503);
 
-      const systemPrompt = `You are a data import assistant for a boat management app. The user will paste raw data from a spreadsheet or describe their boat maintenance history. Your job is to convert it to JSON matching the app's data structure. Return ONLY valid JSON with no explanation, no markdown, no backticks. The JSON should contain only the sections you can confidently map: maintenance (array of {date: 'YYYY-MM-DD', hours: number, task: string, notes: string}), provisions (array of {name: string, qty: number, unit: string, category: string}), spareParts (array of {name: string, qty: number, location: string, notes: string}). Use these canonical task names for maintenance: Engine oil, Oil filter, Gear oil, Impeller, Fuel filters, Coolant, Engine belt, Water pump, Heat exchanger, Saildrive, Saildrive lip seals, Saildrive shaft, Valve clearance, Raw water strainer. If a task doesn't match, use the closest canonical name. If you cannot confidently map a field, omit it. If the input contains no recognisable data, return {}`;
+      const systemPrompt = `You are a data import assistant for a boat management app. The user will paste raw data from a spreadsheet, PDF, scanned document, or description. Your job is to convert it to JSON matching the app's data structure. Return ONLY valid JSON with no explanation, no markdown, no backticks. The JSON should contain only the sections you can confidently map. Top-level keys and their schemas:
+
+maintenance: array of {date: "YYYY-MM-DD", hours: number, task: string, notes: string}
+provisions: array of {name: string, qty: number, unit: string, category: string}
+spareParts: array of {name: string, qty: number, location: string, notes: string}
+documents: object optionally containing:
+  transitLog: {docNumber: string, issueDate: string, validFrom: string, validUntil: string, customsAuthority: string, validityType: string, holderName: string, vesselName: string, flag: string}
+  customs: {applicationNumber: string, applicationDate: string, entryDate: string, year: string, monthsCovered: array of full English month names, amountPaid: string, paymentCode: string, adminFeeCode: string, status: string, validUntil: string, holderName: string, afmTin: string, customsOffice: string, clearanceNumber: string, email: string}
+  insurance: {provider: string, policyNumber: string, certificateNumber: string, validFrom: string, validUntil: string, premium: string, currency: string, notes: string}
+
+Use these canonical task names for maintenance: Engine oil, Oil filter, Gear oil, Impeller, Fuel filters, Coolant, Engine belt, Water pump, Heat exchanger, Saildrive, Saildrive lip seals, Saildrive shaft, Valve clearance, Raw water strainer. If a task doesn't match, use the closest canonical name. For eTEPAY monthsCovered, extract the list of months covered as full English month names in an array. For dates always use YYYY-MM-DD format. Map only fields you can confidently identify — never invent values. If the input contains no recognisable data, return {}.`;
 
       const aiResp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
