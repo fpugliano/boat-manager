@@ -7235,9 +7235,8 @@ function _aiStep3Html(parsed) {
   const cusFields = cusData ? Object.entries(cusData).filter(([,v]) => v !== '' && v !== null && v !== undefined && !(Array.isArray(v) && !v.length)) : [];
   if (cusFields.length) {
     total += 1;
-    const preview = [['year','Year'],['monthsCovered','Months'],['applicationNumber','App #'],['amountPaid','Amount']]
-      .filter(([k]) => cusData[k] !== undefined && cusData[k] !== '' && !(Array.isArray(cusData[k]) && !cusData[k].length))
-      .map(([k,l]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(l)}: ${esc(docFieldVal(cusData[k]))}</div>`).join('');
+    const CUS_LABELS = {applicationNumber:'App #',applicationDate:'App Date',entryDate:'Entry Date',year:'Year',monthsCovered:'Months',amountPaid:'Amount Paid',paymentCode:'Payment Code',adminFeeCode:'Admin Fee Code',status:'Status',validUntil:'Valid Until',holderName:'Holder',afmTin:'AFM/TIN',customsOffice:'Customs Office',clearanceNumber:'Clearance #',email:'Email',paymentRef:'Payment Ref',passportNumber:'Passport #',phone:'Phone',address:'Address'};
+    const preview = cusFields.map(([k,v]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(CUS_LABELS[k]||k)}: ${esc(docFieldVal(v))}</div>`).join('');
     sections.push(`<div style="margin-bottom:12px">
       <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🛃 eTEPAY — 1 record</div>
       ${preview}
@@ -7311,9 +7310,12 @@ async function aiImportApply() {
       if (!data.documents) data.documents = {};
       if (!data.documents.customs) data.documents.customs = {};
       const C = data.documents.customs;
-      ['applicationNumber','applicationDate','entryDate','year','amountPaid','paymentCode','adminFeeCode','status','validUntil','holderName','customsOffice','clearanceNumber','email']
+      ['applicationNumber','applicationDate','entryDate','year','amountPaid','paymentCode','adminFeeCode','status','validUntil','holderName','customsOffice','clearanceNumber','email','paymentRef']
         .forEach(k => { if (cusImport[k] !== undefined && cusImport[k] !== '') C[k] = cusImport[k]; });
-      if (cusImport.afmTin) C.afm = cusImport.afmTin;
+      if (cusImport.afmTin)         C.afm                 = cusImport.afmTin;
+      if (cusImport.passportNumber) C.ownerPassportNumber = cusImport.passportNumber;
+      if (cusImport.phone)          C.ownerPhone          = cusImport.phone;
+      if (cusImport.address)        C.ownerAddress        = cusImport.address;
       if (Array.isArray(cusImport.monthsCovered) && cusImport.monthsCovered.length) C.monthsCovered = cusImport.monthsCovered.join(',');
       else if (cusImport.monthsCovered) C.monthsCovered = cusImport.monthsCovered;
     }
