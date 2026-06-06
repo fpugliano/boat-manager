@@ -31,7 +31,7 @@
 <div id="results" style="display:none">
   <div id="stats"></div>
   <table>
-    <thead><tr><th>Signup</th><th>Last active</th><th>Boat name</th><th>Country</th></tr></thead>
+    <thead><tr><th>Signup</th><th>Last active</th><th>Boat name</th><th>Country</th><th>AI Imports</th></tr></thead>
     <tbody id="tbody"></tbody>
   </table>
 </div>
@@ -61,10 +61,23 @@ async function load() {
     const active7  = records.filter(r => r.lastActive >= d7).length;
     const active30 = records.filter(r => r.lastActive >= d30).length;
 
+    // AI import stats (derived from user records)
+    const totalAiImports = records.reduce((s, r) => s + (r.aiImports || 0), 0);
+    const estCost = (totalAiImports * 0.002).toFixed(2);
+
+    // Also fetch aggregate from worker for cross-check
+    let aggCount = totalAiImports;
+    try {
+      const aggR = await fetch(`${WORKER}/api/analytics/ai-aggregate`, { headers: { 'X-Admin-Password': pw } });
+      if (aggR.ok) { const agg = await aggR.json(); aggCount = agg.count || totalAiImports; }
+    } catch(e) {}
+
     document.getElementById('stats').innerHTML =
       `Total users: <b>${records.length}</b><br>` +
       `Active last 7 days: <b>${active7}</b><br>` +
-      `Active last 30 days: <b>${active30}</b>`;
+      `Active last 30 days: <b>${active30}</b><br>` +
+      `Total AI import calls: <b>${aggCount}</b><br>` +
+      `Est. API cost: <b>$${estCost}</b>`;
 
     const tbody = document.getElementById('tbody');
     tbody.innerHTML = records.map(rec => {
@@ -74,6 +87,7 @@ async function load() {
         <td class="${isRecent ? 'recent' : ''}">${esc(rec.lastActive || '—')}</td>
         <td>${esc(rec.boatName || '—')}</td>
         <td>${esc(rec.country || '—')}</td>
+        <td>${rec.aiImports ? `<b>${rec.aiImports}</b>` : '—'}</td>
       </tr>`;
     }).join('');
 

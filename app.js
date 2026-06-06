@@ -7130,6 +7130,140 @@ function timeAgo(isoStr) {
   return new Date(isoStr).toLocaleDateString();
 }
 
+// ── AI Import Assistant ──────────────────────────────────────
+let _aiImportText = '', _aiImportParsed = null;
+
+function showAiImportModal() {
+  _aiImportText = '';
+  _aiImportParsed = null;
+  showModal('AI Import Assistant', _aiStep1Html());
+}
+
+function _aiStep1Html() {
+  return `
+    <div style="font-size:13px;color:var(--label2);margin-bottom:10px">Paste spreadsheet data (Excel, Numbers, Google Sheets) or describe your records.</div>
+    <textarea id="ai-import-ta" class="mi" style="height:150px;resize:vertical;font-size:13px;font-family:var(--font)" placeholder="Paste rows here, e.g.:\n2024-10-20  1460  Engine oil  Cape Town\nor describe: 3 oil changes in 2023…">${esc(_aiImportText)}</textarea>
+    <div style="font-size:11px;color:var(--label3);margin:6px 0 14px">What can I import? &nbsp;Maintenance log · Provisions · Spare parts · Systems · LPG · Watermaker</div>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="aiImportConvert()">Convert with AI →</button>
+    </div>`;
+}
+
+async function aiImportConvert() {
+  const ta = document.getElementById('ai-import-ta');
+  const text = ta?.value.trim() || '';
+  if (!text) { showToast('Paste some data first', true); return; }
+  _aiImportText = text;
+  const body = document.getElementById('modalBody');
+  if (body) body.innerHTML = `
+    <div class="modal-title">AI Import Assistant</div>
+    <div style="text-align:center;padding:36px 16px">
+      <div style="font-size:36px;margin-bottom:14px">⏳</div>
+      <div style="font-size:14px;font-weight:600;color:var(--label)">Analysing your data…</div>
+      <div style="font-size:12px;color:var(--label3);margin-top:6px">Claude is processing your input</div>
+    </div>`;
+  try {
+    const email = localStorage.getItem(EMAIL_KEY);
+    const hash  = email ? await emailToKey(email) : '';
+    const r = await fetch(`${STORAGE_WORKER_URL}/api/ai-import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: text, userHash: hash }),
+    });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || `HTTP ${r.status}`); }
+    const { result } = await r.json();
+    let parsed;
+    try { parsed = JSON.parse(result); } catch(e) { throw new Error('Claude returned unparseable JSON — try rephrasing your input'); }
+    _aiImportParsed = parsed;
+    if (body) body.innerHTML = `<div class="modal-title">AI Import Assistant</div>` + _aiStep3Html(parsed);
+  } catch(e) {
+    if (body) body.innerHTML = `<div class="modal-title">AI Import Assistant</div>` + _aiStep1Html();
+    showToast('AI import failed: ' + e.message, true);
+  }
+}
+
+function _aiStep3Html(parsed) {
+  const sections = [];
+  let total = 0;
+  if (Array.isArray(parsed.maintenance) && parsed.maintenance.length) {
+    total += parsed.maintenance.length;
+    const rows = parsed.maintenance.slice(0, 5).map(e =>
+      `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(e.date||'?')} · ${esc(String(e.hours||'?'))}h · ${esc(e.task||'?')}</div>`).join('');
+    sections.push(`<div style="margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🔧 Maintenance — ${parsed.maintenance.length} entries</div>
+      ${rows}${parsed.maintenance.length > 5 ? `<div style="font-size:11px;color:var(--label3)">…and ${parsed.maintenance.length - 5} more</div>` : ''}
+    </div>`);
+  }
+  if (Array.isArray(parsed.provisions) && parsed.provisions.length) {
+    total += parsed.provisions.length;
+    const rows = parsed.provisions.slice(0, 4).map(e =>
+      `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(e.name||'?')} × ${esc(String(e.qty||1))} ${esc(e.unit||'')}</div>`).join('');
+    sections.push(`<div style="margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🛒 Provisions — ${parsed.provisions.length} items</div>
+      ${rows}${parsed.provisions.length > 4 ? `<div style="font-size:11px;color:var(--label3)">…and ${parsed.provisions.length - 4} more</div>` : ''}
+    </div>`);
+  }
+  if (Array.isArray(parsed.spareParts) && parsed.spareParts.length) {
+    total += parsed.spareParts.length;
+    const rows = parsed.spareParts.slice(0, 4).map(e =>
+      `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(e.name||'?')} × ${esc(String(e.qty||1))}</div>`).join('');
+    sections.push(`<div style="margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🔩 Spare Parts — ${parsed.spareParts.length} items</div>
+      ${rows}${parsed.spareParts.length > 4 ? `<div style="font-size:11px;color:var(--label3)">…and ${parsed.spareParts.length - 4} more</div>` : ''}
+    </div>`);
+  }
+  if (!sections.length) return `
+    <div style="text-align:center;padding:24px 0">
+      <div style="font-size:28px;margin-bottom:10px">🤔</div>
+      <div style="font-size:14px;font-weight:600;color:var(--label)">No data recognised</div>
+      <div style="font-size:12px;color:var(--label3);margin-top:6px">Try pasting column headers with your data, or rephrase your description.</div>
+    </div>
+    <div class="modal-btns"><button class="btn btn-p" onclick="showAiImportModal()">← Try again</button></div>`;
+  return `
+    <div style="max-height:300px;overflow-y:auto;margin-bottom:4px">${sections.join('')}</div>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="showAiImportModal()">← Edit</button>
+      <button class="btn btn-p" onclick="aiImportApply()">Import ${total} ${total===1?'entry':'entries'}</button>
+    </div>`;
+}
+
+async function aiImportApply() {
+  if (!_aiImportParsed) return;
+  const p = _aiImportParsed;
+  try {
+    if (Array.isArray(p.maintenance) && p.maintenance.length) {
+      if (!data.maintenance) data.maintenance = { engines:{}, sched:{}, log:[] };
+      if (!data.maintenance.log) data.maintenance.log = [];
+      p.maintenance.forEach(e => data.maintenance.log.unshift({
+        id: uid(), date: e.date||'', hours: String(e.hours||''),
+        task: normalizeMaintTask(e.task||''), cost:'',
+        notes: e.notes||'', engines: ['port','starboard'],
+      }));
+    }
+    if (Array.isArray(p.provisions) && p.provisions.length) {
+      if (!data.provisions) data.provisions = {items:[]};
+      if (!data.provisions.items) data.provisions.items = [];
+      p.provisions.forEach(e => data.provisions.items.push({
+        id: uid(), name: e.name||'', qty: Number(e.qty)||0,
+        minQty:0, unit: e.unit||'', category: e.category||'misc', location:'',
+      }));
+    }
+    if (Array.isArray(p.spareParts) && p.spareParts.length) {
+      if (!data.spareParts) data.spareParts = [];
+      p.spareParts.forEach(e => data.spareParts.push({
+        id: uid(), desc: e.name||'', pn:'', category:'General',
+        qty: Number(e.qty)||1, minQuantity:0, unitPrice:0,
+        location: e.location||'', notes: e.notes||'', storeUrl:'',
+      }));
+    }
+    migrateData();
+    await save(); await pushToCloud(); hideModal(); renderApp();
+    const total = (p.maintenance?.length||0) + (p.provisions?.length||0) + (p.spareParts?.length||0);
+    showToast(`Imported ${total} ${total===1?'entry':'entries'} via AI`);
+  } catch(e) { showToast('Import failed: ' + e.message, true); }
+}
+
 function renderSettings() {
   const email = localStorage.getItem(EMAIL_KEY) || '—';
   const syncColors = {synced:'var(--green)',syncing:'var(--orange)',offline:'var(--red)',idle:'var(--label3)'};
@@ -7185,8 +7319,9 @@ function renderSettings() {
         <div class="fl">Import from JSON</div>
         <div class="fv" style="font-size:12px;color:var(--label3)">Merge plain JSON into app data</div>
       </div>
-      <div class="btn-row">
+      <div class="btn-row" style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-s btn-sm" onclick="document.getElementById('jsonImportFile').click()">⬆ Import Data from JSON</button>
+        <button class="btn btn-p btn-sm" onclick="showAiImportModal()">🤖 AI Import Assistant</button>
       </div>
     </div>
     <div class="sec-hd">Account</div>
