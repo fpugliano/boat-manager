@@ -7525,11 +7525,12 @@ function timeAgo(isoStr) {
 }
 
 // ── AI Import Assistant ──────────────────────────────────────
-let _aiImportText = '', _aiImportParsed = null;
+let _aiImportText = '', _aiImportParsed = null, _aiImportInProgress = false;
 
 function showAiImportModal() {
   _aiImportText = '';
   _aiImportParsed = null;
+  _aiImportInProgress = false;
   showModal('AI Import Assistant', _aiStep1Html());
 }
 
@@ -7665,12 +7666,14 @@ function _aiStep3Html(parsed) {
     <div style="max-height:300px;overflow-y:auto;margin-bottom:4px">${sections.join('')}</div>
     <div class="modal-btns">
       <button class="btn btn-s" onclick="showAiImportModal()">← Edit</button>
-      <button class="btn btn-p" onclick="aiImportApply()">Import ${total} ${total===1?'entry':'entries'}</button>
+      <button class="btn btn-p" onclick="aiImportApply(this)">Import ${total} ${total===1?'entry':'entries'}</button>
     </div>`;
 }
 
-async function aiImportApply() {
-  if (!_aiImportParsed) return;
+async function aiImportApply(btn) {
+  if (_aiImportInProgress || !_aiImportParsed) return;
+  _aiImportInProgress = true;
+  if (btn) { btn.disabled = true; btn.textContent = 'Importing…'; }
   const p = _aiImportParsed;
   try {
     if (Array.isArray(p.maintenance) && p.maintenance.length) {
@@ -7757,13 +7760,37 @@ async function aiImportApply() {
       }));
     }
     migrateData();
-    await save(); await pushToCloud(); hideModal(); renderApp();
-    const docCount = (tlImport && Object.values(tlImport).some(v=>v) ? 1 : 0)
-      + (cusImport && Object.values(cusImport).some(v=>v) ? 1 : 0)
-      + (insImport && Object.values(insImport).some(v=>v) ? 1 : 0);
-    const total = (p.maintenance?.length||0) + (p.provisions?.length||0) + (p.spareParts?.length||0) + docCount + (p.safety?.flares?.length||0);
-    showToast(`Imported ${total} ${total===1?'entry':'entries'} via AI`);
-  } catch(e) { showToast('Import failed: ' + e.message, true); }
+    await save(); await pushToCloud();
+    renderApp();
+    _aiImportParsed = null;
+
+    // Build success summary
+    const lines = [];
+    if (p.maintenance?.length)  lines.push(`${p.maintenance.length} maintenance ${p.maintenance.length===1?'entry':'entries'} → Engine Maintenance`);
+    if (p.provisions?.length)   lines.push(`${p.provisions.length} provision ${p.provisions.length===1?'item':'items'} → Provisions`);
+    if (p.spareParts?.length)   lines.push(`${p.spareParts.length} spare ${p.spareParts.length===1?'part':'parts'} → Spare Parts`);
+    if (tlImport  && Object.values(tlImport).some(v=>v))  lines.push('Transit Log updated → Boat Docs');
+    if (cusImport && Object.values(cusImport).some(v=>v)) lines.push('eTEPAY updated → Boat Docs');
+    if (insImport && Object.values(insImport).some(v=>v)) lines.push('Insurance updated → Boat Docs');
+    if (p.safety?.flares?.length) lines.push(`${p.safety.flares.length} ${p.safety.flares.length===1?'flare':'flares'} added → Safety`);
+
+    const modalBody = document.getElementById('modalBody');
+    if (modalBody) modalBody.innerHTML = `
+      <div style="text-align:center;padding:28px 16px 8px">
+        <div style="font-size:52px;margin-bottom:10px">✅</div>
+        <div style="font-size:17px;font-weight:700;color:var(--label);margin-bottom:14px">Import successful!</div>
+        <div style="text-align:left;background:var(--surface2);border-radius:10px;padding:12px 14px;margin-bottom:4px">
+          ${lines.map(l=>`<div style="font-size:13px;color:var(--label2);padding:3px 0">✓ ${esc(l)}</div>`).join('')}
+        </div>
+      </div>
+      <div class="modal-btns">
+        <button class="btn btn-p" onclick="hideModal()">Done</button>
+      </div>`;
+  } catch(e) {
+    _aiImportInProgress = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Import'; }
+    showToast('Import failed: ' + e.message, true);
+  }
 }
 
 function renderSettings() {
