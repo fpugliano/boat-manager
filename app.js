@@ -7537,7 +7537,7 @@ function _aiStep1Html() {
   return `
     <div style="font-size:13px;color:var(--label2);margin-bottom:10px">Paste spreadsheet data (Excel, Numbers, Google Sheets) or describe your records.</div>
     <textarea id="ai-import-ta" class="mi" style="height:150px;resize:vertical;font-size:13px;font-family:var(--font)" placeholder="Paste rows here, e.g.:\n2024-10-20  1460  Engine oil  Cape Town\nor describe: 3 oil changes in 2023…">${esc(_aiImportText)}</textarea>
-    <div style="font-size:11px;color:var(--label3);margin:6px 0 14px">What can I import? &nbsp;Maintenance log · Provisions · Spare parts · Systems · LPG · Watermaker · Transit Log · eTEPAY · Insurance</div>
+    <div style="font-size:11px;color:var(--label3);margin:6px 0 14px">What can I import? &nbsp;Maintenance log · Provisions · Spare parts · Systems · LPG · Watermaker · Transit Log · eTEPAY · Insurance · Safety</div>
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="aiImportConvert()">Convert with AI →</button>
@@ -7644,6 +7644,16 @@ function _aiStep3Html(parsed) {
       ${preview}
     </div>`);
   }
+  const safetyFlares = parsed.safety?.flares;
+  if (Array.isArray(safetyFlares) && safetyFlares.length) {
+    total += safetyFlares.length;
+    const rows = safetyFlares.slice(0,5).map(f =>
+      `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(f.type||'?')} × ${esc(String(f.qty||1))}${f.expiry?' · '+esc(f.expiry):''}</div>`).join('');
+    sections.push(`<div style="margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🛡️ Safety — ${safetyFlares.length} flare${safetyFlares.length!==1?'s':''}</div>
+      ${rows}${safetyFlares.length>5?`<div style="font-size:11px;color:var(--label3)">…and ${safetyFlares.length-5} more</div>`:''}
+    </div>`);
+  }
   if (!sections.length) return `
     <div style="text-align:center;padding:24px 0">
       <div style="font-size:28px;margin-bottom:10px">🤔</div>
@@ -7739,12 +7749,19 @@ async function aiImportApply() {
       if (insImport.navigationLimits)   I.navigationLimits   = insImport.navigationLimits;
       if (insImport.specialNotes)       I.specialNotes       = insImport.specialNotes;
     }
+    if (Array.isArray(p.safety?.flares) && p.safety.flares.length) {
+      if (!data.safety) data.safety = {flares:[],lifeRafts:[]};
+      if (!data.safety.flares) data.safety.flares = [];
+      p.safety.flares.forEach(f => data.safety.flares.push({
+        id:uid(), type:f.type||'', qty:Number(f.qty)||1, expiry:f.expiry||'', notes:f.notes||''
+      }));
+    }
     migrateData();
     await save(); await pushToCloud(); hideModal(); renderApp();
     const docCount = (tlImport && Object.values(tlImport).some(v=>v) ? 1 : 0)
       + (cusImport && Object.values(cusImport).some(v=>v) ? 1 : 0)
       + (insImport && Object.values(insImport).some(v=>v) ? 1 : 0);
-    const total = (p.maintenance?.length||0) + (p.provisions?.length||0) + (p.spareParts?.length||0) + docCount;
+    const total = (p.maintenance?.length||0) + (p.provisions?.length||0) + (p.spareParts?.length||0) + docCount + (p.safety?.flares?.length||0);
     showToast(`Imported ${total} ${total===1?'entry':'entries'} via AI`);
   } catch(e) { showToast('Import failed: ' + e.message, true); }
 }
