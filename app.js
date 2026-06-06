@@ -7149,7 +7149,7 @@ function _aiStep1Html() {
   return `
     <div style="font-size:13px;color:var(--label2);margin-bottom:10px">Paste spreadsheet data (Excel, Numbers, Google Sheets) or describe your records.</div>
     <textarea id="ai-import-ta" class="mi" style="height:150px;resize:vertical;font-size:13px;font-family:var(--font)" placeholder="Paste rows here, e.g.:\n2024-10-20  1460  Engine oil  Cape Town\nor describe: 3 oil changes in 2023…">${esc(_aiImportText)}</textarea>
-    <div style="font-size:11px;color:var(--label3);margin:6px 0 14px">What can I import? &nbsp;Maintenance log · Provisions · Spare parts · Transit Log · eTEPAY · Insurance</div>
+    <div style="font-size:11px;color:var(--label3);margin:6px 0 14px">What can I import? &nbsp;Maintenance log · Provisions · Spare parts · Systems · LPG · Watermaker · Transit Log · eTEPAY · Insurance</div>
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="aiImportConvert()">Convert with AI →</button>
