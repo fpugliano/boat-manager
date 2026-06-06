@@ -7585,7 +7585,7 @@ function _aiStep3Html(parsed) {
     const rows = parsed.maintenance.slice(0, 5).map(e =>
       `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(e.date||'?')} · ${esc(String(e.hours||'?'))}h · ${esc(e.task||'?')}</div>`).join('');
     sections.push(`<div style="margin-bottom:12px">
-      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🔧 Maintenance — ${parsed.maintenance.length} entries</div>
+      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🔧 Maintenance — ${parsed.maintenance.length} entries <span style="font-weight:400;color:var(--label3)">→ Engine Maintenance tab</span></div>
       ${rows}${parsed.maintenance.length > 5 ? `<div style="font-size:11px;color:var(--label3)">…and ${parsed.maintenance.length - 5} more</div>` : ''}
     </div>`);
   }
@@ -7594,7 +7594,7 @@ function _aiStep3Html(parsed) {
     const rows = parsed.provisions.slice(0, 4).map(e =>
       `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(e.name||'?')} × ${esc(String(e.qty||1))} ${esc(e.unit||'')}</div>`).join('');
     sections.push(`<div style="margin-bottom:12px">
-      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🛒 Provisions — ${parsed.provisions.length} items</div>
+      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🛒 Provisions — ${parsed.provisions.length} items <span style="font-weight:400;color:var(--label3)">→ Provisions tab</span></div>
       ${rows}${parsed.provisions.length > 4 ? `<div style="font-size:11px;color:var(--label3)">…and ${parsed.provisions.length - 4} more</div>` : ''}
     </div>`);
   }
@@ -7603,7 +7603,7 @@ function _aiStep3Html(parsed) {
     const rows = parsed.spareParts.slice(0, 4).map(e =>
       `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(e.name||'?')} × ${esc(String(e.qty||1))}</div>`).join('');
     sections.push(`<div style="margin-bottom:12px">
-      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🔩 Spare Parts — ${parsed.spareParts.length} items</div>
+      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🔩 Spare Parts — ${parsed.spareParts.length} items <span style="font-weight:400;color:var(--label3)">→ Spare Parts tab</span></div>
       ${rows}${parsed.spareParts.length > 4 ? `<div style="font-size:11px;color:var(--label3)">…and ${parsed.spareParts.length - 4} more</div>` : ''}
     </div>`);
   }
@@ -7617,7 +7617,7 @@ function _aiStep3Html(parsed) {
     const docRows = tlFields.filter(([k]) => TL_DOC_KEYS[k]).map(([k,v]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(TL_DOC_KEYS[k])}: ${esc(docFieldVal(v))}</div>`).join('');
     const vslRows = tlFields.filter(([k]) => TL_VSL_KEYS[k]).map(([k,v]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(TL_VSL_KEYS[k])}: ${esc(docFieldVal(v))}</div>`).join('');
     sections.push(`<div style="margin-bottom:12px">
-      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">📜 Transit Log — 1 record</div>
+      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">📜 Transit Log — 1 record <span style="font-weight:400;color:var(--label3)">→ Boat Docs → Transit Log</span></div>
       ${docRows?`<div style="font-size:11px;font-weight:600;color:var(--label3);margin:4px 0 2px">Document Info</div>${docRows}`:''}
       ${vslRows?`<div style="font-size:11px;font-weight:600;color:var(--label3);margin:4px 0 2px">Vessel &amp; Owner</div>${vslRows}`:''}
     </div>`);
@@ -7629,7 +7629,7 @@ function _aiStep3Html(parsed) {
     const CUS_LABELS = {applicationNumber:'App #',applicationDate:'App Date',entryDate:'Entry Date',year:'Year',monthsCovered:'Months',amountPaid:'Amount Paid',paymentCode:'Payment Code',adminFeeCode:'Admin Fee Code',status:'Status',validUntil:'Valid Until',holderName:'Holder',afmTin:'AFM/TIN',customsOffice:'Customs Office',clearanceNumber:'Clearance #',email:'Email',paymentRef:'Payment Ref',passportNumber:'Passport #',phone:'Phone',address:'Address'};
     const preview = cusFields.map(([k,v]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(CUS_LABELS[k]||k)}: ${esc(docFieldVal(v))}</div>`).join('');
     sections.push(`<div style="margin-bottom:12px">
-      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🛃 eTEPAY — 1 record</div>
+      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🛃 eTEPAY — 1 record <span style="font-weight:400;color:var(--label3)">→ Boat Docs → eTEPAY</span></div>
       ${preview}
     </div>`);
   }
@@ -7640,7 +7640,7 @@ function _aiStep3Html(parsed) {
     const INS_LABELS = {insurer:'Insurer',certNumber:'Cert #',issueDate:'Issue Date',expiryDate:'Expiry Date',premium:'Premium',personalInjury:'Personal Injury/Death',materialDamage:'Material Damage',pollution:'Pollution',totalSumInsured:'Total Sum Insured',thirdPartyLiability:'Third Party Liability',deductibles:'Deductibles',navigationLimits:'Navigation Limits',specialNotes:'Special Notes'};
     const preview = insFields.map(([k,v]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(INS_LABELS[k]||k)}: ${esc(docFieldVal(v))}</div>`).join('');
     sections.push(`<div style="margin-bottom:12px">
-      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🛡️ Insurance — 1 record</div>
+      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🛡️ Insurance — 1 record <span style="font-weight:400;color:var(--label3)">→ Boat Docs → Insurance</span></div>
       ${preview}
     </div>`);
   }
@@ -7650,7 +7650,7 @@ function _aiStep3Html(parsed) {
     const rows = safetyFlares.slice(0,5).map(f =>
       `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(f.type||'?')} × ${esc(String(f.qty||1))}${f.expiry?' · '+esc(f.expiry):''}</div>`).join('');
     sections.push(`<div style="margin-bottom:12px">
-      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🛡️ Safety — ${safetyFlares.length} flare${safetyFlares.length!==1?'s':''}</div>
+      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🛡️ Safety — Flares — ${safetyFlares.length} flare${safetyFlares.length!==1?'s':''} <span style="font-weight:400;color:var(--label3)">→ Safety tab</span></div>
       ${rows}${safetyFlares.length>5?`<div style="font-size:11px;color:var(--label3)">…and ${safetyFlares.length-5} more</div>`:''}
     </div>`);
   }
