@@ -5951,10 +5951,12 @@ function renderClearance() {
   for (const m of covered) {
     const mi = FULL_MO.indexOf(m); if (mi===-1) continue;
     etTotal++;
-    if (new Date(etYear, mi, 1) > now0) etFuture++;
+    if (new Date(etYear, mi+1, 1) > now0) etFuture++;
   }
   const etColor   = etFuture>3?'#22C55E':etFuture>0?'#F59E0B':'#EF4444';
-  const etPaidStr = tlFmtDate(parseTLDate(C.validUntil));
+  const validMoIdxs = covered.map(m => FULL_MO.indexOf(m)).filter(i => i !== -1);
+  const lastMoIdx   = validMoIdxs.length ? Math.max(...validMoIdxs) : -1;
+  const etPaidStr   = lastMoIdx >= 0 ? `${FULL_MO[lastMoIdx].slice(0,3)} ${etYear}` : '—';
 
   // ── Gauge 4: Schengen ──
   const holderKey = (cur?.holderName||'').trim().toLowerCase();
