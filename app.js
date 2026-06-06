@@ -7247,8 +7247,8 @@ function _aiStep3Html(parsed) {
   const insFields = insData ? Object.entries(insData).filter(([,v]) => v !== '' && v !== null && v !== undefined) : [];
   if (insFields.length) {
     total += 1;
-    const preview = [['provider','Provider'],['certificateNumber','Cert #'],['validFrom','From'],['validUntil','Until']]
-      .filter(([k]) => insData[k]).map(([k,l]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(l)}: ${esc(docFieldVal(insData[k]))}</div>`).join('');
+    const INS_LABELS = {insurer:'Insurer',certNumber:'Cert #',issueDate:'Issue Date',expiryDate:'Expiry Date',premium:'Premium',personalInjury:'Personal Injury/Death',materialDamage:'Material Damage',pollution:'Pollution',totalSumInsured:'Total Sum Insured',thirdPartyLiability:'Third Party Liability',deductibles:'Deductibles',navigationLimits:'Navigation Limits',specialNotes:'Special Notes'};
+    const preview = insFields.map(([k,v]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(INS_LABELS[k]||k)}: ${esc(docFieldVal(v))}</div>`).join('');
     sections.push(`<div style="margin-bottom:12px">
       <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🛡️ Insurance — 1 record</div>
       ${preview}
@@ -7322,14 +7322,19 @@ async function aiImportApply() {
       if (!data.documents) data.documents = {};
       if (!data.documents.insurance) data.documents.insurance = {};
       const I = data.documents.insurance;
-      if (insImport.provider)           I.insurer    = insImport.provider;
-      if (insImport.policyNumber)       I.policyNumber   = insImport.policyNumber;
-      if (insImport.certificateNumber)  I.certNumber = insImport.certificateNumber;
-      if (insImport.validFrom)          I.issueDate  = insImport.validFrom;
-      if (insImport.validUntil)         I.expiryDate = insImport.validUntil;
-      if (insImport.premium)            I.premium    = insImport.premium;
-      if (insImport.currency)           I.currency   = insImport.currency;
-      if (insImport.notes)              I.specialNotes = insImport.notes;
+      if (insImport.insurer)            I.insurer            = insImport.insurer;
+      if (insImport.certNumber)         I.certNumber         = insImport.certNumber;
+      if (insImport.issueDate)          I.issueDate          = insImport.issueDate;
+      if (insImport.expiryDate)         I.expiryDate         = insImport.expiryDate;
+      if (insImport.premium != null && insImport.premium !== '') I.premium = String(insImport.premium);
+      if (insImport.personalInjury)     I.maxPersonalInjury  = insImport.personalInjury;
+      if (insImport.materialDamage)     I.maxMaterial        = insImport.materialDamage;
+      if (insImport.pollution)          I.maxPollution       = insImport.pollution;
+      if (insImport.totalSumInsured)    I.totalSumInsured    = insImport.totalSumInsured;
+      if (insImport.thirdPartyLiability) I.thirdPartyLiability = insImport.thirdPartyLiability;
+      if (insImport.deductibles)        I.deductibles        = insImport.deductibles;
+      if (insImport.navigationLimits)   I.navigationLimits   = insImport.navigationLimits;
+      if (insImport.specialNotes)       I.specialNotes       = insImport.specialNotes;
     }
     migrateData();
     await save(); await pushToCloud(); hideModal(); renderApp();

@@ -100,7 +100,7 @@ spareParts: array of {name: string, qty: number, location: string, notes: string
 documents: object optionally containing:
   transitLog: {docNumber: string, issueDate: string, validFrom: string, validUntil: string, customsAuthority: string, validityType: string, holderName: string, vesselName: string, flag: string}
   customs: {applicationNumber: string, applicationDate: string, entryDate: string, year: string, monthsCovered: array of full English month names, amountPaid: string, paymentCode: string, adminFeeCode: string, status: string, validUntil: string, holderName: string, afmTin: string, customsOffice: string, clearanceNumber: string, email: string}
-  insurance: {provider: string, policyNumber: string, certificateNumber: string, validFrom: string, validUntil: string, premium: string, currency: string, notes: string}
+  insurance: {insurer: string, certNumber: string, issueDate: string, expiryDate: string, premium: number, personalInjury: string, materialDamage: string, pollution: string, totalSumInsured: string, thirdPartyLiability: string, deductibles: string, navigationLimits: string, specialNotes: string}
 
 Use these canonical task names for maintenance: Engine oil, Oil filter, Gear oil, Impeller, Fuel filters, Coolant, Engine belt, Water pump, Heat exchanger, Saildrive, Saildrive lip seals, Saildrive shaft, Valve clearance, Raw water strainer. If a task doesn't match, use the closest canonical name. For eTEPAY monthsCovered, extract the list of months covered as full English month names in an array. For dates always use YYYY-MM-DD format. Map only fields you can confidently identify — never invent values. If the input contains no recognisable data, return {}.`;
 
