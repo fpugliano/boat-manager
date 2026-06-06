@@ -74,6 +74,7 @@ const EMPTY_DEFAULTS = {
     {id:'ex_s2', cat:'Battery Storage', category:'Battery Storage', make:'Victron', model:'Lithium Battery B', serialNumber:'', location:'engine room centre',     installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', notes:'12V', photos:[]},
     {id:'ex_s3', cat:'Battery Storage', category:'Battery Storage', make:'Victron', model:'Lithium Battery C', serialNumber:'', location:'engine room starboard',  installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', notes:'12V', photos:[]},
   ],
+  safety: { flares: [], lifeRafts: [] },
   schengen: null
 };
 
@@ -481,6 +482,17 @@ function getAlerts() {
       if (d <= 10) alerts.push({color:alertColor(d,10), days:d, text:`${p.name} — seaman book expires ${d<0?Math.abs(d)+'d ago':'in '+d+'d'}`});
     }
   });
+  // Safety — flares and life rafts
+  (data.safety?.flares||[]).forEach(f => {
+    if (!f.expiry) return;
+    const d = daysUntil(f.expiry);
+    if (d <= 180) alerts.push({color:alertColor(d,180), days:d, text:`Flare: ${f.type||'Flare'} ${d<0?`expired ${Math.abs(d)}d ago`:`expires in ${d}d`}`});
+  });
+  (data.safety?.lifeRafts||[]).forEach(r => {
+    if (!r.expiry) return;
+    const d = daysUntil(r.expiry);
+    if (d <= 180) alerts.push({color:alertColor(d,180), days:d, text:`Life raft: ${[r.brand,r.model].filter(Boolean).join(' ')||'Life Raft'} ${d<0?`expired ${Math.abs(d)}d ago`:`expires in ${d}d`}`});
+  });
   // Maintenance — only overdue tasks
   getEngines().forEach(eid => {
     MAINT_TASKS.forEach(task => {
@@ -592,6 +604,7 @@ const TABS = [
   {id:'winter',     icon:'❄️', label:'Winterize'},
   {id:'upgrades',   icon:'🔧', label:'Upgrades & Repairs'},
   {id:'parts',      icon:'🔩', label:'Spare Parts'},
+  {id:'safety',     icon:'🛡️', label:'Safety'},
   {id:'systems',    icon:'🔌', label:'Systems'},
   {id:'settings',   icon:'⚙️', label:'Settings'},
 ];
@@ -643,6 +656,7 @@ function renderActiveTab() {
       case 'upgrades':  mc.innerHTML = renderUpgrades(); break;
       case 'schengen':  mc.innerHTML = renderSchengen(); break;
       case 'parts':     mc.innerHTML = renderParts(); break;
+      case 'safety':    mc.innerHTML = renderSafety(); break;
       case 'systems':   mc.innerHTML = renderSystems(); break;
       case 'winter':    mc.innerHTML = renderWinterization(); break;
       case 'settings':  mc.innerHTML = renderSettings(); break;
@@ -4370,6 +4384,377 @@ function saveEditedPart(idx) {
 }
 
 // ═══════════════════════════════════════════════════════════
+//  SAFETY TAB
+// ═══════════════════════════════════════════════════════════
+
+function safetyStatusBadge(expiry) {
+  if (!expiry) return '';
+  const d = daysUntil(expiry);
+  if (d < 0) return '<span class="badge b-red">Expired</span>';
+  if (d <= 180) { const m = Math.max(1, Math.ceil(d/30)); return `<span class="badge b-orange">${m} month${m!==1?'s':''}</span>`; }
+  return '<span class="badge b-green">OK</span>';
+}
+
+function renderSafety() {
+  if (!data.safety) data.safety = { flares:[], lifeRafts:[] };
+  const flares = data.safety.flares || [];
+  const rafts  = data.safety.lifeRafts || [];
+
+  const expiredFlares = flares.filter(f => f.expiry && daysUntil(f.expiry) < 0);
+  const alertHtml = expiredFlares.length
+    ? `<div style="margin-bottom:12px;padding:10px 14px;background:rgba(239,68,68,.08);border:1.5px solid #EF4444;border-radius:10px;font-size:13px;color:#EF4444;font-weight:600">🔴 ${expiredFlares.length} flare type${expiredFlares.length!==1?'s':''} expired — replace immediately</div>`
+    : '';
+
+  const flareRowsHtml = flares.length ? flares.map(f => {
+    const expired = f.expiry && daysUntil(f.expiry) < 0;
+    return `<div class="part-row" data-safety-flare-id="${f.id}" draggable="true"
+      ondragstart="safetyFlareDragStart(event,'${f.id}')"
+      ondragover="safetyFlareDragOver(event,'${f.id}')"
+      ondragleave="safetyFlareDragLeave(event)"
+      ondrop="safetyFlareDrop(event,'${f.id}')"
+      ondragend="safetyFlareDragEnd()">
+      <span class="prov-grip" ontouchstart="safetyFlareTouchStart(event,'${f.id}')">⠿</span>
+      <div class="qty-wrap">
+        <button class="qb" onclick="adjFlareQty('${f.id}',-1)">−</button>
+        <div class="qn"${expired?' style="color:var(--red)"':''}>${f.qty||0}</div>
+        <button class="qb" onclick="adjFlareQty('${f.id}',1)">+</button>
+      </div>
+      <div class="p-info">
+        <div class="p-desc">${esc(f.type||'—')} ${safetyStatusBadge(f.expiry)}</div>
+        <div class="p-meta">${f.expiry?esc(fmtDate(f.expiry)):'No expiry set'}${f.notes?' · '+esc(f.notes):''}</div>
+      </div>
+      <button class="btn btn-s btn-xs no-print" onclick="showEditFlare('${f.id}')" style="margin-right:4px">✏️</button>
+    </div>`;
+  }).join('') : '<div style="padding:16px;color:var(--label3)">No flares — tap + Add to get started</div>';
+
+  const raftRowsHtml = rafts.length ? rafts.map((r, idx) => {
+    const raftName = [r.brand,r.model].filter(Boolean).join(' ') || '—';
+    const revisions = r.revisions || [];
+    const revRows = revisions.map(rev => `
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 14px 6px 50px;border-top:1px solid var(--sep)">
+        <div class="p-info"><div style="font-size:12px;color:var(--label2)">${esc(fmtDate(rev.date)||rev.date||'—')}${rev.notes?' · '+esc(rev.notes):''}</div></div>
+        <button class="btn btn-s btn-xs no-print" onclick="showEditRevision('${r.id}','${rev.id}')">✏️</button>
+      </div>`).join('');
+    const isLast = idx === rafts.length - 1;
+    return `<div data-safety-raft-id="${r.id}" draggable="true"${isLast?'':' style="border-bottom:1px solid var(--sep)"'}
+      ondragstart="safetyRaftDragStart(event,'${r.id}')"
+      ondragover="safetyRaftDragOver(event,'${r.id}')"
+      ondragleave="safetyRaftDragLeave(event)"
+      ondrop="safetyRaftDrop(event,'${r.id}')"
+      ondragend="safetyRaftDragEnd()">
+      <div class="part-row" style="border-bottom:none">
+        <span class="prov-grip" ontouchstart="safetyRaftTouchStart(event,'${r.id}')">⠿</span>
+        <div class="p-info">
+          <div class="p-desc">${esc(raftName)} · ${r.persons||'—'} persons ${safetyStatusBadge(r.expiry)}</div>
+          <div class="p-meta">${r.expiry?esc(fmtDate(r.expiry)):'No expiry set'}${r.serialNumber?' · S/N: '+esc(r.serialNumber):''}</div>
+        </div>
+        <button class="btn btn-s btn-xs no-print" onclick="showEditRaft('${r.id}')" style="margin-right:4px">✏️</button>
+      </div>
+      <div style="background:var(--surface2)">
+        ${revRows}
+        <div style="padding:6px 14px 6px 50px${revRows?';border-top:1px solid var(--sep)':''}">
+          <button class="btn btn-s btn-xs" onclick="showAddRevision('${r.id}')">+ Add revision</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('') : '<div style="padding:16px;color:var(--label3)">No life rafts — tap + Add to get started</div>';
+
+  return `${alertHtml}
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-hd" style="display:flex;align-items:center;justify-content:space-between">
+        <span>Flares <span style="color:var(--blue);font-weight:700">${flares.length} ITEMS</span></span>
+        <button class="btn btn-p btn-sm" onclick="showAddFlare()">+ Add</button>
+      </div>
+      <div style="padding:0">${flareRowsHtml}</div>
+    </div>
+    <div class="card">
+      <div class="card-hd" style="display:flex;align-items:center;justify-content:space-between">
+        <span>Life Rafts <span style="color:var(--blue);font-weight:700">${rafts.length} ITEMS</span></span>
+        <button class="btn btn-p btn-sm" onclick="showAddRaft()">+ Add</button>
+      </div>
+      <div style="padding:0">${raftRowsHtml}</div>
+    </div>`;
+}
+
+// ── Flare qty ──
+function adjFlareQty(id, delta) {
+  const f = (data.safety?.flares||[]).find(f=>f.id===id); if (!f) return;
+  f.qty = Math.max(0, (f.qty||0)+delta);
+  save(); document.getElementById('mainContent').innerHTML = renderSafety();
+}
+
+// ── Flare modals ──
+function showAddFlare() {
+  showModal('Add Flare', `
+    <div class="mi-label">Type</div><input class="mi" id="sf-type" placeholder="e.g. Red hand flare">
+    <div class="mi-label">Quantity</div><input class="mi" id="sf-qty" type="number" value="1" min="0">
+    <div class="mi-label">Expiry Date</div><input class="mi" id="sf-exp" type="date">
+    <div class="mi-label">Notes</div><input class="mi" id="sf-notes" placeholder="Optional">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveFlare()">Add</button>
+    </div>`);
+}
+function saveFlare() {
+  if (!data.safety) data.safety = {flares:[],lifeRafts:[]};
+  if (!data.safety.flares) data.safety.flares = [];
+  data.safety.flares.push({id:uid(), type:document.getElementById('sf-type').value.trim(), qty:parseInt(document.getElementById('sf-qty').value)||0, expiry:document.getElementById('sf-exp').value, notes:document.getElementById('sf-notes').value.trim()});
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderSafety();
+}
+function showEditFlare(id) {
+  const f = (data.safety?.flares||[]).find(f=>f.id===id); if (!f) return;
+  showModal('Edit Flare', `
+    <div class="mi-label">Type</div><input class="mi" id="sf-type" value="${esc(f.type||'')}">
+    <div class="mi-label">Quantity</div><input class="mi" id="sf-qty" type="number" value="${f.qty||0}" min="0">
+    <div class="mi-label">Expiry Date</div><input class="mi" id="sf-exp" type="date" value="${esc(f.expiry||'')}">
+    <div class="mi-label">Notes</div><input class="mi" id="sf-notes" value="${esc(f.notes||'')}">
+    <div class="modal-btns">
+      <button onclick="if(confirm('Delete this flare?')){hideModal();removeFlare('${id}')}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:10px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">🗑 Delete</button>
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveEditFlare('${id}')">Save</button>
+    </div>`);
+}
+function saveEditFlare(id) {
+  const f = (data.safety?.flares||[]).find(f=>f.id===id); if (!f) return;
+  f.type=document.getElementById('sf-type').value.trim(); f.qty=parseInt(document.getElementById('sf-qty').value)||0;
+  f.expiry=document.getElementById('sf-exp').value; f.notes=document.getElementById('sf-notes').value.trim();
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderSafety();
+}
+function removeFlare(id) {
+  if (!data.safety?.flares) return;
+  data.safety.flares = data.safety.flares.filter(f=>f.id!==id);
+  save(); document.getElementById('mainContent').innerHTML = renderSafety();
+}
+
+// ── Raft modals ──
+function showAddRaft() {
+  showModal('Add Life Raft', `
+    <div class="mi-label">Brand</div><input class="mi" id="sr-brand" placeholder="e.g. Survitec">
+    <div class="mi-label">Model</div><input class="mi" id="sr-model" placeholder="e.g. Ocean ISO 6">
+    <div class="mi-label">Persons</div><input class="mi" id="sr-persons" type="number" value="6" min="1">
+    <div class="mi-label">Expiry Date</div><input class="mi" id="sr-exp" type="date">
+    <div class="mi-label">Serial Number</div><input class="mi" id="sr-sn" placeholder="Optional">
+    <div class="mi-label">Notes</div><input class="mi" id="sr-notes" placeholder="Optional">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveRaft()">Add</button>
+    </div>`);
+}
+function saveRaft() {
+  if (!data.safety) data.safety = {flares:[],lifeRafts:[]};
+  if (!data.safety.lifeRafts) data.safety.lifeRafts = [];
+  data.safety.lifeRafts.push({id:uid(), brand:document.getElementById('sr-brand').value.trim(), model:document.getElementById('sr-model').value.trim(), persons:parseInt(document.getElementById('sr-persons').value)||0, expiry:document.getElementById('sr-exp').value, serialNumber:document.getElementById('sr-sn').value.trim(), notes:document.getElementById('sr-notes').value.trim(), revisions:[]});
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderSafety();
+}
+function showEditRaft(id) {
+  const r = (data.safety?.lifeRafts||[]).find(r=>r.id===id); if (!r) return;
+  showModal('Edit Life Raft', `
+    <div class="mi-label">Brand</div><input class="mi" id="sr-brand" value="${esc(r.brand||'')}">
+    <div class="mi-label">Model</div><input class="mi" id="sr-model" value="${esc(r.model||'')}">
+    <div class="mi-label">Persons</div><input class="mi" id="sr-persons" type="number" value="${r.persons||6}" min="1">
+    <div class="mi-label">Expiry Date</div><input class="mi" id="sr-exp" type="date" value="${esc(r.expiry||'')}">
+    <div class="mi-label">Serial Number</div><input class="mi" id="sr-sn" value="${esc(r.serialNumber||'')}">
+    <div class="mi-label">Notes</div><input class="mi" id="sr-notes" value="${esc(r.notes||'')}">
+    <div class="modal-btns">
+      <button onclick="if(confirm('Delete this life raft?')){hideModal();removeRaft('${id}')}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:10px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">🗑 Delete</button>
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveEditRaft('${id}')">Save</button>
+    </div>`);
+}
+function saveEditRaft(id) {
+  const r = (data.safety?.lifeRafts||[]).find(r=>r.id===id); if (!r) return;
+  r.brand=document.getElementById('sr-brand').value.trim(); r.model=document.getElementById('sr-model').value.trim();
+  r.persons=parseInt(document.getElementById('sr-persons').value)||0; r.expiry=document.getElementById('sr-exp').value;
+  r.serialNumber=document.getElementById('sr-sn').value.trim(); r.notes=document.getElementById('sr-notes').value.trim();
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderSafety();
+}
+function removeRaft(id) {
+  if (!data.safety?.lifeRafts) return;
+  data.safety.lifeRafts = data.safety.lifeRafts.filter(r=>r.id!==id);
+  save(); document.getElementById('mainContent').innerHTML = renderSafety();
+}
+
+// ── Revision modals ──
+function showAddRevision(raftId) {
+  const today = new Date().toISOString().slice(0,10);
+  showModal('Add Revision', `
+    <div class="mi-label">Date</div><input class="mi" id="srv-date" type="date" value="${today}">
+    <div class="mi-label">Notes</div><input class="mi" id="srv-notes" placeholder="e.g. Annual service">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveRevision('${raftId}')">Add</button>
+    </div>`);
+}
+function saveRevision(raftId) {
+  const r = (data.safety?.lifeRafts||[]).find(r=>r.id===raftId); if (!r) return;
+  if (!r.revisions) r.revisions = [];
+  r.revisions.push({id:uid(), date:document.getElementById('srv-date').value, notes:document.getElementById('srv-notes').value.trim()});
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderSafety();
+}
+function showEditRevision(raftId, revId) {
+  const r = (data.safety?.lifeRafts||[]).find(r=>r.id===raftId); if (!r) return;
+  const rev = (r.revisions||[]).find(rv=>rv.id===revId); if (!rev) return;
+  showModal('Edit Revision', `
+    <div class="mi-label">Date</div><input class="mi" id="srv-date" type="date" value="${esc(rev.date||'')}">
+    <div class="mi-label">Notes</div><input class="mi" id="srv-notes" value="${esc(rev.notes||'')}">
+    <div class="modal-btns">
+      <button onclick="if(confirm('Delete this revision?')){hideModal();removeRevision('${raftId}','${revId}')}" style="background:#FCEBEB;border:1.5px solid #F09595;color:#A32D2D;border-radius:10px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">🗑 Delete</button>
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveEditRevision('${raftId}','${revId}')">Save</button>
+    </div>`);
+}
+function saveEditRevision(raftId, revId) {
+  const r = (data.safety?.lifeRafts||[]).find(r=>r.id===raftId); if (!r) return;
+  const rev = (r.revisions||[]).find(rv=>rv.id===revId); if (!rev) return;
+  rev.date=document.getElementById('srv-date').value; rev.notes=document.getElementById('srv-notes').value.trim();
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderSafety();
+}
+function removeRevision(raftId, revId) {
+  const r = (data.safety?.lifeRafts||[]).find(r=>r.id===raftId); if (!r) return;
+  r.revisions = (r.revisions||[]).filter(rv=>rv.id!==revId);
+  save(); document.getElementById('mainContent').innerHTML = renderSafety();
+}
+
+// ── Flare drag-to-reorder ──
+let _safetyFlareDragId = null, _safetyFlareTouchState = null;
+function safetyFlareDragStart(e, id) {
+  if (e.target.closest('button,input,select,a')) { e.preventDefault(); return; }
+  _safetyFlareDragId = id; e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',id);
+  setTimeout(()=>document.querySelector(`[data-safety-flare-id="${id}"]`)?.classList.add('prov-dragging'),0);
+}
+function safetyFlareDragOver(e, id) {
+  if (!_safetyFlareDragId||_safetyFlareDragId===id) return;
+  e.preventDefault(); e.dataTransfer.dropEffect='move';
+  document.querySelectorAll('.prov-drag-over').forEach(el=>el.classList.remove('prov-drag-over'));
+  e.currentTarget.classList.add('prov-drag-over');
+}
+function safetyFlareDragLeave(e) { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('prov-drag-over'); }
+function safetyFlareDrop(e, targetId) {
+  e.preventDefault();
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el=>el.classList.remove('prov-drag-over','prov-dragging'));
+  const fromId=_safetyFlareDragId; _safetyFlareDragId=null; _safetyFlareDoReorder(fromId,targetId);
+}
+function safetyFlareDragEnd() {
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el=>el.classList.remove('prov-drag-over','prov-dragging'));
+  _safetyFlareDragId=null;
+}
+function safetyFlareTouchStart(e, id) {
+  e.preventDefault();
+  const touch=e.touches[0], row=e.currentTarget.closest('[data-safety-flare-id]'); if (!row) return;
+  const rect=row.getBoundingClientRect(), clone=row.cloneNode(true);
+  Object.assign(clone.style,{position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',opacity:'0.85',zIndex:'9999',pointerEvents:'none',outline:'2px dashed var(--blue)',borderRadius:'4px',background:'var(--surface)',boxShadow:'0 4px 16px rgba(0,0,0,.18)',transition:'none'});
+  document.body.appendChild(clone); row.style.opacity='0.3';
+  _safetyFlareTouchState={id,row,clone,offsetY:touch.clientY-rect.top,over:null};
+  document.addEventListener('touchmove',_safetyFlareTouchMove,{passive:false});
+  document.addEventListener('touchend',_safetyFlareTouchEnd);
+}
+function _safetyFlareTouchMove(e) {
+  e.preventDefault(); if (!_safetyFlareTouchState) return;
+  const touch=e.touches[0],{clone,offsetY}=_safetyFlareTouchState;
+  clone.style.top=(touch.clientY-offsetY)+'px'; clone.style.display='none';
+  const under=document.elementFromPoint(touch.clientX,touch.clientY); clone.style.display='';
+  const targetRow=under?.closest('[data-safety-flare-id]');
+  document.querySelectorAll('.prov-drag-over').forEach(el=>el.classList.remove('prov-drag-over'));
+  if (targetRow&&targetRow!==_safetyFlareTouchState.row){targetRow.classList.add('prov-drag-over');_safetyFlareTouchState.over=targetRow;}
+  else{_safetyFlareTouchState.over=null;}
+}
+function _safetyFlareTouchEnd() {
+  document.removeEventListener('touchmove',_safetyFlareTouchMove); document.removeEventListener('touchend',_safetyFlareTouchEnd);
+  if (!_safetyFlareTouchState) return;
+  const{id,row,clone,over}=_safetyFlareTouchState; _safetyFlareTouchState=null;
+  clone.remove(); row.style.opacity='';
+  document.querySelectorAll('.prov-drag-over').forEach(el=>el.classList.remove('prov-drag-over'));
+  if (over) _safetyFlareDoReorder(id, over.dataset.safetyFlareId);
+}
+function _safetyFlareDoReorder(fromId, toId) {
+  if (!fromId||!toId||fromId===toId) return;
+  const arr=data.safety?.flares||[]; const fi=arr.findIndex(f=>f.id===fromId);
+  if (fi===-1||!arr.find(f=>f.id===toId)) return;
+  const[moved]=arr.splice(fi,1); arr.splice(arr.findIndex(f=>f.id===toId),0,moved);
+  save(); document.getElementById('mainContent').innerHTML=renderSafety();
+}
+
+// ── Raft drag-to-reorder ──
+let _safetyRaftDragId = null, _safetyRaftTouchState = null;
+function safetyRaftDragStart(e, id) {
+  if (e.target.closest('button,input,select,a')) { e.preventDefault(); return; }
+  _safetyRaftDragId=id; e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',id);
+  setTimeout(()=>document.querySelector(`[data-safety-raft-id="${id}"]`)?.classList.add('prov-dragging'),0);
+}
+function safetyRaftDragOver(e, id) {
+  if (!_safetyRaftDragId||_safetyRaftDragId===id) return;
+  e.preventDefault(); e.dataTransfer.dropEffect='move';
+  document.querySelectorAll('.prov-drag-over').forEach(el=>el.classList.remove('prov-drag-over'));
+  e.currentTarget.classList.add('prov-drag-over');
+}
+function safetyRaftDragLeave(e) { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('prov-drag-over'); }
+function safetyRaftDrop(e, targetId) {
+  e.preventDefault();
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el=>el.classList.remove('prov-drag-over','prov-dragging'));
+  const fromId=_safetyRaftDragId; _safetyRaftDragId=null; _safetyRaftDoReorder(fromId,targetId);
+}
+function safetyRaftDragEnd() {
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el=>el.classList.remove('prov-drag-over','prov-dragging'));
+  _safetyRaftDragId=null;
+}
+function safetyRaftTouchStart(e, id) {
+  e.preventDefault();
+  const touch=e.touches[0], row=e.currentTarget.closest('[data-safety-raft-id]'); if (!row) return;
+  const rect=row.getBoundingClientRect(), clone=row.cloneNode(true);
+  Object.assign(clone.style,{position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',opacity:'0.85',zIndex:'9999',pointerEvents:'none',outline:'2px dashed var(--blue)',borderRadius:'4px',background:'var(--surface)',boxShadow:'0 4px 16px rgba(0,0,0,.18)',transition:'none'});
+  document.body.appendChild(clone); row.style.opacity='0.3';
+  _safetyRaftTouchState={id,row,clone,offsetY:touch.clientY-rect.top,over:null};
+  document.addEventListener('touchmove',_safetyRaftTouchMove,{passive:false});
+  document.addEventListener('touchend',_safetyRaftTouchEnd);
+}
+function _safetyRaftTouchMove(e) {
+  e.preventDefault(); if (!_safetyRaftTouchState) return;
+  const touch=e.touches[0],{clone,offsetY}=_safetyRaftTouchState;
+  clone.style.top=(touch.clientY-offsetY)+'px'; clone.style.display='none';
+  const under=document.elementFromPoint(touch.clientX,touch.clientY); clone.style.display='';
+  const targetRow=under?.closest('[data-safety-raft-id]');
+  document.querySelectorAll('.prov-drag-over').forEach(el=>el.classList.remove('prov-drag-over'));
+  if (targetRow&&targetRow!==_safetyRaftTouchState.row){targetRow.classList.add('prov-drag-over');_safetyRaftTouchState.over=targetRow;}
+  else{_safetyRaftTouchState.over=null;}
+}
+function _safetyRaftTouchEnd() {
+  document.removeEventListener('touchmove',_safetyRaftTouchMove); document.removeEventListener('touchend',_safetyRaftTouchEnd);
+  if (!_safetyRaftTouchState) return;
+  const{id,row,clone,over}=_safetyRaftTouchState; _safetyRaftTouchState=null;
+  clone.remove(); row.style.opacity='';
+  document.querySelectorAll('.prov-drag-over').forEach(el=>el.classList.remove('prov-drag-over'));
+  if (over) _safetyRaftDoReorder(id, over.dataset.safetyRaftId);
+}
+function _safetyRaftDoReorder(fromId, toId) {
+  if (!fromId||!toId||fromId===toId) return;
+  const arr=data.safety?.lifeRafts||[]; const fi=arr.findIndex(r=>r.id===fromId);
+  if (fi===-1||!arr.find(r=>r.id===toId)) return;
+  const[moved]=arr.splice(fi,1); arr.splice(arr.findIndex(r=>r.id===toId),0,moved);
+  save(); document.getElementById('mainContent').innerHTML=renderSafety();
+}
+
+// ── Safety prefill ──
+function prefillSafetyData() {
+  if (data.safety?.flares?.length || data.safety?.lifeRafts?.length) return false;
+  if (!data.safety) data.safety = {flares:[],lifeRafts:[]};
+  const dFwd = n => { const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+  const today = new Date().toISOString().slice(0,10);
+  data.safety.flares = [
+    {id:uid(), type:'Red hand flare (Example)',        qty:4, expiry:dFwd(730),  notes:''},
+    {id:uid(), type:'Parachute rocket (Example)',      qty:2, expiry:dFwd(730),  notes:''},
+    {id:uid(), type:'Orange smoke (Example)',          qty:2, expiry:dFwd(548),  notes:''},
+    {id:uid(), type:'White collision flare (Example)', qty:4, expiry:dFwd(1095), notes:''},
+  ];
+  data.safety.lifeRafts = [{
+    id:uid(), brand:'Example Brand', model:'Ocean ISO 6 (Example)', persons:6,
+    expiry:dFwd(730), serialNumber:'EXAMPLE-001',
+    notes:'Replace this with your actual life raft details',
+    revisions:[{id:uid(), date:today, notes:'Annual service (Example) — update with your actual service history'}]
+  }];
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════
 //  SECTION 7 — SYSTEMS
 // ═══════════════════════════════════════════════════════════
 
@@ -6380,6 +6765,7 @@ async function createPIN() {
     try { prefillWatermakerData();    } catch(e) { console.warn('prefillWatermaker', e); }
     try { prefillLpgData();           } catch(e) { console.warn('prefillLpg', e); }
     try { prefillProvisionsData();    } catch(e) { console.warn('prefillProvisions', e); }
+    try { prefillSafetyData();        } catch(e) { console.warn('prefillSafety', e); }
     await save();
     trackAnalytics(true);
     pushToCloud();
@@ -6488,6 +6874,7 @@ async function attemptUnlock() {
       try { if (prefillWatermakerData()) prefillDirty = true; } catch(e) { console.warn('prefillWatermaker', e); }
       try { if (prefillLpgData()) prefillDirty = true; } catch(e) { console.warn('prefillLpg', e); }
       try { if (prefillProvisionsData()) prefillDirty = true; } catch(e) { console.warn('prefillProvisions', e); }
+      try { if (prefillSafetyData()) prefillDirty = true; } catch(e) { console.warn('prefillSafety', e); }
       if (prefillDirty) save();
       await pushToCloud();
     }
@@ -6639,6 +7026,7 @@ async function attemptLogin() {
       try { if (prefillWatermakerData()) prefillDirty = true; } catch(e) { console.warn('prefillWatermaker', e); }
       try { if (prefillLpgData()) prefillDirty = true; } catch(e) { console.warn('prefillLpg', e); }
       try { if (prefillProvisionsData()) prefillDirty = true; } catch(e) { console.warn('prefillProvisions', e); }
+      try { if (prefillSafetyData()) prefillDirty = true; } catch(e) { console.warn('prefillSafety', e); }
         if (prefillDirty) save();
         await pushToCloud();
       }
