@@ -5499,78 +5499,82 @@ function tlFrozenDays(log) {
   return frozen;
 }
 function tlCircleGauge(days, maxDays, color) {
-  const r = 28, cx = 36, cy = 36, circ = Math.round(2 * Math.PI * r);
+  const CL = 101;
   const pct = days === null ? 0 : Math.min(1, Math.max(0, days / maxDays));
-  const dashoffset = Math.round(circ * (1 - pct));
+  const offset = Math.round(CL * (1 - pct));
   const txt = days === null ? '—' : String(Math.max(0, days));
-  const fs = txt.length > 3 ? '11' : '17';
-  return `<svg width="72" height="72" viewBox="0 0 72 72" style="display:block;margin:0 auto">
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#e5e7eb" stroke-width="7"/>
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="7"
-      stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${dashoffset}"
-      transform="rotate(-90 ${cx} ${cy})"/>
-    <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle"
-      font-size="${fs}" font-weight="800" fill="${color}" font-family="var(--font)">${esc(txt)}</text>
-    <text x="${cx}" y="${cy+15}" text-anchor="middle" font-size="8" fill="#9ca3af" font-family="var(--font)">days</text>
+  const fs = txt.length > 3 ? '11' : '14';
+  return `<svg viewBox="0 0 80 44" style="width:100%;display:block">
+    <path d="M8,40 A32,32 0 0,1 72,40" fill="none" stroke="#e5e7eb" stroke-width="10" stroke-linecap="round"/>
+    <path d="M8,40 A32,32 0 0,1 72,40" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${CL}" stroke-dashoffset="${offset}"/>
+    <text x="40" y="28" text-anchor="middle" font-size="${fs}" font-weight="800" fill="${color}" font-family="var(--font)">${esc(txt)}</text>
+    <text x="40" y="38" text-anchor="middle" font-size="7" fill="#9ca3af" font-family="var(--font)">days</text>
   </svg>`;
 }
 function renderTLGauges(cur) {
+  function tlCard(title, svgContent, subs) {
+    return `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px 10px;text-align:center">
+      <div style="font-size:10px;font-weight:700;color:var(--label2);line-height:1.3;margin-bottom:4px">${title}</div>
+      ${svgContent}
+      ${(subs||[]).filter(Boolean).map(l=>`<div style="font-size:10px;color:var(--label3);margin-top:3px;word-break:break-all">${l}</div>`).join('')}
+    </div>`;
+  }
+
   // Gauge 1 — Boat validity
   const frozen = tlFrozenDays(cur);
   const boatRaw = tlDaysUntil(cur.validUntil);
   const boatDays = boatRaw === null ? null : boatRaw - frozen;
   const boatColor = boatDays===null?'#9ca3af':boatDays>180?'#22C55E':boatDays>90?'#F59E0B':'#EF4444';
-  const frozenNote = frozen>0 ? `<div style="font-size:10px;color:var(--label3);text-align:center;margin-top:3px">${frozen}d frozen deducted</div>` : '';
-  const g1 = `<div style="padding:10px 4px;text-align:center">
-    <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:5px">Boat</div>
-    ${tlCircleGauge(boatDays,365,boatColor)}${frozenNote}</div>`;
+  const boatSubs = [cur?.validUntil?`Valid until ${esc(cur.validUntil)}`:'', frozen>0?`${frozen}d frozen`:''];
+  const g1 = tlCard('TL — Boat', tlCircleGauge(boatDays,365,boatColor), boatSubs);
 
   // Gauge 2 — User validity (6 months from userStartDate or validUntil, whichever sooner)
   const startDate = parseTLDate(cur.userStartDate||cur.issueDate||cur.validFrom||'');
   const validUntilDate = parseTLDate(cur.validUntil);
-  let userDays = null;
+  let userDays=null, userExpStr='—';
   if (startDate) {
     const sixMo = new Date(startDate); sixMo.setDate(sixMo.getDate()+180);
-    const userExp = validUntilDate ? (sixMo < validUntilDate ? sixMo : validUntilDate) : sixMo;
+    const userExp = validUntilDate ? (sixMo<validUntilDate?sixMo:validUntilDate) : sixMo;
     const now = new Date(); now.setHours(0,0,0,0);
-    userDays = Math.round((userExp - now)/86400000);
+    userDays = Math.round((userExp-now)/86400000);
+    userExpStr = tlFmtDate(userExp);
   }
   const userColor = userDays===null?'#9ca3af':userDays>60?'#22C55E':userDays>30?'#F59E0B':'#EF4444';
-  const g2 = `<div style="padding:10px 4px;text-align:center;border-left:1px solid var(--sep);border-right:1px solid var(--sep)">
-    <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:5px">User</div>
-    ${tlCircleGauge(userDays,180,userColor)}
-    <div style="font-size:10px;color:var(--label3);margin-top:3px">€30 to change</div></div>`;
+  const g2 = tlCard('User', tlCircleGauge(userDays,180,userColor), [esc(cur.holderName||'—'), `Until ${esc(userExpStr)}`, '€30 to change']);
 
   // Gauge 3 — Schengen (live from data.schengen)
   const holderKey = (cur.holderName||'').trim().toLowerCase();
   const schengenMatch = holderKey ? (data.schengen?.persons||[]).find(p=>(p.name||'').trim().toLowerCase()===holderKey) : null;
   let g3;
   if (!schengenMatch) {
-    g3 = `<div style="padding:10px 4px;text-align:center">
-      <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:5px">Schengen</div>
-      <div style="height:72px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#9ca3af">—</div>
-      <div style="font-size:10px;color:var(--blue);cursor:pointer;margin-top:3px" onclick="showTab('schengen')">Set up in Schengen tab</div></div>`;
+    g3 = `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px 10px;text-align:center">
+      <div style="font-size:10px;font-weight:700;color:var(--label2);line-height:1.3;margin-bottom:4px">Schengen</div>
+      <svg viewBox="0 0 80 44" style="width:100%;display:block">
+        <path d="M8,40 A32,32 0 0,1 72,40" fill="none" stroke="#e5e7eb" stroke-width="10" stroke-linecap="round"/>
+        <text x="40" y="28" text-anchor="middle" font-size="14" font-weight="800" fill="#9ca3af" font-family="var(--font)">—</text>
+      </svg>
+      <div style="font-size:10px;color:var(--blue);cursor:pointer;margin-top:3px" onclick="showTab('schengen')">Set up in Schengen tab</div>
+    </div>`;
   } else {
     const isEU = schengenMatch.passports?.[schengenMatch.activePassport||0]?.eu === true;
     if (isEU) {
-      g3 = `<div style="padding:10px 4px;text-align:center">
-        <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:5px">Schengen</div>
-        <svg width="72" height="72" viewBox="0 0 72 72" style="display:block;margin:0 auto">
-          <circle cx="36" cy="36" r="28" fill="none" stroke="#22C55E" stroke-width="7"/>
-          <text x="36" y="36" text-anchor="middle" dominant-baseline="middle" font-size="10" font-weight="700" fill="#22C55E" font-family="var(--font)">EU</text>
+      g3 = `<div style="background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;padding:12px 8px 10px;text-align:center">
+        <div style="font-size:10px;font-weight:700;color:var(--label2);line-height:1.3;margin-bottom:4px">Schengen</div>
+        <svg viewBox="0 0 80 44" style="width:100%;display:block">
+          <path d="M8,40 A32,32 0 0,1 72,40" fill="none" stroke="#e5e7eb" stroke-width="10" stroke-linecap="round"/>
+          <path d="M8,40 A32,32 0 0,1 72,40" fill="none" stroke="#22C55E" stroke-width="10" stroke-linecap="round" stroke-dasharray="101" stroke-dashoffset="0"/>
+          <text x="40" y="28" text-anchor="middle" font-size="14" font-weight="800" fill="#22C55E" font-family="var(--font)">EU</text>
         </svg>
-        <div style="font-size:10px;color:#22C55E;font-weight:600;margin-top:3px">No limit</div></div>`;
+        <div style="font-size:10px;color:#22C55E;font-weight:600;margin-top:3px">No limit</div>
+      </div>`;
     } else {
       const {days:schUsed} = calcSchengenDays(schengenMatch.log);
       const schRem = 90 - schUsed;
       const schColor = schRem>45?'#22C55E':schRem>20?'#F59E0B':'#EF4444';
-      g3 = `<div style="padding:10px 4px;text-align:center">
-        <div style="font-size:11px;font-weight:700;color:var(--label2);margin-bottom:5px">Schengen</div>
-        ${tlCircleGauge(schRem,90,schColor)}
-        <div style="font-size:10px;color:var(--label3);margin-top:3px">${schUsed}/90 used</div></div>`;
+      g3 = tlCard('Schengen', tlCircleGauge(schRem,90,schColor), [`${schUsed}/90 used`]);
     }
   }
-  return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;overflow:hidden;margin-bottom:10px">${g1}${g2}${g3}</div>`;
+  return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">${g1}${g2}${g3}</div>`;
 }
 function renderTLAlertBar(cur) {
   const issues = [];
