@@ -8180,6 +8180,11 @@ function renderSettings() {
 // ═══════════════════════════════════════════════════════════
 
 async function init() {
+  if (new URLSearchParams(window.location.search).has('new')) {
+    window.history.replaceState({}, '', window.location.pathname);
+    startNewSetup('');
+    return;
+  }
   const hasSalt   = !!localStorage.getItem(SALT_KEY);
   const hasVerify = !!localStorage.getItem(VERIFY_KEY);
   if (hasSalt && hasVerify) {
