@@ -7535,6 +7535,11 @@ function showAiImportModal() {
   showModal('AI Import Assistant', _aiStep1Html());
 }
 
+function showAiImportTextMode() {
+  showAiImportModal();
+  setTimeout(() => aiShowTextInput(), 0);
+}
+
 function _aiStep1Html() {
   return `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
@@ -7882,75 +7887,63 @@ async function aiImportApply(btn) {
 }
 
 function renderSettings() {
-  const email = localStorage.getItem(EMAIL_KEY) || '—';
-  const syncColors = {synced:'var(--green)',syncing:'var(--orange)',offline:'var(--red)',idle:'var(--label3)'};
-  const syncLabels = {synced:'Synced ✓',syncing:'Syncing…',offline:'Offline / error',idle:'Not synced yet'};
-  const rawTs = localStorage.getItem(LAST_SYNC_KEY);
+  if (!ui.settingsOpen) ui.settingsOpen = {};
+  const email    = localStorage.getItem(EMAIL_KEY) || '—';
+  const rawTs    = localStorage.getItem(LAST_SYNC_KEY);
   const lastSync = timeAgo(rawTs);
+  const dotColor = {synced:'#22C55E',syncing:'#F59E0B',offline:'#EF4444',idle:'#9ca3af'}[syncStatus]||'#9ca3af';
+  const dotLabel = {synced:'Synced',syncing:'Syncing…',offline:'Error',idle:'Not synced'}[syncStatus]||'—';
+
+  function settingsRow(id, label, rightHtml, expandedHtml) {
+    const open = !!ui.settingsOpen[id];
+    const toggle = `ui.settingsOpen=ui.settingsOpen||{};ui.settingsOpen['${id}']=!${open};document.getElementById('mainContent').innerHTML=renderSettings()`;
+    return `<div onclick="${toggle}" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:0.5px solid var(--sep);cursor:pointer;user-select:none;-webkit-user-select:none">
+        <span style="font-size:13px;font-weight:500;color:var(--label)">${label}</span>
+        <div style="display:flex;align-items:center;gap:6px">${rightHtml||''}<span style="color:var(--label3);font-size:13px">${open?'▲':'▼'}</span></div>
+      </div>
+      ${open&&expandedHtml?`<div style="background:var(--surface2);border-bottom:0.5px solid var(--sep)">${expandedHtml}</div>`:''}`;
+  }
+
+  const subRow = (content, border=true) =>
+    `<div style="padding:10px 14px${border?';border-bottom:0.5px solid var(--sep)':''}">${content}</div>`;
+
+  const syncRight = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0"></span><span style="font-size:12px;color:var(--label3)">${dotLabel}</span>`;
+  const syncExpanded =
+    subRow(`<div style="font-size:11px;color:var(--label3);margin-bottom:2px">Account</div><div style="font-size:13px;color:var(--label)">${esc(email)}</div>`) +
+    subRow(`<div style="font-size:11px;color:var(--label3);margin-bottom:2px">Last synced</div><div style="font-size:13px;color:var(--label)">${esc(lastSync)}</div>`) +
+    subRow(`<button class="btn btn-s btn-sm" onclick="syncNow()">↕ Sync Now</button>`) +
+    subRow(`<div style="font-size:11px;color:var(--label3);margin-bottom:6px">Use this if your data looks outdated on this device.</div><button class="btn btn-s btn-sm" onclick="forceResync()" style="color:var(--red)">↺ Reset local data &amp; re-sync</button>`, false);
+
+  const backupExpanded =
+    subRow(`<div style="font-size:11px;color:var(--label3);margin-bottom:6px">Save to iCloud Drive. Restore on any device.</div><button class="btn btn-s btn-sm" onclick="saveBackup()">⬇ Export Encrypted Backup</button>`) +
+    subRow(`<div style="font-size:11px;color:var(--label3);margin-bottom:6px">Import a previously exported encrypted backup file.</div><button class="btn btn-p btn-sm" onclick="document.getElementById('backupFile').click()">⬆ Restore from Backup</button>`, false);
+
+  const acctRight = `<span style="font-size:12px;color:var(--label3);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(email)}</span>`;
+  const acctExpanded =
+    subRow(`<button class="btn btn-d btn-sm" onclick="logOut()">Log out / Switch account</button>`) +
+    subRow(`<button class="btn btn-d btn-sm" onclick="deleteAccount()">🗑 Delete My Account</button>`, false);
+
   return `
-    <div class="sec-hd">Cloud Sync</div>
-    <div class="card">
-      <div class="fr">
-        <div class="fl">Account</div>
-        <div class="fv" style="font-size:13px">${esc(email)}</div>
+    <div style="margin-bottom:16px;border-radius:16px;overflow:hidden;background:linear-gradient(135deg,#1a5fa8,#378ADD);padding:20px 16px 16px">
+      <div style="font-size:28px;margin-bottom:6px">🤖</div>
+      <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:4px">AI Import Assistant</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.82);margin-bottom:14px;line-height:1.5">Take a photo or paste text — AI reads your documents and imports data automatically</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <button onclick="showAiImportModal()" style="background:#fff;color:#1a5fa8;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">📷 Photo</button>
+        <button onclick="showAiImportTextMode()" style="background:rgba(255,255,255,0.18);color:#fff;border:1px solid rgba(255,255,255,0.35);border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">📋 Paste text</button>
       </div>
-      <div class="fr">
-        <div class="fl">Status</div>
-        <div class="fv" style="color:${syncColors[syncStatus]||'var(--label3)'}">${syncLabels[syncStatus]||'—'}</div>
-      </div>
-      <div class="fr">
-        <div class="fl">Last synced</div>
-        <div class="fv" style="font-size:12px;color:var(--label3)">${esc(lastSync)}</div>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-s btn-sm" onclick="syncNow()">↕ Sync Now</button>
-      </div>
-      <div class="fr" style="border-top:1px solid var(--sep)">
-        <div class="fl">Reset &amp; re-sync</div>
-        <div class="fv" style="font-size:12px;color:var(--label3)">Use this if your data looks outdated on this device.</div>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-s btn-sm" onclick="forceResync()" style="color:var(--red)">↺ Reset local data &amp; re-sync</button>
-      </div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.55);text-align:center">Transit Log · Insurance · eTEPAY · Provisions · Spare Parts · Safety · more</div>
     </div>
-    <div class="sec-hd">Backup &amp; Restore</div>
-    <div class="card">
-      <div class="fr">
-        <div class="fl">Export Encrypted Backup</div>
-        <div class="fv" style="font-size:12px;color:var(--label3)">Save this file to iCloud Drive. Use it to restore your data on any device.</div>
+    <div class="card" style="margin-bottom:16px;overflow:hidden">
+      ${settingsRow('sync',    'Cloud sync',          syncRight,  syncExpanded)}
+      ${settingsRow('backup',  'Backup &amp; restore', '',         backupExpanded)}
+      <div onclick="document.getElementById('jsonImportFile').click()" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:0.5px solid var(--sep);cursor:pointer;user-select:none;-webkit-user-select:none">
+        <span style="font-size:13px;font-weight:500;color:var(--label)">Import from JSON</span>
+        <span style="color:var(--label3);font-size:15px">›</span>
       </div>
-      <div class="btn-row">
-        <button class="btn btn-s btn-sm" onclick="saveBackup()">⬇ Export Encrypted Backup</button>
-      </div>
-      <div class="fr" style="border-top:1px solid var(--sep)">
-        <div class="fl">Restore from Backup</div>
-        <div class="fv" style="font-size:12px;color:var(--label3)">Import a previously exported encrypted backup file</div>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-p btn-sm" onclick="document.getElementById('backupFile').click()">⬆ Restore from Backup</button>
-      </div>
+      ${settingsRow('account', 'Account',             acctRight,  acctExpanded)}
     </div>
-    <div class="sec-hd">Import Data</div>
-    <div class="card">
-      <div class="fr">
-        <div class="fl">Import from JSON</div>
-        <div class="fv" style="font-size:12px;color:var(--label3)">Merge plain JSON into app data</div>
-      </div>
-      <div class="btn-row" style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-s btn-sm" onclick="document.getElementById('jsonImportFile').click()">⬆ Import Data from JSON</button>
-        <button class="btn btn-p btn-sm" onclick="showAiImportModal()">🤖 AI Import Assistant</button>
-      </div>
-    </div>
-    <div class="sec-hd">Account</div>
-    <div class="card">
-      <div class="btn-row">
-        <button class="btn btn-d btn-sm" onclick="logOut()">Log out / Switch account</button>
-      </div>
-      <div class="btn-row" style="border-top:1px solid var(--sep);padding-top:10px;margin-top:4px">
-        <button class="btn btn-d btn-sm" onclick="deleteAccount()">🗑 Delete My Account</button>
-      </div>
-    </div>
-    <div style="text-align:center;padding:16px 0 8px">
+    <div style="text-align:center;padding:4px 0 16px">
       <button onclick="showPrivacyPolicy()" style="background:none;border:none;color:var(--label3);font-family:var(--font);font-size:13px;cursor:pointer;text-decoration:underline">Privacy Policy</button>
       <span style="color:var(--label3);font-size:13px"> · </span>
       <button onclick="showTermsOfUse()" style="background:none;border:none;color:var(--label3);font-family:var(--font);font-size:13px;cursor:pointer;text-decoration:underline">Terms of Use</button>
