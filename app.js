@@ -4122,17 +4122,40 @@ function prefillShipyardData() {
   const sy = data.shipyard;
   if (sy && (sy.history?.length || sy.quotes?.length)) return false;
   if (!data.shipyard) data.shipyard = {};
+  const dRel = (yearsAgo, extraDays = 0) => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - yearsAgo);
+    d.setDate(d.getDate() + extraDays);
+    return d.toISOString().slice(0, 10);
+  };
+  const seasonLabel = yearsAgo => {
+    const y = new Date().getFullYear() - yearsAgo;
+    return `${y}/${y + 1}`;
+  };
   data.shipyard.history = [
-    {id:uid(), year:'2023/2024', name:'Example Boatyard',         location:'Example Port',   start:'2023-10-01', end:'2024-04-01', cost:'€3,200', notes:'Antifouling and hull inspection (Example)'},
-    {id:uid(), year:'2022/2023', name:'Another Example Boatyard', location:'Example Marina', start:'2022-10-01', end:'2023-03-01', cost:'€4,800', notes:'Full haul out and keel repaint (Example)'},
-    {id:uid(), year:'2021/2022', name:'Example Yard',             location:'Example City',   start:'2021-11-01', end:'2022-04-01', cost:'€5,500', notes:'Engine service and osmosis treatment (Example)'},
-  ];
-  data.shipyard.quotes = [
-    {id:uid(), name:'Example Boatyard',         location:'Example Port',   price:'€3,200', notes:'Includes pressure wash and antifouling (Example)', selected:false},
-    {id:uid(), name:'Another Example Boatyard', location:'Example Marina', price:'€2,950', notes:'No travel lift fee (Example)',                     selected:false},
-    {id:uid(), name:'Example Yard',             location:'Example City',   price:'€3,800', notes:'Premium yard, full refit available (Example)',     selected:false},
+    {
+      id: uid(),
+      year:     seasonLabel(2),
+      name:     'Example Boatyard (Example)',
+      location: 'Example Marina, Greece',
+      start:    dRel(2),
+      end:      dRel(2, 21),
+      cost:     '0',
+      notes:    'Antifouling, hull inspection, saildrive service (Example)\nReplace with your actual haul-out history (Example)',
+    },
+    {
+      id: uid(),
+      year:     seasonLabel(1),
+      name:     'Another Example Boatyard (Example)',
+      location: 'Example Port',
+      start:    dRel(1),
+      end:      dRel(1, 14),
+      cost:     '0',
+      notes:    'Antifouling, waterline repaint, propeller polish (Example)\nReplace with your actual haul-out history (Example)',
+    },
   ];
   if (!data.shipyard.current) data.shipyard.current = {};
+  if (!data.shipyard.quotes)  data.shipyard.quotes  = [];
   return true;
 }
 
