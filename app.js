@@ -1868,11 +1868,11 @@ function renderMaintGauges() {
           <div style="font-size:10px;font-weight:700;color:var(--label2);line-height:1.3">${title}</div>
           <span class="prov-grip" style="font-size:13px;line-height:1">⠿</span>
         </div>
-        <svg viewBox="0 0 130 82" style="width:100%;display:block">
-          <path d="M 13 72 A 52 52 0 0 1 117 72" fill="none" stroke="#e5e7eb" stroke-width="10" stroke-linecap="round"/>
-          <path d="M 13 72 A 52 52 0 0 1 117 72" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${L}" stroke-dashoffset="${offset}"/>
-          <text x="65" y="55" text-anchor="middle" font-size="22" font-weight="800" fill="${color}" font-family="var(--font)">${num}</text>
-          <text x="65" y="70" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="var(--font)">hrs left</text>
+        <svg viewBox="0 0 130 72" style="width:100%;display:block">
+          <path d="M13,65 A52,52 0 0,1 117,65" fill="none" stroke="#e5e7eb" stroke-width="10" stroke-linecap="round"/>
+          <path d="M13,65 A52,52 0 0,1 117,65" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${L}" stroke-dashoffset="${offset}"/>
+          <text x="65" y="48" text-anchor="middle" font-size="22" font-weight="800" fill="${color}" font-family="var(--font)">${num}</text>
+          <text x="65" y="62" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="var(--font)">hrs left</text>
         </svg>
         <div style="font-size:11px;color:var(--label3);margin-top:-2px">${dueLabel}</div>
       </div>`;
