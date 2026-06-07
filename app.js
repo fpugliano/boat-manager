@@ -2371,6 +2371,44 @@ function renderSchengen() {
   </div>`;
 }
 
+function schengenArcGauge(remaining, idx) {
+  function hexLerp(c1, c2, t) {
+    const r1=parseInt(c1.slice(1,3),16),g1=parseInt(c1.slice(3,5),16),b1=parseInt(c1.slice(5,7),16);
+    const r2=parseInt(c2.slice(1,3),16),g2=parseInt(c2.slice(3,5),16),b2=parseInt(c2.slice(5,7),16);
+    const r=Math.round(r1+(r2-r1)*t),g=Math.round(g1+(g2-g1)*t),b=Math.round(b1+(b2-b1)*t);
+    return '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');
+  }
+  const pct = Math.min(1, Math.max(0, Math.max(0, remaining) / 90));
+  const arcR = 52, cx = 65, cy = 65;
+  const arcLen = Math.PI * arcR;
+  const dashOffset = (arcLen * (1 - pct)).toFixed(2);
+  const angle = Math.PI * (1 - pct);
+  const dotX = (cx + arcR * Math.cos(angle)).toFixed(2);
+  const dotY = (cy - arcR * Math.sin(angle)).toFixed(2);
+  const dotColor = pct <= 0.4 ? hexLerp('#E24B4A','#EF9F27',pct/0.4) : hexLerp('#EF9F27','#639922',(pct-0.4)/0.6);
+  const arcLenStr = arcLen.toFixed(2);
+  const gradId = `schg${idx}`;
+  const displayNum = Math.max(0, remaining);
+  return `<svg viewBox="0 0 130 72" overflow="visible" style="width:100%;display:block;margin-bottom:2px">
+    <defs>
+      <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#E24B4A"/>
+        <stop offset="40%" stop-color="#EF9F27"/>
+        <stop offset="100%" stop-color="#639922"/>
+      </linearGradient>
+    </defs>
+    <path d="M13,65 A52,52 0 0,1 117,65" fill="none" stroke="var(--sep)" stroke-width="10" stroke-linecap="round"/>
+    <path d="M13,65 A52,52 0 0,1 117,65" fill="none" stroke="url(#${gradId})" stroke-width="10" stroke-linecap="round" stroke-dasharray="${arcLenStr}" stroke-dashoffset="${dashOffset}"/>
+    <circle cx="${dotX}" cy="${dotY}" r="9" fill="${dotColor}" opacity="0.25"/>
+    <circle cx="${dotX}" cy="${dotY}" r="5" fill="${dotColor}"/>
+    <text x="13" y="72" text-anchor="middle" font-size="8" fill="var(--label3)" font-family="var(--font)">0</text>
+    <text x="117" y="72" text-anchor="middle" font-size="8" fill="var(--label3)" font-family="var(--font)">90d</text>
+  </svg>
+  <div style="text-align:center;margin-bottom:8px">
+    <span style="font-size:28px;font-weight:800;color:${dotColor}">${displayNum}</span><span style="font-size:11px;color:var(--label3)"> / 90 days left</span>
+  </div>`;
+}
+
 function renderSchengenPersonStatus(p, idx) {
   const activePassIdx = p.activePassport || 0;
   const activePass = p.passports?.[activePassIdx];
@@ -2406,12 +2444,7 @@ function renderSchengenPersonStatus(p, idx) {
     <div style="margin-bottom:${seamanActive?'0':'8px'}">${statusBadge}</div>
     ${seamanWarning}
     ${isEU ? `<div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:10px">🇪🇺 EU Passport · No limit</div>` : `
-      <div style="display:flex;justify-content:center;margin-bottom:8px">
-        <div style="width:60px;height:60px;border-radius:50%;border:4px solid ${circleColor};display:flex;flex-direction:column;align-items:center;justify-content:center">
-          <div style="font-size:17px;font-weight:800;color:${circleColor};line-height:1">${Math.abs(remaining)}</div>
-          <div style="font-size:9px;color:${overstayed?'var(--red)':'var(--label3)'};line-height:1.2">${overstayed?'over!':'days left'}</div>
-        </div>
-      </div>
+      ${schengenArcGauge(remaining, idx)}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px">
         <div style="background:var(--surface2);border-radius:8px;padding:5px;text-align:center">
           <div style="font-size:14px;font-weight:700">${days}</div>
