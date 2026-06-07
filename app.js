@@ -608,6 +608,13 @@ const TABS = [
   {id:'systems',    icon:'🔌', label:'Systems'},
   {id:'settings',   icon:'⚙️', label:'Settings'},
 ];
+const CUSTOMIZABLE_TABS = TABS.filter(t => t.id !== 'settings');
+const DOC_SUBTAB_DEFS = [
+  {id:'insurance',  icon:'🛡️', label:'Insurance'},
+  {id:'customs',    icon:'🛃', label:'eTEPAY'},
+  {id:'transitlog', icon:'📜', label:'Transit Log'},
+  {id:'photos',     icon:'📷', label:'Document Photos'},
+];
 
 function renderApp() {
   const app = document.getElementById('app');
@@ -624,7 +631,7 @@ function renderApp() {
     </div>
     <div class="alert-bar" id="alertBar"></div>
     <div class="tab-bar">
-      ${TABS.map(t=>`<button class="tab-btn ${ui.tab===t.id?'active':''}" onclick="showTab('${t.id}')">${t.icon} ${t.label}</button>`).join('')}
+      ${getVisibleTabs().map(t=>`<button class="tab-btn ${ui.tab===t.id?'active':''}" onclick="showTab('${t.id}')">${t.icon} ${t.label}</button>`).join('')}
     </div>
     <main id="mainContent" style="padding-bottom:120px"></main>
     <div class="backup-bar" id="backupBar"></div>`;
@@ -673,7 +680,8 @@ function renderActiveTab() {
 // ═══════════════════════════════════════════════════════════
 
 function renderDocuments() {
-  const SUBS = {vessel:'🚢 Vessel Doc', insurance:'🛡️ Insurance', customs:'🛃 eTEPAY', transitlog:'📜 Transit Log', photos:'📷 Document Photos'};
+  const SUBS = getVisibleDocSubtabs();
+  if (!SUBS[ui.docSub]) ui.docSub = Object.keys(SUBS)[0];
   return `
     <div class="subtab-bar">
       ${Object.keys(SUBS).map(s=>`
@@ -6772,7 +6780,7 @@ async function createPIN() {
     startActivityTracking();
     document.getElementById('setupOv').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
-    renderApp();
+    applyHomeTab(); renderApp();
   } catch(e) {
     if (err) err.textContent = 'Setup failed: ' + e.message;
     if (go) { go.textContent='Create Account →'; go.disabled=false; }
@@ -6882,7 +6890,7 @@ async function attemptUnlock() {
     startActivityTracking();
     document.getElementById('setupOv').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
-    renderApp();
+    applyHomeTab(); renderApp();
   } catch(e) {
     at.count++;
     if (at.count >= MAX_FAILS) { at.lockUntil = Date.now() + LOCKOUT_MS; at.count = MAX_FAILS; }
@@ -7034,7 +7042,7 @@ async function attemptLogin() {
       startActivityTracking();
       document.getElementById('setupOv').classList.add('hidden');
       document.getElementById('app').classList.remove('hidden');
-      renderApp();
+      applyHomeTab(); renderApp();
       return;
     } catch(e) { /* fall through to cloud */ }
   }
@@ -7057,7 +7065,7 @@ async function attemptLogin() {
     startActivityTracking();
     document.getElementById('setupOv').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
-    renderApp();
+    applyHomeTab(); renderApp();
     setSyncStatus('synced');
   } catch(e) {
     if (e.message.includes('404') && !hasSalt && !hasVerify) {
@@ -7886,6 +7894,208 @@ async function aiImportApply(btn) {
   }
 }
 
+// ── Tab Settings ──────────────────────────────────────────────
+function getTabSettings() {
+  if (!data.settings) data.settings = {};
+  if (!data.settings.tabs || !data.settings.tabs.length)
+    data.settings.tabs = CUSTOMIZABLE_TABS.map((t,i) => ({id:t.id, visible:true, order:i}));
+  if (!data.settings.docSubtabs || !data.settings.docSubtabs.length)
+    data.settings.docSubtabs = DOC_SUBTAB_DEFS.map(t => ({id:t.id, visible:true}));
+  if (!data.settings.homeTab) data.settings.homeTab = 'clearance';
+  return data.settings;
+}
+function getVisibleTabs() {
+  const s = getTabSettings();
+  const tabMap = Object.fromEntries(s.tabs.map(t=>[t.id,t]));
+  const vis = CUSTOMIZABLE_TABS
+    .filter(t => tabMap[t.id]?.visible !== false)
+    .sort((a,b) => (tabMap[a.id]?.order??999)-(tabMap[b.id]?.order??999));
+  return [...vis, TABS.find(t=>t.id==='settings')];
+}
+function getVisibleDocSubtabs() {
+  const s = getTabSettings();
+  const subMap = Object.fromEntries(s.docSubtabs.map(t=>[t.id,t]));
+  const ALL = {vessel:'🚢 Vessel Doc', insurance:'🛡️ Insurance', customs:'🛃 eTEPAY', transitlog:'📜 Transit Log', photos:'📷 Document Photos'};
+  const result = {vessel:'🚢 Vessel Doc'};
+  for (const id of ['insurance','customs','transitlog','photos'])
+    if (subMap[id]?.visible !== false) result[id] = ALL[id];
+  return result;
+}
+function applyHomeTab() {
+  const s = getTabSettings();
+  const vis = getVisibleTabs();
+  const visIds = new Set(vis.map(t=>t.id));
+  ui.tab = (s.homeTab && visIds.has(s.homeTab)) ? s.homeTab : (vis[0]?.id||'documents');
+}
+
+// ── Tab Edit Modal ─────────────────────────────────────────────
+let _tabEditState = null, _tabEditDragId = null, _tabEditTouchState = null;
+
+function showTabsEditModal() {
+  const s = getTabSettings();
+  _tabEditState = {
+    tabs: s.tabs.map(t=>({...t})),
+    docSubtabs: s.docSubtabs.map(t=>({...t})),
+    homeTab: s.homeTab,
+  };
+  showModal('My Tabs', _buildTabEditHtml());
+}
+function _buildTabEditHtml() {
+  const {tabs, docSubtabs, homeTab} = _tabEditState;
+  const tabMap = Object.fromEntries(tabs.map(t=>[t.id,t]));
+  const subMap = Object.fromEntries(docSubtabs.map(t=>[t.id,t]));
+  const sorted = [...CUSTOMIZABLE_TABS].sort((a,b)=>(tabMap[a.id]?.order??999)-(tabMap[b.id]?.order??999));
+  const docsVis = tabMap['documents']?.visible !== false;
+  const sw = (checked, onchg) => `<label style="position:relative;display:inline-block;width:36px;height:20px;flex-shrink:0;cursor:pointer">
+    <input type="checkbox" ${checked?'checked':''} onchange="${onchg}" style="opacity:0;width:0;height:0;position:absolute">
+    <span style="position:absolute;inset:0;background:${checked?'var(--blue)':'#d1d5db'};border-radius:10px;transition:background .15s">
+      <span style="position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:2px;left:${checked?'18':'2'}px;transition:left .15s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>
+    </span></label>`;
+  const rows = sorted.map(t => {
+    const ts = tabMap[t.id]||{id:t.id,visible:true,order:999};
+    const on = ts.visible !== false;
+    const isHome = ts.id === homeTab && on;
+    return `<div data-tab-edit-id="${t.id}" draggable="true"
+      ondragstart="tabEditDragStart(event,'${t.id}')" ondragover="tabEditDragOver(event,'${t.id}')"
+      ondragleave="tabEditDragLeave(event)" ondrop="tabEditDrop(event,'${t.id}')" ondragend="tabEditDragEnd()"
+      style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:0.5px solid var(--sep);background:var(--surface)">
+      <span class="prov-grip" ontouchstart="tabEditTouchStart(event,'${t.id}')" style="font-size:16px;color:var(--label3);flex-shrink:0;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none">⠿</span>
+      <span style="font-size:16px;flex-shrink:0">${t.icon}</span>
+      <div style="flex:1;display:flex;align-items:center;gap:6px;min-width:0">
+        <span style="font-size:13px;font-weight:500;color:var(--label)">${esc(t.label)}</span>
+        ${isHome?`<span style="font-size:10px;font-weight:700;color:#fff;background:var(--blue);padding:1px 7px;border-radius:8px">Home</span>`:''}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        ${on&&!isHome?`<button onclick="tabEditSetHome('${t.id}')" style="font-size:10px;color:var(--blue);background:none;border:1px solid var(--blue);border-radius:8px;padding:2px 7px;font-family:var(--font);cursor:pointer;white-space:nowrap">Set home</button>`:''}
+        ${sw(on,`tabEditToggle('${t.id}',this.checked)`)}
+      </div>
+    </div>
+    ${t.id==='documents'&&docsVis ? DOC_SUBTAB_DEFS.map(st=>{
+      const sts = subMap[st.id]||{id:st.id,visible:true};
+      const son = sts.visible !== false;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px 8px 46px;border-bottom:0.5px solid var(--sep);background:var(--surface2)">
+        <span style="font-size:14px">${st.icon}</span>
+        <span style="font-size:12px;color:var(--label2);flex:1">${esc(st.label)}</span>
+        ${sw(son,`tabEditToggleSub('${st.id}',this.checked)`)}
+      </div>`;
+    }).join('') : ''}`;
+  }).join('');
+  return `
+    <div style="font-size:11px;color:var(--label3);margin-bottom:8px">Drag ⠿ to reorder · toggle to show/hide · tap Set home</div>
+    <div style="max-height:52vh;overflow-y:auto;border:1px solid var(--sep);border-radius:10px;overflow-x:hidden">${rows}</div>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveTabSettings()">Save</button>
+    </div>`;
+}
+function _refreshTabEditModal() {
+  const body = document.getElementById('modalBody');
+  if (body) body.innerHTML = `<div class="modal-title">My Tabs</div>` + _buildTabEditHtml();
+}
+function tabEditToggle(id, checked) {
+  if (!_tabEditState) return;
+  const ts = _tabEditState.tabs.find(t=>t.id===id); if (!ts) return;
+  if (!checked) {
+    const visCount = _tabEditState.tabs.filter(t=>t.visible!==false).length;
+    if (visCount <= 3) { showToast('Keep at least 3 tabs visible', true); _refreshTabEditModal(); return; }
+    ts.visible = false;
+    if (_tabEditState.homeTab === id) {
+      const next = _tabEditState.tabs.find(t=>t.id!==id&&t.visible!==false);
+      _tabEditState.homeTab = next?.id || _tabEditState.tabs[0]?.id;
+    }
+  } else { ts.visible = true; }
+  _refreshTabEditModal();
+}
+function tabEditToggleSub(id, checked) {
+  if (!_tabEditState) return;
+  const st = _tabEditState.docSubtabs.find(t=>t.id===id); if (st) st.visible = checked;
+  _refreshTabEditModal();
+}
+function tabEditSetHome(id) {
+  if (!_tabEditState) return;
+  const ts = _tabEditState.tabs.find(t=>t.id===id);
+  if (!ts || ts.visible===false) return;
+  _tabEditState.homeTab = id;
+  _refreshTabEditModal();
+}
+function saveTabSettings() {
+  if (!_tabEditState) return;
+  if (!data.settings) data.settings = {};
+  data.settings.tabs = _tabEditState.tabs.map(t=>({...t}));
+  data.settings.docSubtabs = _tabEditState.docSubtabs.map(t=>({...t}));
+  data.settings.homeTab = _tabEditState.homeTab;
+  _tabEditState = null;
+  save();
+  hideModal();
+  const vis = getVisibleTabs();
+  if (!vis.find(t=>t.id===ui.tab)) ui.tab = data.settings.homeTab || vis[0]?.id || 'documents';
+  renderApp();
+  document.getElementById('mainContent').innerHTML = renderSettings();
+}
+
+// ── Tab Edit Drag ──────────────────────────────────────────────
+function tabEditDragStart(e, id) {
+  if (e.target.closest('button,input,select,a')) { e.preventDefault(); return; }
+  _tabEditDragId = id; e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',id);
+  setTimeout(()=>document.querySelector(`[data-tab-edit-id="${id}"]`)?.classList.add('prov-dragging'),0);
+}
+function tabEditDragOver(e, id) {
+  if (!_tabEditDragId||_tabEditDragId===id) return;
+  e.preventDefault(); e.dataTransfer.dropEffect='move';
+  document.querySelectorAll('.prov-drag-over').forEach(el=>el.classList.remove('prov-drag-over'));
+  e.currentTarget.classList.add('prov-drag-over');
+}
+function tabEditDragLeave(e) { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('prov-drag-over'); }
+function tabEditDrop(e, targetId) {
+  e.preventDefault();
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el=>el.classList.remove('prov-drag-over','prov-dragging'));
+  const fromId=_tabEditDragId; _tabEditDragId=null; _tabEditDoReorder(fromId, targetId);
+}
+function tabEditDragEnd() {
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el=>el.classList.remove('prov-drag-over','prov-dragging'));
+  _tabEditDragId=null;
+}
+function tabEditTouchStart(e, id) {
+  e.preventDefault();
+  const touch=e.touches[0], row=e.currentTarget.closest('[data-tab-edit-id]'); if (!row) return;
+  const rect=row.getBoundingClientRect(), clone=row.cloneNode(true);
+  Object.assign(clone.style,{position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',opacity:'0.85',zIndex:'9999',pointerEvents:'none',outline:'2px dashed var(--blue)',borderRadius:'4px',background:'var(--surface)',boxShadow:'0 4px 16px rgba(0,0,0,.18)',transition:'none'});
+  document.body.appendChild(clone); row.style.opacity='0.3';
+  _tabEditTouchState={id,row,clone,offsetY:touch.clientY-rect.top,over:null};
+  document.addEventListener('touchmove',_tabEditTouchMove,{passive:false});
+  document.addEventListener('touchend',_tabEditTouchEnd);
+}
+function _tabEditTouchMove(e) {
+  e.preventDefault(); if (!_tabEditTouchState) return;
+  const touch=e.touches[0],{clone,offsetY}=_tabEditTouchState;
+  clone.style.top=(touch.clientY-offsetY)+'px'; clone.style.display='none';
+  const under=document.elementFromPoint(touch.clientX,touch.clientY); clone.style.display='';
+  const targetRow=under?.closest('[data-tab-edit-id]');
+  document.querySelectorAll('.prov-drag-over').forEach(el=>el.classList.remove('prov-drag-over'));
+  if (targetRow&&targetRow!==_tabEditTouchState.row){targetRow.classList.add('prov-drag-over');_tabEditTouchState.over=targetRow;}
+  else{_tabEditTouchState.over=null;}
+}
+function _tabEditTouchEnd() {
+  document.removeEventListener('touchmove',_tabEditTouchMove); document.removeEventListener('touchend',_tabEditTouchEnd);
+  if (!_tabEditTouchState) return;
+  const{id,row,clone,over}=_tabEditTouchState; _tabEditTouchState=null;
+  clone.remove(); row.style.opacity='';
+  document.querySelectorAll('.prov-drag-over').forEach(el=>el.classList.remove('prov-drag-over'));
+  if (over) _tabEditDoReorder(id, over.dataset.tabEditId);
+}
+function _tabEditDoReorder(fromId, toId) {
+  if (!fromId||!toId||fromId===toId||!_tabEditState) return;
+  const tabs = _tabEditState.tabs;
+  const sorted = [...CUSTOMIZABLE_TABS]
+    .map(t => tabs.find(s=>s.id===t.id)||{id:t.id,visible:true,order:999})
+    .sort((a,b)=>a.order-b.order);
+  const fi=sorted.findIndex(t=>t.id===fromId), ti=sorted.findIndex(t=>t.id===toId);
+  if (fi===-1||ti===-1) return;
+  const [moved]=sorted.splice(fi,1); sorted.splice(ti,0,moved);
+  sorted.forEach((t,i)=>{ const ts=tabs.find(s=>s.id===t.id); if(ts) ts.order=i; });
+  _refreshTabEditModal();
+}
+
 function renderSettings() {
   if (!ui.settingsOpen) ui.settingsOpen = {};
   const email    = localStorage.getItem(EMAIL_KEY) || '—';
@@ -7933,6 +8143,21 @@ function renderSettings() {
         <button onclick="showAiImportTextMode()" style="background:rgba(255,255,255,0.18);color:#fff;border:1px solid rgba(255,255,255,0.35);border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">📋 Paste text</button>
       </div>
       <div style="font-size:11px;color:rgba(255,255,255,0.55);text-align:center">Transit Log · Insurance · eTEPAY · Provisions · Spare Parts · Safety · more</div>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:0.5px solid var(--sep)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:20px">⊞</span>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--label)">My tabs</div>
+            <div style="font-size:11px;color:var(--label3)">Choose tabs to show · set home tab · reorder</div>
+          </div>
+        </div>
+        <button onclick="showTabsEditModal()" class="btn btn-s btn-sm">Edit</button>
+      </div>
+      <div style="padding:10px 14px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+        ${(()=>{const s=getTabSettings();const tabMap=Object.fromEntries(s.tabs.map(t=>[t.id,t]));const vis=CUSTOMIZABLE_TABS.filter(t=>tabMap[t.id]?.visible!==false).sort((a,b)=>(tabMap[a.id]?.order??999)-(tabMap[b.id]?.order??999));const prev=vis.slice(0,5);const more=vis.length-prev.length;return prev.map(t=>`<span style="font-size:11px;color:var(--label2);background:var(--surface2);border-radius:8px;padding:3px 8px">${t.icon} ${esc(t.label)}</span>`).join('')+(more>0?`<span style="font-size:11px;color:var(--label3)"> · and ${more} more</span>`:'');})()}
+      </div>
     </div>
     <div class="card" style="margin-bottom:16px;overflow:hidden">
       ${settingsRow('sync',    'Cloud sync',          syncRight,  syncExpanded)}
