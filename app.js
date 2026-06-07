@@ -7525,24 +7525,106 @@ function timeAgo(isoStr) {
 }
 
 // ── AI Import Assistant ──────────────────────────────────────
-let _aiImportText = '', _aiImportParsed = null, _aiImportInProgress = false;
+let _aiImportText = '', _aiImportParsed = null, _aiImportInProgress = false, _aiImportPhotoData = null;
 
 function showAiImportModal() {
   _aiImportText = '';
   _aiImportParsed = null;
   _aiImportInProgress = false;
+  _aiImportPhotoData = null;
   showModal('AI Import Assistant', _aiStep1Html());
 }
 
 function _aiStep1Html() {
   return `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <label for="ai-photo-input" style="border:1.5px solid var(--sep);border-radius:14px;padding:20px 10px 16px;text-align:center;cursor:pointer;background:var(--surface2);display:block">
+        <div style="font-size:30px;margin-bottom:8px">📷</div>
+        <div style="font-size:13px;font-weight:600;color:var(--label);margin-bottom:4px">Photo</div>
+        <div style="font-size:11px;color:var(--label3)">Take a photo or choose from library</div>
+      </label>
+      <input type="file" id="ai-photo-input" accept="image/*" capture="environment" style="display:none" onchange="aiImportPhotoSelected(this)">
+      <div onclick="aiShowTextInput()" style="border:1.5px solid var(--sep);border-radius:14px;padding:20px 10px 16px;text-align:center;cursor:pointer;background:var(--surface2)">
+        <div style="font-size:30px;margin-bottom:8px">📋</div>
+        <div style="font-size:13px;font-weight:600;color:var(--label);margin-bottom:4px">Paste text</div>
+        <div style="font-size:11px;color:var(--label3)">Copy from spreadsheet or type</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--label3);margin-bottom:14px;text-align:center">Works with photos of: Transit Log · Insurance · eTEPAY · Victron devices · Spare part boxes · Provisions · Receipts · Maintenance log pages</div>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+    </div>`;
+}
+
+function aiShowTextInput() {
+  const body = document.getElementById('modalBody');
+  if (!body) return;
+  body.innerHTML = `
+    <div class="modal-title">AI Import Assistant</div>
     <div style="font-size:13px;color:var(--label2);margin-bottom:10px">Paste spreadsheet data (Excel, Numbers, Google Sheets) or describe your records.</div>
     <textarea id="ai-import-ta" class="mi" style="height:150px;resize:vertical;font-size:13px;font-family:var(--font)" placeholder="Paste rows here, e.g.:\n2024-10-20  1460  Engine oil  Cape Town\nor describe: 3 oil changes in 2023…">${esc(_aiImportText)}</textarea>
     <div style="font-size:11px;color:var(--label3);margin:6px 0 14px">What can I import? &nbsp;Maintenance log · Provisions · Spare parts · Systems · LPG · Watermaker · Transit Log · eTEPAY · Insurance · Safety</div>
     <div class="modal-btns">
-      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-s" onclick="showAiImportModal()">← Back</button>
       <button class="btn btn-p" onclick="aiImportConvert()">Convert with AI →</button>
     </div>`;
+}
+
+function aiImportPhotoSelected(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    _aiImportPhotoData = e.target.result; // data:[mime];base64,[data]
+    const body = document.getElementById('modalBody');
+    if (!body) return;
+    body.innerHTML = `
+      <div class="modal-title">AI Import Assistant</div>
+      <div style="text-align:center;margin-bottom:14px">
+        <img id="ai-photo-preview" style="max-width:100%;max-height:200px;border-radius:10px;object-fit:contain;border:1px solid var(--sep)">
+      </div>
+      <div class="modal-btns">
+        <button class="btn btn-s" onclick="showAiImportModal()">Retake</button>
+        <button class="btn btn-p" onclick="aiImportConvertPhoto(this)">Read with AI →</button>
+      </div>`;
+    const img = document.getElementById('ai-photo-preview');
+    if (img) img.src = _aiImportPhotoData;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function aiImportConvertPhoto(btn) {
+  if (!_aiImportPhotoData) { showToast('No photo selected', true); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Reading…'; }
+  const parts = _aiImportPhotoData.split(',');
+  const mediaType = parts[0].match(/data:([^;]+)/)?.[1] || 'image/jpeg';
+  const imageData = parts[1] || '';
+  const body = document.getElementById('modalBody');
+  if (body) body.innerHTML = `
+    <div class="modal-title">AI Import Assistant</div>
+    <div style="text-align:center;padding:36px 16px">
+      <div style="font-size:36px;margin-bottom:14px">⏳</div>
+      <div style="font-size:14px;font-weight:600;color:var(--label)">Reading your photo…</div>
+      <div style="font-size:12px;color:var(--label3);margin-top:6px">Claude is analysing the image</div>
+    </div>`;
+  try {
+    const email = localStorage.getItem(EMAIL_KEY);
+    const hash  = email ? await emailToKey(email) : '';
+    const r = await fetch(`${STORAGE_WORKER_URL}/api/ai-import-photo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageData, mediaType, userHash: hash }),
+    });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error || `HTTP ${r.status}`); }
+    const { result } = await r.json();
+    let parsed;
+    try { parsed = JSON.parse(result); } catch(e) { throw new Error('Claude returned unparseable JSON — try another photo'); }
+    _aiImportParsed = parsed;
+    if (body) body.innerHTML = `<div class="modal-title">AI Import Assistant</div>` + _aiStep3Html(parsed);
+  } catch(e) {
+    if (body) body.innerHTML = `<div class="modal-title">AI Import Assistant</div>` + _aiStep1Html();
+    showToast('Photo import failed: ' + e.message, true);
+  }
 }
 
 async function aiImportConvert() {
@@ -7655,6 +7737,12 @@ function _aiStep3Html(parsed) {
       ${rows}${safetyFlares.length>5?`<div style="font-size:11px;color:var(--label3)">…and ${safetyFlares.length-5} more</div>`:''}
     </div>`);
   }
+  const warningsHtml = Array.isArray(parsed._warnings) && parsed._warnings.length
+    ? `<div style="margin-bottom:10px;padding:8px 12px;background:rgba(245,158,11,.08);border:1.5px solid #F59E0B;border-radius:8px">
+        <div style="font-size:11px;font-weight:700;color:#D97706;margin-bottom:3px">⚠️ Uncertain readings — please verify:</div>
+        ${parsed._warnings.map(w=>`<div style="font-size:11px;color:#D97706;padding:1px 0">· ${esc(String(w))}</div>`).join('')}
+      </div>`
+    : '';
   if (!sections.length) return `
     <div style="text-align:center;padding:24px 0">
       <div style="font-size:28px;margin-bottom:10px">🤔</div>
@@ -7663,7 +7751,7 @@ function _aiStep3Html(parsed) {
     </div>
     <div class="modal-btns"><button class="btn btn-p" onclick="showAiImportModal()">← Try again</button></div>`;
   return `
-    <div style="max-height:300px;overflow-y:auto;margin-bottom:4px">${sections.join('')}</div>
+    <div style="max-height:300px;overflow-y:auto;margin-bottom:4px">${warningsHtml}${sections.join('')}</div>
     <div class="modal-btns">
       <button class="btn btn-s" onclick="showAiImportModal()">← Edit</button>
       <button class="btn btn-p" onclick="aiImportApply(this)">Import ${total} ${total===1?'entry':'entries'}</button>

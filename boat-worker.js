@@ -1,6 +1,24 @@
 // Oroboro Boat Manager — Cloudflare Worker
 // Deploy to: https://boat-manager-storage.fpugliano.workers.dev
 
+const SYSTEM_PROMPT = `You are a data import assistant for a boat management app. The user will paste raw data from a spreadsheet, PDF, scanned document, or description. Your job is to convert it to JSON matching the app's data structure. Return ONLY valid JSON with no explanation, no markdown, no backticks. The JSON should contain only the sections you can confidently map. Top-level keys and their schemas:
+
+maintenance: array of {date: "YYYY-MM-DD", hours: number, task: string, notes: string}
+provisions: array of {name: string, qty: number, unit: string, category: string}
+spareParts: array of {name: string, qty: number, location: string, notes: string}
+documents: object optionally containing:
+  transitLog: {docNumber: string, issueDate: string, validFrom: string, validUntil: string, customsAuthority: string, validityType: string (one of: "Limited","Unlimited"), prevDocsCount: number, otherNotes: string, provisions: string, vesselName: string, flag: string, portOfRegistry: string, registrationNumber: string, callSign: string, vesselType: string, grossTonnage: string, engine: string, lengthLOA: string, yearBuilt: string, yearFirstReg: string, ownerName: string, holderName: string, address: string, telephone: string, email: string, afmTin: string, passportId: string}
+  customs: {applicationNumber: string, applicationDate: string, entryDate: string, year: string, monthsCovered: array of full English month names (convert abbreviations or checkboxes to full names e.g. "Apr"→"April"), amountPaid: string, paymentCode: string, adminFeeCode: string, status: string (one of: "New","Paid","Pending"), validUntil: string, holderName: string, afmTin: string, customsOffice: string, clearanceNumber: string, email: string, paymentRef: string, passportNumber: string, phone: string, address: string}
+  insurance: {insurer: string, certNumber: string, issueDate: string, expiryDate: string, premium: number, personalInjury: string, materialDamage: string, pollution: string, totalSumInsured: string, thirdPartyLiability: string, deductibles: string, navigationLimits: string, specialNotes: string}
+safety: object optionally containing:
+  flares: array of {type: string, qty: number, expiry: string, notes: string}
+
+If the user mentions flares, distress signals, smoke signals, signal flags or other safety equipment, map to safety.flares with type name, quantity, expiry date in YYYY-MM-DD format, and any notes.
+
+Use these canonical task names for maintenance: Engine oil, Oil filter, Gear oil, Impeller, Fuel filters, Coolant, Engine belt, Water pump, Heat exchanger, Saildrive, Saildrive lip seals, Saildrive shaft, Valve clearance, Raw water strainer. If a task doesn't match, use the closest canonical name. For eTEPAY monthsCovered, extract the list of months covered as full English month names in an array. For dates always use YYYY-MM-DD format. Map only fields you can confidently identify — never invent values. If the input contains no recognisable data, return {}.
+
+If reading from an image, extract every visible field. For any field that is partially obscured, blurry, or unclear, include it with your best reading and add the field name to a _warnings array in your response. Identify the document or product type automatically — a Victron device label maps to Systems, a food product maps to Provisions, a spare part box maps to Spare Parts, a Greek customs document maps to Transit Log, an insurance certificate maps to Insurance, a chandlery receipt may contain items for multiple tabs.`;
+
 export default {
   async fetch(request, env) {
     const url    = new URL(request.url);
@@ -92,22 +110,6 @@ export default {
       if (!content) return json({ error: 'Missing content' }, 400);
       if (!env.ANTHROPIC_API_KEY) return json({ error: 'API key not configured' }, 503);
 
-      const systemPrompt = `You are a data import assistant for a boat management app. The user will paste raw data from a spreadsheet, PDF, scanned document, or description. Your job is to convert it to JSON matching the app's data structure. Return ONLY valid JSON with no explanation, no markdown, no backticks. The JSON should contain only the sections you can confidently map. Top-level keys and their schemas:
-
-maintenance: array of {date: "YYYY-MM-DD", hours: number, task: string, notes: string}
-provisions: array of {name: string, qty: number, unit: string, category: string}
-spareParts: array of {name: string, qty: number, location: string, notes: string}
-documents: object optionally containing:
-  transitLog: {docNumber: string, issueDate: string, validFrom: string, validUntil: string, customsAuthority: string, validityType: string (one of: "Limited","Unlimited"), prevDocsCount: number, otherNotes: string, provisions: string, vesselName: string, flag: string, portOfRegistry: string, registrationNumber: string, callSign: string, vesselType: string, grossTonnage: string, engine: string, lengthLOA: string, yearBuilt: string, yearFirstReg: string, ownerName: string, holderName: string, address: string, telephone: string, email: string, afmTin: string, passportId: string}
-  customs: {applicationNumber: string, applicationDate: string, entryDate: string, year: string, monthsCovered: array of full English month names (convert abbreviations or checkboxes to full names e.g. "Apr"→"April"), amountPaid: string, paymentCode: string, adminFeeCode: string, status: string (one of: "New","Paid","Pending"), validUntil: string, holderName: string, afmTin: string, customsOffice: string, clearanceNumber: string, email: string, paymentRef: string, passportNumber: string, phone: string, address: string}
-  insurance: {insurer: string, certNumber: string, issueDate: string, expiryDate: string, premium: number, personalInjury: string, materialDamage: string, pollution: string, totalSumInsured: string, thirdPartyLiability: string, deductibles: string, navigationLimits: string, specialNotes: string}
-safety: object optionally containing:
-  flares: array of {type: string, qty: number, expiry: string, notes: string}
-
-If the user mentions flares, distress signals, smoke signals, signal flags or other safety equipment, map to safety.flares with type name, quantity, expiry date in YYYY-MM-DD format, and any notes.
-
-Use these canonical task names for maintenance: Engine oil, Oil filter, Gear oil, Impeller, Fuel filters, Coolant, Engine belt, Water pump, Heat exchanger, Saildrive, Saildrive lip seals, Saildrive shaft, Valve clearance, Raw water strainer. If a task doesn't match, use the closest canonical name. For eTEPAY monthsCovered, extract the list of months covered as full English month names in an array. For dates always use YYYY-MM-DD format. Map only fields you can confidently identify — never invent values. If the input contains no recognisable data, return {}.`;
-
       const aiResp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -118,7 +120,7 @@ Use these canonical task names for maintenance: Engine oil, Oil filter, Gear oil
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
           max_tokens: 2000,
-          system: systemPrompt,
+          system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: String(content).slice(0, 8000) }],
         }),
       });
@@ -151,6 +153,63 @@ Use these canonical task names for maintenance: Engine oil, Oil filter, Gear oil
         const aggRec = agg ? JSON.parse(agg) : { count: 0, estCostUsd: 0 };
         aggRec.count = (aggRec.count || 0) + 1;
         aggRec.estCostUsd = Math.round(((aggRec.estCostUsd || 0) + 0.002) * 1000) / 1000;
+        await env.BOAT_DATA.put(aggKey, JSON.stringify(aggRec));
+      } catch(e) {}
+
+      return json({ result });
+    }
+
+    // POST /api/ai-import-photo — vision endpoint
+    if (method === 'POST' && path === '/api/ai-import-photo') {
+      const body = await request.json();
+      const { imageData, mediaType, userHash } = body;
+      if (!imageData) return json({ error: 'Missing imageData' }, 400);
+      if (!env.ANTHROPIC_API_KEY) return json({ error: 'API key not configured' }, 503);
+
+      const aiResp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 4096,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: 'user', content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType || 'image/jpeg', data: imageData }},
+            { type: 'text', text: 'Extract all data from this image and map it to the correct sections.' },
+          ]}],
+        }),
+      });
+
+      if (!aiResp.ok) {
+        const errText = await aiResp.text();
+        return json({ error: `Anthropic API error ${aiResp.status}: ${errText}` }, 502);
+      }
+
+      const aiJson = await aiResp.json();
+      const result = aiJson.content?.[0]?.text || '{}';
+
+      if (userHash && /^[0-9a-f]{40,}$/.test(userHash)) {
+        try {
+          const userKey = `analytics:users:${userHash}`;
+          const existing = await env.BOAT_DATA.get(userKey);
+          if (existing) {
+            const rec = JSON.parse(existing);
+            rec.aiImports = (rec.aiImports || 0) + 1;
+            await env.BOAT_DATA.put(userKey, JSON.stringify(rec));
+          }
+        } catch(e) {}
+      }
+
+      try {
+        const aggKey = 'analytics:ai_imports:total';
+        const agg = await env.BOAT_DATA.get(aggKey);
+        const aggRec = agg ? JSON.parse(agg) : { count: 0, estCostUsd: 0 };
+        aggRec.count = (aggRec.count || 0) + 1;
+        aggRec.estCostUsd = Math.round(((aggRec.estCostUsd || 0) + 0.01) * 1000) / 1000;
         await env.BOAT_DATA.put(aggKey, JSON.stringify(aggRec));
       } catch(e) {}
 
