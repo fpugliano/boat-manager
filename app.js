@@ -4038,9 +4038,9 @@ function prefillNewUserSampleData() {
       data.maintenance.engines[eid].hours = 450;
     });
     const entries = [
-      {id:uid(), date:dAgo(90),  hours:'300', task:'Engine oil change',    cost:'€85',  notes:'Example entry', engines:['port','starboard']},
-      {id:uid(), date:dAgo(180), hours:'250', task:'Impeller replacement', cost:'€120', notes:'Example entry', engines:['port','starboard']},
-      {id:uid(), date:dAgo(90),  hours:'300', task:'Gear oil change',      cost:'€60',  notes:'Example entry', engines:['port','starboard']},
+      {id:uid(), date:dAgo(90),  hours:'300', task:'Engine oil', cost:'€85',  notes:'Example entry', engines:['port','starboard']},
+      {id:uid(), date:dAgo(180), hours:'250', task:'Impeller',   cost:'€120', notes:'Example entry', engines:['port','starboard']},
+      {id:uid(), date:dAgo(90),  hours:'300', task:'Gear oil',   cost:'€60',  notes:'Example entry', engines:['port','starboard']},
     ];
     entries.forEach(e => data.maintenance.log.unshift(e));
     if (!data.maintenance.sched) data.maintenance.sched = {};
