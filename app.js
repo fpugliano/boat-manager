@@ -6344,11 +6344,49 @@ function renderCoastalLog() {
           ${meta ? `<div style="font-size:11px;color:var(--label3);margin-top:2px">${meta}</div>` : ''}
         </div>`
       : `<div style="margin:10px 12px 4px;font-size:11px;font-weight:600;color:var(--label3)">Unlabelled</div>`;
-    // Show newest entries first within the group
-    return header + [...entries].reverse().map(e => renderCoastalEntryRow(e)).join('');
+    const summaryCard = arrivedE ? renderCoastalPassageSummaryCard(entries, totalNm, durationStr) : '';
+    // Oldest first (chronological) — Departed at top, Arrived at bottom
+    return header + summaryCard + entries.map(e => renderCoastalEntryRow(e)).join('');
   }).join('');
 
   return `<div style="padding-bottom:80px">${newBtn}${sections}</div>`;
+}
+
+function renderCoastalPassageSummaryCard(entries, totalNm, durationStr) {
+  const departE  = entries.find(e => e.eventType === 'Departed');
+  const arrivedE = [...entries].reverse().find(e => e.eventType === 'Arrived');
+  const fmtT = ts => ts ? new Date(ts).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '—';
+  // Stats row
+  let avgSogStr = '—';
+  if (departE?.timestamp && arrivedE?.timestamp && totalNm > 0) {
+    const ms = new Date(arrivedE.timestamp) - new Date(departE.timestamp);
+    if (ms > 0) avgSogStr = (totalNm / (ms / 3600000)).toFixed(1) + ' kn';
+  }
+  const nmStr = totalNm > 0.1 ? totalNm.toFixed(1) + ' nm' : '—';
+  const statsRow = [nmStr, durationStr || '—', avgSogStr].map((v, i) =>
+    `<span style="font-size:11px;font-weight:600;color:var(--label)">${esc(v)}</span><span style="font-size:10px;color:var(--label3);margin-left:2px">${['nm','duration','avg SOG'][i]}</span>`
+  ).join('<span style="color:var(--sep);margin:0 6px">·</span>');
+  // Timeline strip — all events in order
+  const strip = entries.map((e, i) => {
+    const icon  = COASTAL_ICONS[e.eventType]  || '•';
+    const color = COASTAL_COLORS[e.eventType] || '#9ca3af';
+    const t = fmtT(e.timestamp);
+    const isLast = i === entries.length - 1;
+    return `<span style="display:inline-flex;align-items:center;gap:3px;white-space:nowrap">` +
+      `<span style="font-size:12px">${icon}</span>` +
+      `<span style="font-size:10px;font-weight:600;color:${color}">${esc(e.eventType)}</span>` +
+      `<span style="font-size:10px;color:var(--label3)">${t}</span>` +
+      `</span>` +
+      (isLast ? '' : `<span style="color:var(--label3);font-size:10px;margin:0 4px">→</span>`);
+  }).join('');
+  return `<div style="margin:0 12px 6px;background:rgba(99,153,34,.06);border:1.5px solid rgba(99,153,34,.22);border-left:4px solid #639922;border-radius:10px;padding:9px 12px">
+    <div style="display:flex;align-items:center;gap:4px;margin-bottom:7px;flex-wrap:wrap">
+      ${statsRow}
+    </div>
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px;overflow:hidden">
+      ${strip}
+    </div>
+  </div>`;
 }
 
 function renderCoastalEntryRow(e) {
