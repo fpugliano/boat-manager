@@ -4140,30 +4140,72 @@ function prefillShipyardData() {
     const y = new Date().getFullYear() - yearsAgo;
     return `${y}/${y + 1}`;
   };
+  const dAbs = offsetDays => {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    return d.toISOString().slice(0, 10);
+  };
+
+  data.shipyard.current = {
+    name:         'Palma Boat Yard (Example)',
+    location:     'Palma de Mallorca, Spain',
+    startDate:    dAbs(-25),
+    endDate:      dAbs(5),
+    actualCost:   '€3,500',
+    depositPaid:  '€1,200',
+    balanceDue:   '€2,300',
+    notes:        'Annual haul-out. Antifouling bottom paint, hull inspection, anode replacement, propeller polish (Example)',
+  };
+
+  data.shipyard.quotes = [
+    {
+      id: uid(),
+      name:     'Palma Boat Yard (Example)',
+      location: 'Palma de Mallorca, Spain',
+      price:    '€3,500',
+      notes:    'Antifouling + hull inspection + anodes (Example)',
+      selected: true,
+    },
+    {
+      id: uid(),
+      name:     'Port Adriano Marina (Example)',
+      location: 'Calvià, Mallorca',
+      price:    '€4,100',
+      notes:    'Full antifouling + osmosis treatment + anodes (Example)',
+      selected: false,
+    },
+    {
+      id: uid(),
+      name:     'Club de Mar (Example)',
+      location: 'Palma de Mallorca, Spain',
+      price:    '€2,950',
+      notes:    'Basic antifouling only, no extras (Example)',
+      selected: false,
+    },
+  ];
+
   data.shipyard.history = [
     {
       id: uid(),
       year:     seasonLabel(2),
-      name:     'Example Boatyard (Example)',
-      location: 'Example Marina, Greece',
+      name:     'Gouvia Marina Boatyard (Example)',
+      location: 'Corfu, Greece',
       start:    dRel(2),
-      end:      dRel(2, 21),
-      cost:     '0',
-      notes:    'Antifouling, hull inspection, saildrive service (Example)\nReplace with your actual haul-out history (Example)',
+      end:      dRel(2, 18),
+      cost:     '€2,800',
+      notes:    'Antifouling, hull inspection, saildrive service, cutlass bearing replacement (Example)',
     },
     {
       id: uid(),
       year:     seasonLabel(1),
-      name:     'Another Example Boatyard (Example)',
-      location: 'Example Port',
+      name:     'Marina de Lagos (Example)',
+      location: 'Lagos, Portugal',
       start:    dRel(1),
       end:      dRel(1, 14),
-      cost:     '0',
-      notes:    'Antifouling, waterline repaint, propeller polish (Example)\nReplace with your actual haul-out history (Example)',
+      cost:     '€3,100',
+      notes:    'Antifouling, waterline repaint, propeller polish, engine raw-water impeller (Example)',
     },
   ];
-  if (!data.shipyard.current) data.shipyard.current = {};
-  if (!data.shipyard.quotes)  data.shipyard.quotes  = [];
   return true;
 }
 
