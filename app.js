@@ -5599,7 +5599,7 @@ function startNewWinterSeason() {
 //  PASSAGE LOG (Log Book tab)
 // ═══════════════════════════════════════════════════════════
 
-let _lbGpsPos = null, _lbPid = null;
+let _lbGpsPos = null, _lbPid = null, _lbWatchId = null, _lbPrevFix = null;
 
 function getPassageLog() {
   if (!data.passageLog || typeof data.passageLog !== 'object' || Array.isArray(data.passageLog))
@@ -5711,9 +5711,7 @@ function renderPassageEntryRow(e, pid) {
   const posStr = (e.position?.lat != null && e.position?.lon != null)
     ? fmtLat(e.position.lat) + ' ' + fmtLon(e.position.lon) : '';
   const srcBadge = e.positionSource === 'gps'
-    ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(34,197,94,.15);color:#15803d;font-weight:700">GPS</span>`
-    : e.positionSource === 'raymarine'
-    ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(26,95,168,.15);color:#1a5fa8;font-weight:700">RAYM</span>` : '';
+    ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(34,197,94,.15);color:#15803d;font-weight:700">GPS</span>` : '';
   const notesSnip = e.notes ? ' · ' + e.notes.slice(0, 35) + (e.notes.length > 35 ? '…' : '') : '';
   const distStr = e.distanceRun ? `<span style="font-size:10px;color:var(--blue);font-weight:600">${(+e.distanceRun).toFixed(1)} nm</span> ` : '';
   return `<div style="padding:8px 12px;border-bottom:1px solid var(--sep);display:flex;align-items:center;gap:6px">
@@ -5722,7 +5720,7 @@ function renderPassageEntryRow(e, pid) {
         <span>${esc(timeStr)}</span>${srcBadge}${distStr}
       </div>
       <div style="font-size:10px;color:var(--label3);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-        ${posStr ? esc(posStr) : ''}${e.cog != null ? ` · COG ${e.cog}°` : ''}${e.sog != null ? ` · SOG ${e.sog}kn` : ''}${e.windDir != null ? ` · 💨 ${e.windDir}° F${e.windForce != null ? e.windForce : '?'}` : ''}${esc(notesSnip)}
+        ${posStr ? esc(posStr) : ''}${e.cog != null ? ` · COG ${e.cog}°` : ''}${e.sog != null ? ` · SOG ${e.sog}kn` : ''}${e.windDir != null ? ` · 💨 ${e.windDir}°${e.windSpeed != null ? ' ' + e.windSpeed + 'kn' : ''}` : ''}${e.currentSpeed != null ? ` · 🌊 ${e.currentSpeed}kn` : ''}${esc(notesSnip)}
       </div>
     </div>
     <button onclick="event.stopPropagation();showEditEntry('${pid}','${e.id}')" style="background:none;border:1.5px solid var(--sep);border-radius:8px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--label3);flex-shrink:0">✏</button>
@@ -5779,7 +5777,6 @@ function deletePassage(pid) {
 // ── Entry form ──
 
 function lbEntryForm(e) {
-  const rayIP = data.settings?.raymarineIP || '192.168.0.1';
   const lat = e?.position?.lat != null ? String(e.position.lat.toFixed(5)) : '';
   const lon = e?.position?.lon != null ? String(e.position.lon.toFixed(5)) : '';
   const tsVal = e?.timestamp
@@ -5787,29 +5784,31 @@ function lbEntryForm(e) {
     : new Date().toISOString().slice(0, 16);
   const SEA = ['Calm', 'Slight', 'Moderate', 'Rough', 'Very rough', 'High'];
   const seaSel = SEA.map(s => `<option value="${s}"${e?.seaState === s ? ' selected' : ''}>${s}</option>`).join('');
+  const isNew = !e;
   return `
     <div class="mi-label">Date / Time (UTC)</div>
     <input class="mi" id="lb-ts" type="datetime-local" value="${tsVal}">
     <div style="background:rgba(34,197,94,.08);border:1.5px solid rgba(34,197,94,.3);border-radius:10px;padding:10px;margin-bottom:10px">
-      <div style="font-size:11px;font-weight:700;color:#15803d;margin-bottom:8px" id="lb-auto-label">📍 Position <span id="lb-gps-status" style="font-weight:400;color:#15803d;font-size:10px">Getting GPS…</span></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+      <div style="font-size:11px;font-weight:700;color:#15803d;margin-bottom:8px">📍 Position <span id="lb-gps-status" style="font-weight:400;color:#15803d;font-size:10px">${isNew ? 'GPS acquiring…' : ''}</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
         <div><div class="mi-label" style="font-size:10px">Lat</div><input class="mi" id="lb-lat" value="${esc(lat)}" placeholder="e.g. 36.72134" style="font-size:12px"></div>
         <div><div class="mi-label" style="font-size:10px">Lon</div><input class="mi" id="lb-lon" value="${esc(lon)}" placeholder="e.g. −8.56789" style="font-size:12px"></div>
         <div><div class="mi-label" style="font-size:10px">COG °</div><input class="mi" id="lb-cog" value="${e?.cog != null ? e.cog : ''}" placeholder="—" type="number" min="0" max="359"></div>
         <div><div class="mi-label" style="font-size:10px">SOG kn</div><input class="mi" id="lb-sog" value="${e?.sog != null ? e.sog : ''}" placeholder="—" type="number" step="0.1" min="0"></div>
       </div>
-      <input type="hidden" id="lb-pos-source" value="${esc(e?.positionSource || 'gps')}">
-      <div style="display:flex;gap:6px;align-items:center;margin-top:2px">
-        <input class="mi" id="lb-ray-ip" value="${esc(rayIP)}" placeholder="192.168.0.1" style="flex:1;font-size:12px;margin-bottom:0">
-        <button type="button" onclick="lbConnectRaymarine()" style="flex-shrink:0;white-space:nowrap;background:rgba(26,95,168,.1);color:#1a5fa8;border:1px solid rgba(26,95,168,.3);border-radius:8px;padding:7px 10px;font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer">⚓ Raymarine</button>
-      </div>
-      <div id="lb-ray-status" style="display:none;font-size:11px;text-align:center;margin-top:4px"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
       <div><div class="mi-label">Wind dir °</div><input class="mi" id="lb-wind-dir" value="${e?.windDir != null ? e.windDir : ''}" placeholder="e.g. 225" type="number" min="0" max="359"></div>
-      <div><div class="mi-label">Wind Bf</div><input class="mi" id="lb-wind-force" value="${e?.windForce != null ? e.windForce : ''}" placeholder="e.g. 4" type="number" min="0" max="12" step="0.1"></div>
-      <div><div class="mi-label">Barometer hPa</div><input class="mi" id="lb-baro" value="${e?.barometer != null ? e.barometer : ''}" placeholder="e.g. 1013" type="number"></div>
+      <div><div class="mi-label">Wind kn</div><input class="mi" id="lb-wind-speed" value="${e?.windSpeed != null ? e.windSpeed : ''}" placeholder="e.g. 15" type="number" min="0" step="0.1"></div>
       <div><div class="mi-label">Sea state</div><select class="mi" id="lb-sea"><option value="">—</option>${seaSel}</select></div>
+      <div><div class="mi-label">Barometer hPa</div><input class="mi" id="lb-baro" value="${e?.barometer != null ? e.barometer : ''}" placeholder="e.g. 1013" type="number"></div>
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:var(--label2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Current</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div><div class="mi-label" style="font-size:10px">Dir °</div><input class="mi" id="lb-cur-dir" value="${e?.currentDir != null ? e.currentDir : ''}" placeholder="e.g. 045" type="number" min="0" max="359"></div>
+        <div><div class="mi-label" style="font-size:10px">Speed kn</div><input class="mi" id="lb-cur-speed" value="${e?.currentSpeed != null ? e.currentSpeed : ''}" placeholder="e.g. 1.5" type="number" min="0" step="0.1"></div>
+      </div>
     </div>
     <div class="mi-label">Watch leader</div><input class="mi" id="lb-watch" value="${esc(e?.watchLeader || '')}" placeholder="Optional">
     <div class="mi-label">Notes</div><textarea class="mi" id="lb-notes" rows="2" placeholder="Optional">${esc(e?.notes || '')}</textarea>
@@ -5842,13 +5841,15 @@ function lbReadForm() {
   return {
     timestamp:      new Date(document.getElementById('lb-ts')?.value || '').toISOString(),
     position:       (!isNaN(lat) && !isNaN(lon)) ? { lat, lon } : null,
-    positionSource: document.getElementById('lb-pos-source')?.value || 'manual',
+    positionSource: 'gps',
     cog:            nv('lb-cog'),
     sog:            nv('lb-sog'),
     windDir:        nv('lb-wind-dir'),
-    windForce:      nv('lb-wind-force'),
+    windSpeed:      nv('lb-wind-speed'),
     seaState:       document.getElementById('lb-sea')?.value       || '',
     barometer:      nv('lb-baro'),
+    currentDir:     nv('lb-cur-dir'),
+    currentSpeed:   nv('lb-cur-speed'),
     watchLeader:    document.getElementById('lb-watch')?.value.trim()  || '',
     notes:          document.getElementById('lb-notes')?.value.trim()  || '',
     fuelSoundings:  document.getElementById('lb-fuel')?.value.trim()   || '',
@@ -5861,10 +5862,10 @@ function showNewEntry(pid) {
   _lbPid = pid; _lbGpsPos = null;
   showModal('New Log Entry', lbEntryForm(null) + `
     <div class="modal-btns">
-      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-s" onclick="lbStopGPS();hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="saveLbEntry()">Add entry</button>
     </div>`);
-  setTimeout(() => { lbFetchGPS(); lbUpdateCalcTime(); }, 80);
+  setTimeout(() => { lbStartGPS(); lbUpdateCalcTime(); }, 80);
 }
 function showEditEntry(pid, eid) {
   const p = findPassage(pid); if (!p) return;
@@ -5882,6 +5883,7 @@ function showEditEntry(pid, eid) {
   setTimeout(() => lbUpdateCalcTime(), 80);
 }
 function saveLbEntry() {
+  lbStopGPS();
   const p = findPassage(_lbPid); if (!p) return;
   if (!p.entries) p.entries = [];
   p.entries.push({ id: uid(), ...lbReadForm() });
@@ -5904,38 +5906,57 @@ function deleteLbEntry(pid, eid) {
 
 // ── GPS helpers ──
 
-function lbFetchGPS() {
+function lbStopGPS() {
+  if (_lbWatchId != null) { navigator.geolocation?.clearWatch(_lbWatchId); _lbWatchId = null; }
+  _lbPrevFix = null;
+}
+
+function lbStartGPS() {
+  lbStopGPS();
   const statusEl = document.getElementById('lb-gps-status');
-  if (!navigator.geolocation) {
-    if (statusEl) statusEl.textContent = '';
-    return;
-  }
-  navigator.geolocation.getCurrentPosition(pos => {
+  if (!navigator.geolocation) { if (statusEl) statusEl.textContent = ''; return; }
+  _lbWatchId = navigator.geolocation.watchPosition(pos => {
     const lat = pos.coords.latitude, lon = pos.coords.longitude;
+    const now = pos.timestamp;
     _lbGpsPos = { lat, lon };
     const latEl = document.getElementById('lb-lat'), lonEl = document.getElementById('lb-lon');
     if (latEl && !latEl.value) latEl.value = lat.toFixed(5);
     if (lonEl && !lonEl.value) lonEl.value = lon.toFixed(5);
     if (statusEl) statusEl.textContent = '';
-    const p = findPassage(_lbPid);
-    if (p) {
-      const sorted = [...(p.entries || [])].sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
-      const last = sorted[sorted.length - 1];
-      if (last?.position?.lat != null) {
-        const dist = haversineNm(last.position.lat, last.position.lon, lat, lon);
-        const cogEl = document.getElementById('lb-cog');
-        const sogEl = document.getElementById('lb-sog');
-        if (cogEl && !cogEl.value) cogEl.value = bearingDeg(last.position.lat, last.position.lon, lat, lon);
-        if (sogEl && !sogEl.value && last.timestamp) {
-          const hrs = (Date.now() - new Date(last.timestamp)) / 3600000;
-          if (hrs > 0) sogEl.value = Math.min(30, dist / hrs).toFixed(1);
+    const cogEl = document.getElementById('lb-cog'), sogEl = document.getElementById('lb-sog');
+    if (_lbPrevFix) {
+      const dtH = (now - _lbPrevFix.ts) / 3600000;
+      if (dtH > 0) {
+        const dist = haversineNm(_lbPrevFix.lat, _lbPrevFix.lon, lat, lon);
+        const sog = dist / dtH;
+        if (sog >= 0.3) {
+          if (cogEl) cogEl.value = bearingDeg(_lbPrevFix.lat, _lbPrevFix.lon, lat, lon);
+          if (sogEl) sogEl.value = Math.min(30, sog).toFixed(1);
+        } else {
+          if (cogEl) { cogEl.value = ''; cogEl.placeholder = '—'; }
+          if (sogEl) sogEl.value = '0';
         }
-        lbUpdateCalcDist(lat, lon);
+      }
+    } else {
+      const p = findPassage(_lbPid);
+      if (p) {
+        const sorted = [...(p.entries || [])].sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
+        const last = sorted[sorted.length - 1];
+        if (last?.position?.lat != null) {
+          const dist = haversineNm(last.position.lat, last.position.lon, lat, lon);
+          if (cogEl && !cogEl.value) cogEl.value = bearingDeg(last.position.lat, last.position.lon, lat, lon);
+          if (sogEl && !sogEl.value && last.timestamp) {
+            const hrs = (Date.now() - new Date(last.timestamp)) / 3600000;
+            if (hrs > 0) sogEl.value = Math.min(30, dist / hrs).toFixed(1);
+          }
+        }
       }
     }
+    _lbPrevFix = { lat, lon, ts: now };
+    lbUpdateCalcDist(lat, lon);
   }, () => {
     if (statusEl) statusEl.textContent = '(GPS unavailable — enter manually)';
-  }, { timeout: 10000, maximumAge: 30000 });
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 });
 }
 
 function lbUpdateCalcDist(lat, lon) {
@@ -5958,78 +5979,6 @@ function lbUpdateCalcTime() {
   timeEl.textContent = `${h}h ${m}m`;
 }
 
-// ── Raymarine (SignalK) ──
-
-async function lbFetch(url) {
-  try {
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 5000);
-    const r = await fetch(url, { signal: ctrl.signal });
-    clearTimeout(tid);
-    return r.ok ? await r.json() : null;
-  } catch { return null; }
-}
-
-async function lbConnectRaymarine() {
-  const ipEl = document.getElementById('lb-ray-ip');
-  const ip = (ipEl?.value || '').trim() || '192.168.0.1';
-  if (!data.settings) data.settings = {};
-  data.settings.raymarineIP = ip; save();
-  const statusEl = document.getElementById('lb-ray-status'); if (!statusEl) return;
-  statusEl.style.display = ''; statusEl.innerHTML = '<span style="color:var(--label3)">Connecting…</span>';
-  const base = `http://${ip}/signalk/v1/api/vessels/self`;
-  const [posD, sogD, cogD, wsD, wdD] = await Promise.all([
-    lbFetch(`${base}/navigation/position`),
-    lbFetch(`${base}/navigation/speedOverGround`),
-    lbFetch(`${base}/navigation/courseOverGroundTrue`),
-    lbFetch(`${base}/environment/wind/speedTrue`),
-    lbFetch(`${base}/environment/wind/directionTrue`),
-  ]);
-  const lat = posD?.value?.latitude ?? posD?.value?.lat;
-  const lon = posD?.value?.longitude ?? posD?.value?.lon;
-  if (lat != null && lon != null) {
-    const sogKn  = sogD?.value != null ? (sogD.value * 1.94384).toFixed(1) : '';
-    const cogDeg = cogD?.value != null ? String(Math.round(((cogD.value * 180 / Math.PI) + 360) % 360)) : '';
-    const wsKn   = wsD?.value  != null ? (wsD.value  * 1.94384).toFixed(1) : '';
-    const wdDeg  = wdD?.value  != null ? String(Math.round(((wdD.value  * 180 / Math.PI) + 360) % 360)) : '';
-    document.getElementById('lb-lat').value = lat.toFixed(5);
-    document.getElementById('lb-lon').value = lon.toFixed(5);
-    if (cogDeg) document.getElementById('lb-cog').value = cogDeg;
-    if (sogKn)  document.getElementById('lb-sog').value = sogKn;
-    if (wdDeg)  document.getElementById('lb-wind-dir').value = wdDeg;
-    if (wsKn)   document.getElementById('lb-wind-force').value = wsKn;
-    document.getElementById('lb-pos-source').value = 'raymarine';
-    const lblEl = document.getElementById('lb-auto-label');
-    if (lblEl) lblEl.innerHTML = '⚓ From Raymarine <span id="lb-gps-status"></span>';
-    statusEl.innerHTML = '<span style="font-weight:600;color:#22C55E">✓ Raymarine connected</span>';
-    _lbGpsPos = { lat, lon };
-    lbUpdateCalcDist(lat, lon);
-  } else {
-    statusEl.innerHTML = '<span style="color:#F59E0B">⚠ Not reachable — enter position manually or use GPS</span>';
-    document.getElementById('lb-pos-source').value = 'gps';
-    lbFetchGPS();
-  }
-}
-
-async function lbTestRaymarine() {
-  const ipEl = document.getElementById('st-ray-ip');
-  const ip = (ipEl?.value || '').trim() || data.settings?.raymarineIP || '192.168.0.1';
-  const resultEl = document.getElementById('st-ray-test-result'); if (!resultEl) return;
-  resultEl.textContent = 'Testing…'; resultEl.style.color = 'var(--label3)';
-  const d = await lbFetch(`http://${ip}/signalk/v1/api/vessels/self/navigation/position`);
-  if (d?.value?.latitude != null) {
-    resultEl.textContent = '✓ Connected'; resultEl.style.color = '#22C55E';
-  } else {
-    resultEl.textContent = '✗ Not reachable'; resultEl.style.color = '#EF4444';
-  }
-}
-
-function saveLbSetting(key, elId) {
-  if (!data.settings) data.settings = {};
-  data.settings[key] = document.getElementById(elId)?.value || '';
-  save(); showToast('Saved');
-}
-
 // ── Export ──
 
 function exportPassage(pid) {
@@ -6047,9 +5996,10 @@ function exportPassage(pid) {
       <td>${e2(posStr)}</td>
       <td>${e.cog != null ? e.cog + '°' : '—'}</td>
       <td>${e.sog != null ? e.sog + 'kn' : '—'}</td>
-      <td>${e.windDir != null ? e.windDir + '°' : '—'}${e.windForce != null ? ' F' + e.windForce : ''}</td>
+      <td>${e.windDir != null ? e.windDir + '°' : '—'}${e.windSpeed != null ? ' ' + e.windSpeed + 'kn' : ''}</td>
       <td>${e2(e.seaState || '—')}</td>
       <td>${e.barometer != null ? e.barometer + 'hPa' : '—'}</td>
+      <td>${e.currentDir != null ? e.currentDir + '°' : '—'}${e.currentSpeed != null ? ' ' + e.currentSpeed + 'kn' : ''}</td>
       <td>${e2(e.watchLeader || '—')}</td>
       <td>${e2(e.notes || '')}</td>
     </tr>`;
@@ -6071,9 +6021,9 @@ tr:nth-child(even)td{background:#f5f7fa}
 <div class="meta">${e2(p.from || '?')} → ${e2(p.to || '?')} &nbsp;·&nbsp; ${e2(p.startDate || '')}${p.endDate ? ' – ' + e2(p.endDate) : ''} &nbsp;·&nbsp; Total: ${totalNm} nm &nbsp;·&nbsp; ${entries.length} entries</div>
 <div class="no-print"><button onclick="window.print()" style="padding:6px 14px;font-size:12px;cursor:pointer">🖨 Print / Save PDF</button></div>
 <table><thead><tr>
-  <th>Date/Time (UTC)</th><th>Position</th><th>COG</th><th>SOG</th><th>Wind</th><th>Sea</th><th>Baro</th><th>Watch</th><th>Notes</th>
+  <th>Date/Time (UTC)</th><th>Position</th><th>COG</th><th>SOG</th><th>Wind</th><th>Sea</th><th>Baro</th><th>Current</th><th>Watch</th><th>Notes</th>
 </tr></thead><tbody>
-${rows || '<tr><td colspan="9" style="text-align:center;color:#999">No entries</td></tr>'}
+${rows || '<tr><td colspan="10" style="text-align:center;color:#999">No entries</td></tr>'}
 </tbody></table>
 </body></html>`;
   const w = window.open('', '_blank');
@@ -6245,7 +6195,7 @@ function prefillPassageLogData() {
         {
           id: uid(), timestamp: dAgoTs(90),
           position: { lat: -33.9269, lon: 18.4242 }, positionSource: 'gps',
-          cog: 340, sog: 6.5, windDir: 100, windForce: 4,
+          cog: 340, sog: 6.5, windDir: 100, windSpeed: 8,
           seaState: 'Slight', barometer: 1016,
           watchLeader: 'Captain (Example)',
           notes: 'Departed Cape Town, heading NW (Example)',
@@ -6254,7 +6204,7 @@ function prefillPassageLogData() {
         {
           id: uid(), timestamp: dAgoTs(85),
           position: { lat: -15.24, lon: 7.31 }, positionSource: 'gps',
-          cog: 295, sog: 7.2, windDir: 50, windForce: 5,
+          cog: 295, sog: 7.2, windDir: 50, windSpeed: 18,
           seaState: 'Moderate', barometer: 1013,
           watchLeader: 'First mate (Example)',
           notes: 'SE trades established, good progress (Example)',
@@ -6262,8 +6212,8 @@ function prefillPassageLogData() {
         },
         {
           id: uid(), timestamp: dAgoTs(78),
-          position: { lat: 2.51, lon: -12.78 }, positionSource: 'raymarine',
-          cog: 285, sog: 6.8, windDir: 35, windForce: 4,
+          position: { lat: 2.51, lon: -12.78 }, positionSource: 'gps',
+          cog: 285, sog: 6.8, windDir: 35, windSpeed: 12,
           seaState: 'Slight', barometer: 1010,
           watchLeader: 'Captain (Example)',
           notes: 'Crossed equator this morning, NE trades beginning (Example)',
@@ -8897,13 +8847,6 @@ function renderSettings() {
         <span style="color:var(--label3);font-size:15px">›</span>
       </div>
       ${settingsRow('account', 'Account',             acctRight,  acctExpanded)}
-      ${settingsRow('chartplotter', 'Chartplotter integration', '',
-        subRow(`<div style="font-size:11px;color:var(--label3);margin-bottom:6px">Connect the Log Book to your Raymarine Axiom via SignalK to auto-fill GPS position, COG, SOG, and wind data.</div>`) +
-        subRow(`<div class="mi-label" style="margin-top:0">Axiom IP address</div>
-          <input class="mi" id="st-ray-ip" value="${esc(data.settings?.raymarineIP || '192.168.0.1')}" placeholder="192.168.0.1" inputmode="decimal">
-          <button class="btn btn-s btn-sm" style="margin-top:6px" onclick="event.stopPropagation();saveLbSetting('raymarineIP','st-ray-ip')">Save IP</button>`) +
-        subRow(`<div style="display:flex;align-items:center;gap:8px"><button class="btn btn-s btn-sm" onclick="event.stopPropagation();lbTestRaymarine()">Test connection</button><span id="st-ray-test-result" style="font-size:12px"></span></div>`, false)
-      )}
     </div>
     <div style="text-align:center;padding:4px 0 16px">
       <button onclick="showPrivacyPolicy()" style="background:none;border:none;color:var(--label3);font-family:var(--font);font-size:13px;cursor:pointer;text-decoration:underline">Privacy Policy</button>
