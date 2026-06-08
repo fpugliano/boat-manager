@@ -365,7 +365,7 @@ function handleJsonImport(input) {
     try {
       const json = JSON.parse(e.target.result);
       if (typeof json !== 'object' || Array.isArray(json) || json === null) throw new Error('Expected a JSON object');
-      const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2','shipyard','systems','watermaker','lpg','provisions','schengen','winterization','upgrades','passageLog'];
+      const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2','shipyard','systems','watermaker','lpg','provisions','schengen','winterization','upgrades','passageLog','coastalLog'];
       if (!KNOWN.some(k => k in json)) throw new Error('No recognised fields found (expected: documents, crew, maintenance, transitLog, etc.)');
 
       // Handle maintenance separately — flat import format (engineHours, log[])
@@ -5635,9 +5635,21 @@ function fmtLon(v) {
 // ── Render ──
 
 function renderPassageLog() {
+  if (!ui.logbookMode) ui.logbookMode = 'coastal';
+  const mode = ui.logbookMode;
+  const activeStyle = 'background:var(--surface);color:var(--label);box-shadow:0 1px 3px rgba(0,0,0,.12)';
+  const inactiveStyle = 'background:transparent;color:var(--label3)';
+  const toggle = `<div style="margin:12px 12px 6px;display:flex;background:var(--surface2);border-radius:10px;padding:3px;gap:3px">
+    <button onclick="ui.logbookMode='coastal';document.getElementById('mainContent').innerHTML=renderPassageLog()" style="flex:1;padding:7px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);${mode==='coastal'?activeStyle:inactiveStyle}">⛵ Coastal</button>
+    <button onclick="ui.logbookMode='offshore';document.getElementById('mainContent').innerHTML=renderPassageLog()" style="flex:1;padding:7px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);${mode==='offshore'?activeStyle:inactiveStyle}">🌊 Offshore</button>
+  </div>`;
+  return toggle + (mode === 'offshore' ? renderOffshoreLog() : renderCoastalLog());
+}
+
+function renderOffshoreLog() {
   const pl = getPassageLog();
   const passages = [...pl.passages].reverse();
-  const newBtn = `<div style="padding:12px 12px 4px">
+  const newBtn = `<div style="padding:4px 12px 4px">
     <button onclick="showNewPassage()" style="width:100%;background:var(--blue);color:#fff;border:none;border-radius:12px;padding:12px;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">+ New passage</button>
   </div>`;
   if (!passages.length) return `<div style="padding-bottom:80px">${newBtn}
@@ -6071,50 +6083,210 @@ ${rows || '<tr><td colspan="9" style="text-align:center;color:#999">No entries</
 
 // ── Prefill ──
 
+// ── Coastal log ──
+
+function getCoastalLog() {
+  if (!Array.isArray(data.coastalLog)) data.coastalLog = [];
+  return data.coastalLog;
+}
+
+const COASTAL_EVENTS = ['Departed','Anchored','Waypoint passed','Fuel stop','Port entry','Port exit','Notable event'];
+const COASTAL_ICONS  = {'Departed':'⛵','Anchored':'⚓','Waypoint passed':'📍','Fuel stop':'⛽','Port entry':'🟢','Port exit':'🔴','Notable event':'⭐'};
+
+function renderCoastalLog() {
+  const entries = [...getCoastalLog()].sort((a, b) => a.timestamp < b.timestamp ? 1 : -1);
+  const newBtn = `<div style="padding:4px 12px 4px">
+    <button onclick="showNewCoastalEntry()" style="width:100%;background:var(--blue);color:#fff;border:none;border-radius:12px;padding:12px;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">+ Log event</button>
+  </div>`;
+  if (!entries.length) return `<div style="padding-bottom:80px">${newBtn}
+    <div style="text-align:center;padding:40px 20px;color:var(--label3);font-size:14px">No events logged yet.<br>Tap "+ Log event" to start.</div>
+  </div>`;
+  const byDate = {};
+  entries.forEach(e => {
+    const d = e.timestamp
+      ? new Date(e.timestamp).toLocaleDateString('en-GB', {weekday:'short', day:'2-digit', month:'short', year:'numeric'})
+      : 'Unknown date';
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(e);
+  });
+  const sections = Object.entries(byDate).map(([date, dayEntries]) =>
+    `<div style="margin:6px 12px 4px;font-size:11px;font-weight:700;color:var(--label3);text-transform:uppercase;letter-spacing:.4px">${date}</div>` +
+    dayEntries.map(e => renderCoastalEntryRow(e)).join('')
+  ).join('');
+  return `<div style="padding-bottom:80px">${newBtn}${sections}</div>`;
+}
+
+function renderCoastalEntryRow(e) {
+  const ts = e.timestamp ? new Date(e.timestamp) : null;
+  const timeStr = ts ? ts.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '—';
+  const icon = COASTAL_ICONS[e.eventType] || '•';
+  const posStr = (e.position?.lat != null && e.position?.lon != null)
+    ? fmtLat(e.position.lat) + ' ' + fmtLon(e.position.lon) : '';
+  const srcBadge = e.positionSource === 'gps'
+    ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(34,197,94,.15);color:#15803d;font-weight:700">GPS</span>`
+    : e.positionSource === 'manual'
+    ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--label3);font-weight:600">Manual</span>` : '';
+  return `<div style="margin:0 12px 6px;background:var(--surface);border:1.5px solid var(--sep);border-radius:12px;padding:10px 12px;display:flex;align-items:flex-start;gap:10px">
+    <div style="font-size:20px;margin-top:1px;flex-shrink:0">${icon}</div>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:700;color:var(--label)">${esc(e.eventType || '—')}</span>
+        <span style="font-size:11px;color:var(--label3)">${timeStr}</span>
+        ${srcBadge}
+      </div>
+      ${posStr ? `<div style="font-size:11px;color:var(--label3);margin-top:2px">${esc(posStr)}</div>` : ''}
+      ${e.notes ? `<div style="font-size:12px;color:var(--label2);margin-top:3px">${esc(e.notes)}</div>` : ''}
+    </div>
+    <button onclick="showEditCoastalEntry('${e.id}')" style="background:none;border:1.5px solid var(--sep);border-radius:8px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--label3);flex-shrink:0;margin-top:1px">✏</button>
+  </div>`;
+}
+
+function _coastalEntryForm(e) {
+  const tsVal = e?.timestamp ? new Date(e.timestamp).toISOString().slice(0,16) : new Date().toISOString().slice(0,16);
+  const evtOpts = COASTAL_EVENTS.map(t =>
+    `<option value="${t}"${e?.eventType===t?' selected':''}>${COASTAL_ICONS[t]} ${t}</option>`).join('');
+  const lat = e?.position?.lat != null ? String(e.position.lat.toFixed(5)) : '';
+  const lon = e?.position?.lon != null ? String(e.position.lon.toFixed(5)) : '';
+  return `<div class="mi-label">Time</div>
+    <input class="mi" id="lbc-ts" type="datetime-local" value="${tsVal}">
+    <div class="mi-label">Event type</div>
+    <select class="mi" id="lbc-evt"><option value="">— select —</option>${evtOpts}</select>
+    <div style="background:rgba(34,197,94,.08);border:1.5px solid rgba(34,197,94,.3);border-radius:10px;padding:10px;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:#15803d;margin-bottom:6px">📍 Position <span id="lbc-gps-status" style="font-weight:400;color:#15803d;font-size:10px">${e ? '' : 'Getting GPS…'}</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div><div class="mi-label" style="font-size:10px">Lat</div><input class="mi" id="lbc-lat" value="${esc(lat)}" placeholder="e.g. 36.72134" style="font-size:12px"></div>
+        <div><div class="mi-label" style="font-size:10px">Lon</div><input class="mi" id="lbc-lon" value="${esc(lon)}" placeholder="e.g. −8.56789" style="font-size:12px"></div>
+      </div>
+      <input type="hidden" id="lbc-pos-source" value="${esc(e?.positionSource || 'gps')}">
+    </div>
+    <div class="mi-label">Notes</div>
+    <textarea class="mi" id="lbc-notes" rows="2" placeholder="Optional">${esc(e?.notes || '')}</textarea>`;
+}
+
+function lbcReadForm() {
+  const latV = document.getElementById('lbc-lat')?.value;
+  const lonV = document.getElementById('lbc-lon')?.value;
+  const lat = parseFloat(latV), lon = parseFloat(lonV);
+  return {
+    timestamp:      new Date(document.getElementById('lbc-ts')?.value || '').toISOString(),
+    eventType:      document.getElementById('lbc-evt')?.value || '',
+    position:       (!isNaN(lat) && !isNaN(lon)) ? { lat, lon } : null,
+    positionSource: document.getElementById('lbc-pos-source')?.value || 'manual',
+    notes:          document.getElementById('lbc-notes')?.value.trim() || '',
+  };
+}
+
+function lbcFetchGPS() {
+  const statusEl = document.getElementById('lbc-gps-status');
+  if (!navigator.geolocation) { if (statusEl) statusEl.textContent = ''; return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude, lon = pos.coords.longitude;
+    const latEl = document.getElementById('lbc-lat'), lonEl = document.getElementById('lbc-lon');
+    if (latEl && !latEl.value) latEl.value = lat.toFixed(5);
+    if (lonEl && !lonEl.value) lonEl.value = lon.toFixed(5);
+    const srcEl = document.getElementById('lbc-pos-source'); if (srcEl) srcEl.value = 'gps';
+    if (statusEl) statusEl.textContent = '';
+  }, () => { if (statusEl) statusEl.textContent = '(GPS unavailable — enter manually)'; },
+  { timeout: 10000, maximumAge: 30000 });
+}
+
+function showNewCoastalEntry() {
+  showModal('Log Event', _coastalEntryForm(null) + `
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveCoastalEntry()">Save</button>
+    </div>`);
+  setTimeout(() => lbcFetchGPS(), 80);
+}
+function showEditCoastalEntry(eid) {
+  const e = getCoastalLog().find(x => x.id === eid); if (!e) return;
+  showModal('Edit Event', _coastalEntryForm(e) + `
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" style="background:var(--red);border-color:var(--red)" onclick="deleteCoastalEntry('${eid}')">Delete</button>
+      <button class="btn btn-p" onclick="saveEditCoastalEntry('${eid}')">Save</button>
+    </div>`);
+}
+function saveCoastalEntry() {
+  const evt = document.getElementById('lbc-evt')?.value;
+  if (!evt) { showToast('Select an event type', true); return; }
+  getCoastalLog().push({ id: uid(), ...lbcReadForm() });
+  save(); hideModal();
+  document.getElementById('mainContent').innerHTML = renderPassageLog();
+}
+function saveEditCoastalEntry(eid) {
+  const log = getCoastalLog(), idx = log.findIndex(x => x.id === eid); if (idx < 0) return;
+  log[idx] = { id: eid, ...lbcReadForm() };
+  save(); hideModal();
+  document.getElementById('mainContent').innerHTML = renderPassageLog();
+}
+function deleteCoastalEntry(eid) {
+  data.coastalLog = getCoastalLog().filter(x => x.id !== eid);
+  save(); hideModal();
+  document.getElementById('mainContent').innerHTML = renderPassageLog();
+}
+
+// ── Prefill ──
+
 function prefillPassageLogData() {
   if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL) return false;
-  if (getPassageLog().passages.some(p => p.name)) return false;
-  const dAgoTs = n => new Date(Date.now() - n * 86400000).toISOString();
-  const dAgoDate = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
-  const passage = {
-    id: uid(),
-    name:      'Cape Town to Grenada (Example)',
-    from:      'Cape Town, South Africa',
-    to:        "St. George's, Grenada",
-    startDate: dAgoDate(90),
-    endDate:   dAgoDate(60),
-    entries: [
-      {
-        id: uid(), timestamp: dAgoTs(90),
-        position: { lat: -33.9269, lon: 18.4242 }, positionSource: 'gps',
-        cog: 340, sog: 6.5, windDir: 100, windForce: 4,
-        seaState: 'Slight', barometer: 1016,
-        watchLeader: 'Captain (Example)',
-        notes: 'Departed Cape Town, heading NW (Example)',
-        fuelSoundings: '480L', waterSoundings: '200L', distanceRun: 0
-      },
-      {
-        id: uid(), timestamp: dAgoTs(85),
-        position: { lat: -15.24, lon: 7.31 }, positionSource: 'gps',
-        cog: 295, sog: 7.2, windDir: 50, windForce: 5,
-        seaState: 'Moderate', barometer: 1013,
-        watchLeader: 'First mate (Example)',
-        notes: 'SE trades established, good progress (Example)',
-        fuelSoundings: '455L', waterSoundings: '185L', distanceRun: 1247
-      },
-      {
-        id: uid(), timestamp: dAgoTs(78),
-        position: { lat: 2.51, lon: -12.78 }, positionSource: 'raymarine',
-        cog: 285, sog: 6.8, windDir: 35, windForce: 4,
-        seaState: 'Slight', barometer: 1010,
-        watchLeader: 'Captain (Example)',
-        notes: 'Crossed equator this morning, NE trades beginning (Example)',
-        fuelSoundings: '420L', waterSoundings: '158L', distanceRun: 1089
-      }
-    ]
-  };
-  getPassageLog().passages.push(passage);
-  return true;
+  let dirty = false;
+  if (!getPassageLog().passages.some(p => p.name)) {
+    const dAgoTs = n => new Date(Date.now() - n * 86400000).toISOString();
+    const dAgoDate = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+    const passage = {
+      id: uid(),
+      name:      'Cape Town to Grenada (Example)',
+      from:      'Cape Town, South Africa',
+      to:        "St. George's, Grenada",
+      startDate: dAgoDate(90),
+      endDate:   dAgoDate(60),
+      entries: [
+        {
+          id: uid(), timestamp: dAgoTs(90),
+          position: { lat: -33.9269, lon: 18.4242 }, positionSource: 'gps',
+          cog: 340, sog: 6.5, windDir: 100, windForce: 4,
+          seaState: 'Slight', barometer: 1016,
+          watchLeader: 'Captain (Example)',
+          notes: 'Departed Cape Town, heading NW (Example)',
+          fuelSoundings: '480L', waterSoundings: '200L', distanceRun: 0
+        },
+        {
+          id: uid(), timestamp: dAgoTs(85),
+          position: { lat: -15.24, lon: 7.31 }, positionSource: 'gps',
+          cog: 295, sog: 7.2, windDir: 50, windForce: 5,
+          seaState: 'Moderate', barometer: 1013,
+          watchLeader: 'First mate (Example)',
+          notes: 'SE trades established, good progress (Example)',
+          fuelSoundings: '455L', waterSoundings: '185L', distanceRun: 1247
+        },
+        {
+          id: uid(), timestamp: dAgoTs(78),
+          position: { lat: 2.51, lon: -12.78 }, positionSource: 'raymarine',
+          cog: 285, sog: 6.8, windDir: 35, windForce: 4,
+          seaState: 'Slight', barometer: 1010,
+          watchLeader: 'Captain (Example)',
+          notes: 'Crossed equator this morning, NE trades beginning (Example)',
+          fuelSoundings: '420L', waterSoundings: '158L', distanceRun: 1089
+        }
+      ]
+    };
+    getPassageLog().passages.push(passage);
+    dirty = true;
+  }
+  if (!getCoastalLog().some(e => e.eventType)) {
+    const dAgoTs = n => new Date(Date.now() - n * 86400000).toISOString();
+    const samples = [
+      { eventType:'Departed',       timestamp: dAgoTs(3),   position:{lat:37.1232,lon:-8.6130}, positionSource:'gps',    notes:'Left Portimão marina, heading east (Example)' },
+      { eventType:'Waypoint passed',timestamp: dAgoTs(3)-3600000, position:{lat:37.0852,lon:-8.4070}, positionSource:'gps', notes:'Passed Cabo de Santa Maria (Example)' },
+      { eventType:'Anchored',       timestamp: dAgoTs(2),   position:{lat:37.0180,lon:-7.9760}, positionSource:'gps',    notes:'Anchored at Isla Canela, calm overnight (Example)' },
+      { eventType:'Port entry',     timestamp: dAgoTs(1),   position:{lat:36.9950,lon:-7.7060}, positionSource:'gps',    notes:'Arrived Ayamonte marina (Example)' },
+      { eventType:'Fuel stop',      timestamp: dAgoTs(1)+7200000, position:{lat:36.9940,lon:-7.7050}, positionSource:'gps', notes:'Took on 80L diesel (Example)' },
+    ];
+    samples.forEach(s => getCoastalLog().push({ id: uid(), ...s }));
+    dirty = true;
+  }
+  return dirty;
 }
 
 // ═══════════════════════════════════════════════════════════
