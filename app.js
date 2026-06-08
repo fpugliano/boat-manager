@@ -7585,7 +7585,7 @@ function _aiStep1Html() {
         <div style="font-size:13px;font-weight:600;color:var(--label);margin-bottom:4px">Photo</div>
         <div style="font-size:11px;color:var(--label3)">Take a photo or choose from library</div>
       </label>
-      <input type="file" id="ai-photo-input" accept="image/*" capture="environment" style="display:none" onchange="aiImportPhotoSelected(this)">
+      <input type="file" id="ai-photo-input" accept="image/*" style="display:none" onchange="aiImportPhotoSelected(this)">
       <div onclick="aiShowTextInput()" style="border:1.5px solid var(--sep);border-radius:14px;padding:20px 10px 16px;text-align:center;cursor:pointer;background:var(--surface2)">
         <div style="font-size:30px;margin-bottom:8px">📋</div>
         <div style="font-size:13px;font-weight:600;color:var(--label);margin-bottom:4px">Paste text</div>
