@@ -365,7 +365,7 @@ function handleJsonImport(input) {
     try {
       const json = JSON.parse(e.target.result);
       if (typeof json !== 'object' || Array.isArray(json) || json === null) throw new Error('Expected a JSON object');
-      const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2','shipyard','systems','watermaker','lpg','provisions','schengen','winterization','upgrades'];
+      const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2','shipyard','systems','watermaker','lpg','provisions','schengen','winterization','upgrades','passageLog'];
       if (!KNOWN.some(k => k in json)) throw new Error('No recognised fields found (expected: documents, crew, maintenance, transitLog, etc.)');
 
       // Handle maintenance separately — flat import format (engineHours, log[])
@@ -595,6 +595,7 @@ function completeSetup() {
 const TABS = [
   {id:'documents',  icon:'📄', label:'Boat Docs'},
   {id:'clearance',  icon:'⚓', label:'Clearance'},
+  {id:'logbook',    icon:'📖', label:'Log Book'},
   {id:'provisions', icon:'🛒', label:'Provisions'},
   {id:'watermaker', icon:'💧', label:'Water Maker'},
   {id:'lpg',        icon:'🔥', label:'LPG'},
@@ -654,6 +655,7 @@ function renderActiveTab() {
     switch(ui.tab) {
       case 'documents':  mc.innerHTML = renderDocuments(); break;
       case 'clearance':  mc.innerHTML = renderClearance(); break;
+      case 'logbook':    mc.innerHTML = renderPassageLog(); break;
       case 'crew':       mc.innerHTML = renderCrew(); break;
       case 'shipyard':    mc.innerHTML = renderShipyard(); break;
       case 'watermaker':  mc.innerHTML = renderWatermaker(); break;
@@ -5593,6 +5595,530 @@ function startNewWinterSeason() {
   save(); winterRerender();
 }
 
+// ═══════════════════════════════════════════════════════════
+//  PASSAGE LOG (Log Book tab)
+// ═══════════════════════════════════════════════════════════
+
+let _lbGpsPos = null, _lbPid = null;
+
+function getPassageLog() {
+  if (!data.passageLog || typeof data.passageLog !== 'object' || Array.isArray(data.passageLog))
+    data.passageLog = { passages: [] };
+  if (!Array.isArray(data.passageLog.passages)) data.passageLog.passages = [];
+  return data.passageLog;
+}
+function findPassage(pid) { return getPassageLog().passages.find(p => p.id === pid) || null; }
+
+function haversineNm(lat1, lon1, lat2, lon2) {
+  const R = 3440.065, r = Math.PI / 180;
+  const dLat = (lat2 - lat1) * r, dLon = (lon2 - lon1) * r;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function bearingDeg(lat1, lon1, lat2, lon2) {
+  const r = Math.PI / 180, dLon = (lon2 - lon1) * r;
+  const y = Math.sin(dLon) * Math.cos(lat2 * r);
+  const x = Math.cos(lat1 * r) * Math.sin(lat2 * r) - Math.sin(lat1 * r) * Math.cos(lat2 * r) * Math.cos(dLon);
+  return Math.round(((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360);
+}
+function fmtLat(v) {
+  if (v == null) return '—';
+  const a = Math.abs(v), d = Math.floor(a);
+  return `${d}°${((a - d) * 60).toFixed(2)}'${v >= 0 ? 'N' : 'S'}`;
+}
+function fmtLon(v) {
+  if (v == null) return '—';
+  const a = Math.abs(v), d = Math.floor(a);
+  return `${d}°${((a - d) * 60).toFixed(2)}'${v >= 0 ? 'E' : 'W'}`;
+}
+
+// ── Render ──
+
+function renderPassageLog() {
+  const pl = getPassageLog();
+  const passages = [...pl.passages].reverse();
+  const newBtn = `<div style="padding:12px 12px 4px">
+    <button onclick="showNewPassage()" style="width:100%;background:var(--blue);color:#fff;border:none;border-radius:12px;padding:12px;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">+ New passage</button>
+  </div>`;
+  if (!passages.length) return `<div style="padding-bottom:80px">${newBtn}
+    <div style="text-align:center;padding:40px 20px;color:var(--label3);font-size:14px">No passages yet.<br>Tap "+ New passage" to begin logging.</div>
+  </div>`;
+  return `<div style="padding-bottom:80px">${newBtn}${passages.map(p => renderPassage(p)).join('')}</div>`;
+}
+
+function renderPassage(p) {
+  if (!ui.logbookOpen) ui.logbookOpen = {};
+  const open = !!ui.logbookOpen[p.id];
+  const entries = [...(p.entries || [])].sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
+  const totalNm = entries.reduce((s, e) => s + (parseFloat(e.distanceRun) || 0), 0);
+  const sogVals = entries.filter(e => e.sog != null).map(e => parseFloat(e.sog));
+  const avgSog = sogVals.length ? (sogVals.reduce((a, b) => a + b, 0) / sogVals.length).toFixed(1) : '—';
+  let duration = '—';
+  if (p.startDate && p.endDate) {
+    const d = Math.round((new Date(p.endDate) - new Date(p.startDate)) / 86400000);
+    duration = d === 0 ? '<1d' : `${d}d`;
+  }
+  const toggle = `ui.logbookOpen=ui.logbookOpen||{};ui.logbookOpen['${p.id}']=!${open};document.getElementById('mainContent').innerHTML=renderPassageLog()`;
+  return `<div style="margin:0 12px 12px;background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;overflow:hidden">
+    <div onclick="${toggle}" style="padding:12px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;-webkit-user-select:none">
+      <div style="min-width:0;flex:1">
+        <div style="font-size:14px;font-weight:700;color:var(--label);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name || 'Unnamed passage')}</div>
+        <div style="font-size:11px;color:var(--label3);margin-top:2px">${esc(p.from || '?')} → ${esc(p.to || '?')} · ${esc(p.startDate || '?')}</div>
+      </div>
+      <span style="color:var(--label3);font-size:15px;margin-left:8px;flex-shrink:0">${open ? '▲' : '▼'}</span>
+    </div>
+    ${open ? `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--sep);border-bottom:1px solid var(--sep)">
+      ${[
+        [totalNm.toFixed(1), 'nm total'],
+        [avgSog !== '—' ? avgSog + 'kn' : '—', 'avg SOG'],
+        [duration, 'duration'],
+        [String(entries.length), 'entries']
+      ].map(([v, l], i) => `<div style="padding:8px 4px;text-align:center${i < 3 ? ';border-right:1px solid var(--sep)' : ''}">
+        <div style="font-size:13px;font-weight:700;color:var(--label)">${esc(v)}</div>
+        <div style="font-size:9px;color:var(--label3)">${l}</div>
+      </div>`).join('')}
+    </div>
+    <div style="padding:8px 12px;border-bottom:1px solid var(--sep);display:flex;justify-content:flex-start;align-items:center;gap:6px">
+      <button onclick="event.stopPropagation();exportPassage('${p.id}')" style="background:var(--surface2);color:var(--label);border:1.5px solid var(--sep);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer">🖨 Export</button>
+      <button onclick="event.stopPropagation();showDeletePassage('${p.id}')" style="background:none;color:var(--red);border:1.5px solid var(--sep);border-radius:8px;padding:5px 10px;font-size:11px;font-family:var(--font);cursor:pointer">✕ Delete</button>
+      <button onclick="event.stopPropagation();showNewEntry('${p.id}')" style="margin-left:auto;background:var(--blue);color:#fff;border:none;border-radius:8px;padding:5px 14px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">+ New entry</button>
+    </div>
+    ${[...entries].reverse().map(e => renderPassageEntryRow(e, p.id)).join('') ||
+      '<div style="padding:14px;text-align:center;font-size:12px;color:var(--label3)">No entries yet — tap "+ New entry" to start</div>'}
+    ` : ''}
+  </div>`;
+}
+
+function renderPassageEntryRow(e, pid) {
+  const ts = e.timestamp ? new Date(e.timestamp) : null;
+  const timeStr = ts
+    ? ts.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' ' +
+      ts.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+    : '—';
+  const posStr = (e.position?.lat != null && e.position?.lon != null)
+    ? fmtLat(e.position.lat) + ' ' + fmtLon(e.position.lon) : '';
+  const srcBadge = e.positionSource === 'gps'
+    ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(34,197,94,.15);color:#15803d;font-weight:700">GPS</span>`
+    : e.positionSource === 'raymarine'
+    ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(26,95,168,.15);color:#1a5fa8;font-weight:700">RAYM</span>` : '';
+  const notesSnip = e.notes ? ' · ' + e.notes.slice(0, 35) + (e.notes.length > 35 ? '…' : '') : '';
+  const distStr = e.distanceRun ? `<span style="font-size:10px;color:var(--blue);font-weight:600">${(+e.distanceRun).toFixed(1)} nm</span> ` : '';
+  return `<div style="padding:8px 12px;border-bottom:1px solid var(--sep);display:flex;align-items:center;gap:6px">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:11px;font-weight:600;color:var(--label);display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+        <span>${esc(timeStr)}</span>${srcBadge}${distStr}
+      </div>
+      <div style="font-size:10px;color:var(--label3);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        ${posStr ? esc(posStr) : ''}${e.cog != null ? ` · COG ${e.cog}°` : ''}${e.sog != null ? ` · SOG ${e.sog}kn` : ''}${e.windDir != null ? ` · 💨 ${e.windDir}° F${e.windForce != null ? e.windForce : '?'}` : ''}${esc(notesSnip)}
+      </div>
+    </div>
+    <button onclick="event.stopPropagation();showEditEntry('${pid}','${e.id}')" style="background:none;border:1.5px solid var(--sep);border-radius:8px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--label3);flex-shrink:0">✏</button>
+  </div>`;
+}
+
+// ── Passage CRUD ──
+
+function showNewPassage() {
+  const today = new Date().toISOString().slice(0, 10);
+  showModal('New Passage', `
+    <div class="mi-label">Passage name</div><input class="mi" id="lbp-name" placeholder="e.g. Lisbon to Madeira">
+    <div class="mi-label">From</div><input class="mi" id="lbp-from" placeholder="Departure port">
+    <div class="mi-label">To</div><input class="mi" id="lbp-to" placeholder="Destination port">
+    <div class="mi-label">Start date</div><input class="mi" id="lbp-start" type="date" value="${today}">
+    <div class="mi-label">End date (optional)</div><input class="mi" id="lbp-end" type="date">
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveNewPassage()">Create</button>
+    </div>`);
+}
+function saveNewPassage() {
+  const name = document.getElementById('lbp-name')?.value.trim();
+  if (!name) { showToast('Enter a passage name', true); return; }
+  const pl = getPassageLog();
+  const p = {
+    id: uid(), name,
+    from:      document.getElementById('lbp-from')?.value.trim() || '',
+    to:        document.getElementById('lbp-to')?.value.trim()   || '',
+    startDate: document.getElementById('lbp-start')?.value       || '',
+    endDate:   document.getElementById('lbp-end')?.value         || '',
+    entries: []
+  };
+  pl.passages.push(p);
+  if (!ui.logbookOpen) ui.logbookOpen = {};
+  ui.logbookOpen[p.id] = true;
+  save(); hideModal();
+  document.getElementById('mainContent').innerHTML = renderPassageLog();
+}
+function showDeletePassage(pid) {
+  showModal('Delete passage', `<div style="padding:8px 0 12px;font-size:14px;color:var(--label)">Delete this passage and all its entries? This cannot be undone.</div>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" style="background:var(--red);border-color:var(--red)" onclick="deletePassage('${pid}')">Delete</button>
+    </div>`);
+}
+function deletePassage(pid) {
+  const pl = getPassageLog();
+  pl.passages = pl.passages.filter(p => p.id !== pid);
+  save(); hideModal();
+  document.getElementById('mainContent').innerHTML = renderPassageLog();
+}
+
+// ── Entry form ──
+
+function lbEntryForm(e) {
+  const rayIP = data.settings?.raymarineIP || '192.168.0.1';
+  const lat = e?.position?.lat != null ? String(e.position.lat.toFixed(5)) : '';
+  const lon = e?.position?.lon != null ? String(e.position.lon.toFixed(5)) : '';
+  const tsVal = e?.timestamp
+    ? new Date(e.timestamp).toISOString().slice(0, 16)
+    : new Date().toISOString().slice(0, 16);
+  const SEA = ['Calm', 'Slight', 'Moderate', 'Rough', 'Very rough', 'High'];
+  const seaSel = SEA.map(s => `<option value="${s}"${e?.seaState === s ? ' selected' : ''}>${s}</option>`).join('');
+  return `
+    <div class="mi-label">Date / Time (UTC)</div>
+    <input class="mi" id="lb-ts" type="datetime-local" value="${tsVal}">
+    <div style="background:rgba(34,197,94,.08);border:1.5px solid rgba(34,197,94,.3);border-radius:10px;padding:10px;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:#15803d;margin-bottom:8px" id="lb-auto-label">📍 Position <span id="lb-gps-status" style="font-weight:400;color:#15803d;font-size:10px">Getting GPS…</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+        <div><div class="mi-label" style="font-size:10px">Lat</div><input class="mi" id="lb-lat" value="${esc(lat)}" placeholder="e.g. 36.72134" style="font-size:12px"></div>
+        <div><div class="mi-label" style="font-size:10px">Lon</div><input class="mi" id="lb-lon" value="${esc(lon)}" placeholder="e.g. −8.56789" style="font-size:12px"></div>
+        <div><div class="mi-label" style="font-size:10px">COG °</div><input class="mi" id="lb-cog" value="${e?.cog != null ? e.cog : ''}" placeholder="—" type="number" min="0" max="359"></div>
+        <div><div class="mi-label" style="font-size:10px">SOG kn</div><input class="mi" id="lb-sog" value="${e?.sog != null ? e.sog : ''}" placeholder="—" type="number" step="0.1" min="0"></div>
+      </div>
+      <input type="hidden" id="lb-pos-source" value="${esc(e?.positionSource || 'gps')}">
+      <div style="display:flex;gap:6px;align-items:center;margin-top:2px">
+        <input class="mi" id="lb-ray-ip" value="${esc(rayIP)}" placeholder="192.168.0.1" style="flex:1;font-size:12px;margin-bottom:0">
+        <button type="button" onclick="lbConnectRaymarine()" style="flex-shrink:0;white-space:nowrap;background:rgba(26,95,168,.1);color:#1a5fa8;border:1px solid rgba(26,95,168,.3);border-radius:8px;padding:7px 10px;font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer">⚓ Raymarine</button>
+      </div>
+      <div id="lb-ray-status" style="display:none;font-size:11px;text-align:center;margin-top:4px"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+      <div><div class="mi-label">Wind dir °</div><input class="mi" id="lb-wind-dir" value="${e?.windDir != null ? e.windDir : ''}" placeholder="e.g. 225" type="number" min="0" max="359"></div>
+      <div><div class="mi-label">Wind Bf</div><input class="mi" id="lb-wind-force" value="${e?.windForce != null ? e.windForce : ''}" placeholder="e.g. 4" type="number" min="0" max="12" step="0.1"></div>
+      <div><div class="mi-label">Barometer hPa</div><input class="mi" id="lb-baro" value="${e?.barometer != null ? e.barometer : ''}" placeholder="e.g. 1013" type="number"></div>
+      <div><div class="mi-label">Sea state</div><select class="mi" id="lb-sea"><option value="">—</option>${seaSel}</select></div>
+    </div>
+    <div class="mi-label">Watch leader</div><input class="mi" id="lb-watch" value="${esc(e?.watchLeader || '')}" placeholder="Optional">
+    <div class="mi-label">Notes</div><textarea class="mi" id="lb-notes" rows="2" placeholder="Optional">${esc(e?.notes || '')}</textarea>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+      <div><div class="mi-label">Fuel soundings</div><input class="mi" id="lb-fuel" value="${esc(e?.fuelSoundings || '')}" placeholder="e.g. 480L"></div>
+      <div><div class="mi-label">Water soundings</div><input class="mi" id="lb-water" value="${esc(e?.waterSoundings || '')}" placeholder="e.g. 200L"></div>
+    </div>
+    <div style="background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:var(--label2);padding:7px 10px 2px;text-transform:uppercase;letter-spacing:.3px">Calculated</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--sep)">
+        <div style="padding:7px 10px;text-align:center;border-right:1px solid var(--sep)">
+          <div style="font-size:15px;font-weight:700;color:var(--label)" id="lb-calc-dist">${e?.distanceRun ? (+e.distanceRun).toFixed(1) : '—'}</div>
+          <div style="font-size:9px;color:var(--label3)">nm since last entry</div>
+        </div>
+        <div style="padding:7px 10px;text-align:center">
+          <div style="font-size:15px;font-weight:700;color:var(--label)" id="lb-calc-time">—</div>
+          <div style="font-size:9px;color:var(--label3)">time since last entry</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function lbReadForm() {
+  const latV = document.getElementById('lb-lat')?.value;
+  const lonV = document.getElementById('lb-lon')?.value;
+  const lat = parseFloat(latV), lon = parseFloat(lonV);
+  const nv = id => { const v = document.getElementById(id)?.value; return v !== '' && v != null ? Number(v) : null; };
+  const calcDistEl = document.getElementById('lb-calc-dist');
+  const distN = parseFloat(calcDistEl?.textContent);
+  return {
+    timestamp:      new Date(document.getElementById('lb-ts')?.value || '').toISOString(),
+    position:       (!isNaN(lat) && !isNaN(lon)) ? { lat, lon } : null,
+    positionSource: document.getElementById('lb-pos-source')?.value || 'manual',
+    cog:            nv('lb-cog'),
+    sog:            nv('lb-sog'),
+    windDir:        nv('lb-wind-dir'),
+    windForce:      nv('lb-wind-force'),
+    seaState:       document.getElementById('lb-sea')?.value       || '',
+    barometer:      nv('lb-baro'),
+    watchLeader:    document.getElementById('lb-watch')?.value.trim()  || '',
+    notes:          document.getElementById('lb-notes')?.value.trim()  || '',
+    fuelSoundings:  document.getElementById('lb-fuel')?.value.trim()   || '',
+    waterSoundings: document.getElementById('lb-water')?.value.trim()  || '',
+    distanceRun:    isNaN(distN) ? 0 : distN,
+  };
+}
+
+function showNewEntry(pid) {
+  _lbPid = pid; _lbGpsPos = null;
+  showModal('New Log Entry', lbEntryForm(null) + `
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveLbEntry()">Add entry</button>
+    </div>`);
+  setTimeout(() => { lbFetchGPS(); lbUpdateCalcTime(); }, 80);
+}
+function showEditEntry(pid, eid) {
+  const p = findPassage(pid); if (!p) return;
+  const e = (p.entries || []).find(x => x.id === eid); if (!e) return;
+  _lbPid = pid;
+  _lbGpsPos = (e.position?.lat != null) ? { lat: e.position.lat, lon: e.position.lon } : null;
+  showModal('Edit Log Entry', lbEntryForm(e) + `
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" style="background:var(--red);border-color:var(--red)" onclick="deleteLbEntry('${pid}','${eid}')">Delete</button>
+      <button class="btn btn-p" onclick="saveEditEntry('${pid}','${eid}')">Save</button>
+    </div>`);
+  const statusEl = document.getElementById('lb-gps-status');
+  if (statusEl) statusEl.textContent = '';
+  setTimeout(() => lbUpdateCalcTime(), 80);
+}
+function saveLbEntry() {
+  const p = findPassage(_lbPid); if (!p) return;
+  if (!p.entries) p.entries = [];
+  p.entries.push({ id: uid(), ...lbReadForm() });
+  save(); hideModal();
+  document.getElementById('mainContent').innerHTML = renderPassageLog();
+}
+function saveEditEntry(pid, eid) {
+  const p = findPassage(pid); if (!p) return;
+  const idx = (p.entries || []).findIndex(x => x.id === eid); if (idx < 0) return;
+  p.entries[idx] = { id: eid, ...lbReadForm() };
+  save(); hideModal();
+  document.getElementById('mainContent').innerHTML = renderPassageLog();
+}
+function deleteLbEntry(pid, eid) {
+  const p = findPassage(pid); if (!p) return;
+  p.entries = (p.entries || []).filter(x => x.id !== eid);
+  save(); hideModal();
+  document.getElementById('mainContent').innerHTML = renderPassageLog();
+}
+
+// ── GPS helpers ──
+
+function lbFetchGPS() {
+  const statusEl = document.getElementById('lb-gps-status');
+  if (!navigator.geolocation) {
+    if (statusEl) statusEl.textContent = '';
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude, lon = pos.coords.longitude;
+    _lbGpsPos = { lat, lon };
+    const latEl = document.getElementById('lb-lat'), lonEl = document.getElementById('lb-lon');
+    if (latEl && !latEl.value) latEl.value = lat.toFixed(5);
+    if (lonEl && !lonEl.value) lonEl.value = lon.toFixed(5);
+    if (statusEl) statusEl.textContent = '';
+    const p = findPassage(_lbPid);
+    if (p) {
+      const sorted = [...(p.entries || [])].sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
+      const last = sorted[sorted.length - 1];
+      if (last?.position?.lat != null) {
+        const dist = haversineNm(last.position.lat, last.position.lon, lat, lon);
+        const cogEl = document.getElementById('lb-cog');
+        const sogEl = document.getElementById('lb-sog');
+        if (cogEl && !cogEl.value) cogEl.value = bearingDeg(last.position.lat, last.position.lon, lat, lon);
+        if (sogEl && !sogEl.value && last.timestamp) {
+          const hrs = (Date.now() - new Date(last.timestamp)) / 3600000;
+          if (hrs > 0) sogEl.value = Math.min(30, dist / hrs).toFixed(1);
+        }
+        lbUpdateCalcDist(lat, lon);
+      }
+    }
+  }, () => {
+    if (statusEl) statusEl.textContent = '(GPS unavailable — enter manually)';
+  }, { timeout: 10000, maximumAge: 30000 });
+}
+
+function lbUpdateCalcDist(lat, lon) {
+  const p = findPassage(_lbPid); if (!p) return;
+  const sorted = [...(p.entries || [])].sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
+  const last = sorted[sorted.length - 1];
+  const distEl = document.getElementById('lb-calc-dist'); if (!distEl) return;
+  distEl.textContent = (last?.position?.lat != null)
+    ? haversineNm(last.position.lat, last.position.lon, lat, lon).toFixed(1) : '—';
+}
+
+function lbUpdateCalcTime() {
+  const p = findPassage(_lbPid); if (!p) return;
+  const sorted = [...(p.entries || [])].sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
+  const last = sorted[sorted.length - 1];
+  const timeEl = document.getElementById('lb-calc-time'); if (!timeEl) return;
+  if (!last?.timestamp) { timeEl.textContent = 'First entry'; return; }
+  const ms = Date.now() - new Date(last.timestamp);
+  const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+  timeEl.textContent = `${h}h ${m}m`;
+}
+
+// ── Raymarine (SignalK) ──
+
+async function lbFetch(url) {
+  try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 5000);
+    const r = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(tid);
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
+
+async function lbConnectRaymarine() {
+  const ipEl = document.getElementById('lb-ray-ip');
+  const ip = (ipEl?.value || '').trim() || '192.168.0.1';
+  if (!data.settings) data.settings = {};
+  data.settings.raymarineIP = ip; save();
+  const statusEl = document.getElementById('lb-ray-status'); if (!statusEl) return;
+  statusEl.style.display = ''; statusEl.innerHTML = '<span style="color:var(--label3)">Connecting…</span>';
+  const base = `http://${ip}/signalk/v1/api/vessels/self`;
+  const [posD, sogD, cogD, wsD, wdD] = await Promise.all([
+    lbFetch(`${base}/navigation/position`),
+    lbFetch(`${base}/navigation/speedOverGround`),
+    lbFetch(`${base}/navigation/courseOverGroundTrue`),
+    lbFetch(`${base}/environment/wind/speedTrue`),
+    lbFetch(`${base}/environment/wind/directionTrue`),
+  ]);
+  const lat = posD?.value?.latitude ?? posD?.value?.lat;
+  const lon = posD?.value?.longitude ?? posD?.value?.lon;
+  if (lat != null && lon != null) {
+    const sogKn  = sogD?.value != null ? (sogD.value * 1.94384).toFixed(1) : '';
+    const cogDeg = cogD?.value != null ? String(Math.round(((cogD.value * 180 / Math.PI) + 360) % 360)) : '';
+    const wsKn   = wsD?.value  != null ? (wsD.value  * 1.94384).toFixed(1) : '';
+    const wdDeg  = wdD?.value  != null ? String(Math.round(((wdD.value  * 180 / Math.PI) + 360) % 360)) : '';
+    document.getElementById('lb-lat').value = lat.toFixed(5);
+    document.getElementById('lb-lon').value = lon.toFixed(5);
+    if (cogDeg) document.getElementById('lb-cog').value = cogDeg;
+    if (sogKn)  document.getElementById('lb-sog').value = sogKn;
+    if (wdDeg)  document.getElementById('lb-wind-dir').value = wdDeg;
+    if (wsKn)   document.getElementById('lb-wind-force').value = wsKn;
+    document.getElementById('lb-pos-source').value = 'raymarine';
+    const lblEl = document.getElementById('lb-auto-label');
+    if (lblEl) lblEl.innerHTML = '⚓ From Raymarine <span id="lb-gps-status"></span>';
+    statusEl.innerHTML = '<span style="font-weight:600;color:#22C55E">✓ Raymarine connected</span>';
+    _lbGpsPos = { lat, lon };
+    lbUpdateCalcDist(lat, lon);
+  } else {
+    statusEl.innerHTML = '<span style="color:#F59E0B">⚠ Not reachable — enter position manually or use GPS</span>';
+    document.getElementById('lb-pos-source').value = 'gps';
+    lbFetchGPS();
+  }
+}
+
+async function lbTestRaymarine() {
+  const ipEl = document.getElementById('st-ray-ip');
+  const ip = (ipEl?.value || '').trim() || data.settings?.raymarineIP || '192.168.0.1';
+  const resultEl = document.getElementById('st-ray-test-result'); if (!resultEl) return;
+  resultEl.textContent = 'Testing…'; resultEl.style.color = 'var(--label3)';
+  const d = await lbFetch(`http://${ip}/signalk/v1/api/vessels/self/navigation/position`);
+  if (d?.value?.latitude != null) {
+    resultEl.textContent = '✓ Connected'; resultEl.style.color = '#22C55E';
+  } else {
+    resultEl.textContent = '✗ Not reachable'; resultEl.style.color = '#EF4444';
+  }
+}
+
+function saveLbSetting(key, elId) {
+  if (!data.settings) data.settings = {};
+  data.settings[key] = document.getElementById(elId)?.value || '';
+  save(); showToast('Saved');
+}
+
+// ── Export ──
+
+function exportPassage(pid) {
+  const p = findPassage(pid); if (!p) return;
+  const entries = [...(p.entries || [])].sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
+  const e2 = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const totalNm = entries.reduce((s, e) => s + (parseFloat(e.distanceRun) || 0), 0).toFixed(1);
+  const rows = entries.map(e => {
+    const ts = e.timestamp ? new Date(e.timestamp) : null;
+    const tStr = ts ? ts.toUTCString().replace(/ GMT$/, '') : '—';
+    const posStr = (e.position?.lat != null && e.position?.lon != null)
+      ? fmtLat(e.position.lat) + ' ' + fmtLon(e.position.lon) : '—';
+    return `<tr>
+      <td>${e2(tStr)}</td>
+      <td>${e2(posStr)}</td>
+      <td>${e.cog != null ? e.cog + '°' : '—'}</td>
+      <td>${e.sog != null ? e.sog + 'kn' : '—'}</td>
+      <td>${e.windDir != null ? e.windDir + '°' : '—'}${e.windForce != null ? ' F' + e.windForce : ''}</td>
+      <td>${e2(e.seaState || '—')}</td>
+      <td>${e.barometer != null ? e.barometer + 'hPa' : '—'}</td>
+      <td>${e2(e.watchLeader || '—')}</td>
+      <td>${e2(e.notes || '')}</td>
+    </tr>`;
+  }).join('');
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>${e2(p.name || 'Passage Log')}</title>
+<style>
+body{font-family:Georgia,serif;font-size:11px;margin:20px}
+h1{font-size:16px;margin-bottom:4px}
+.meta{color:#555;margin-bottom:16px;font-size:11px}
+table{width:100%;border-collapse:collapse;font-size:10px}
+th{background:#1a5fa8;color:#fff;padding:5px 6px;text-align:left;white-space:nowrap}
+td{padding:5px 6px;border-bottom:1px solid #ddd;vertical-align:top}
+tr:nth-child(even)td{background:#f5f7fa}
+.no-print{margin-bottom:12px}
+@media print{.no-print{display:none}}
+</style></head><body>
+<h1>📖 ${e2(p.name || 'Passage Log')}</h1>
+<div class="meta">${e2(p.from || '?')} → ${e2(p.to || '?')} &nbsp;·&nbsp; ${e2(p.startDate || '')}${p.endDate ? ' – ' + e2(p.endDate) : ''} &nbsp;·&nbsp; Total: ${totalNm} nm &nbsp;·&nbsp; ${entries.length} entries</div>
+<div class="no-print"><button onclick="window.print()" style="padding:6px 14px;font-size:12px;cursor:pointer">🖨 Print / Save PDF</button></div>
+<table><thead><tr>
+  <th>Date/Time (UTC)</th><th>Position</th><th>COG</th><th>SOG</th><th>Wind</th><th>Sea</th><th>Baro</th><th>Watch</th><th>Notes</th>
+</tr></thead><tbody>
+${rows || '<tr><td colspan="9" style="text-align:center;color:#999">No entries</td></tr>'}
+</tbody></table>
+</body></html>`;
+  const w = window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); }
+  else showToast('Allow pop-ups to export', true);
+}
+
+// ── Prefill ──
+
+function prefillPassageLogData() {
+  if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL) return false;
+  if (getPassageLog().passages.some(p => p.name)) return false;
+  const dAgoTs = n => new Date(Date.now() - n * 86400000).toISOString();
+  const dAgoDate = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+  const passage = {
+    id: uid(),
+    name:      'Cape Town to Grenada (Example)',
+    from:      'Cape Town, South Africa',
+    to:        "St. George's, Grenada",
+    startDate: dAgoDate(90),
+    endDate:   dAgoDate(60),
+    entries: [
+      {
+        id: uid(), timestamp: dAgoTs(90),
+        position: { lat: -33.9269, lon: 18.4242 }, positionSource: 'gps',
+        cog: 340, sog: 6.5, windDir: 100, windForce: 4,
+        seaState: 'Slight', barometer: 1016,
+        watchLeader: 'Captain (Example)',
+        notes: 'Departed Cape Town, heading NW (Example)',
+        fuelSoundings: '480L', waterSoundings: '200L', distanceRun: 0
+      },
+      {
+        id: uid(), timestamp: dAgoTs(85),
+        position: { lat: -15.24, lon: 7.31 }, positionSource: 'gps',
+        cog: 295, sog: 7.2, windDir: 50, windForce: 5,
+        seaState: 'Moderate', barometer: 1013,
+        watchLeader: 'First mate (Example)',
+        notes: 'SE trades established, good progress (Example)',
+        fuelSoundings: '455L', waterSoundings: '185L', distanceRun: 1247
+      },
+      {
+        id: uid(), timestamp: dAgoTs(78),
+        position: { lat: 2.51, lon: -12.78 }, positionSource: 'raymarine',
+        cog: 285, sog: 6.8, windDir: 35, windForce: 4,
+        seaState: 'Slight', barometer: 1010,
+        watchLeader: 'Captain (Example)',
+        notes: 'Crossed equator this morning, NE trades beginning (Example)',
+        fuelSoundings: '420L', waterSoundings: '158L', distanceRun: 1089
+      }
+    ]
+  };
+  getPassageLog().passages.push(passage);
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════
+
 function renderLogbook() {
   const log = (data.logbook || []).slice().reverse();
   const totalNm = (data.logbook||[]).reduce((s,e)=>s+(parseFloat(e.distance)||0),0).toFixed(1);
@@ -6803,6 +7329,7 @@ async function createPIN() {
     try { prefillLpgData();           } catch(e) { console.warn('prefillLpg', e); }
     try { prefillProvisionsData();    } catch(e) { console.warn('prefillProvisions', e); }
     try { prefillSafetyData();        } catch(e) { console.warn('prefillSafety', e); }
+    try { prefillPassageLogData();    } catch(e) { console.warn('prefillPassageLog', e); }
     await save();
     trackAnalytics(true);
     pushToCloud();
@@ -6912,6 +7439,7 @@ async function attemptUnlock() {
       try { if (prefillLpgData()) prefillDirty = true; } catch(e) { console.warn('prefillLpg', e); }
       try { if (prefillProvisionsData()) prefillDirty = true; } catch(e) { console.warn('prefillProvisions', e); }
       try { if (prefillSafetyData()) prefillDirty = true; } catch(e) { console.warn('prefillSafety', e); }
+      try { if (prefillPassageLogData()) prefillDirty = true; } catch(e) { console.warn('prefillPassageLog', e); }
       if (prefillDirty) save();
       await pushToCloud();
     }
@@ -7064,6 +7592,7 @@ async function attemptLogin() {
       try { if (prefillLpgData()) prefillDirty = true; } catch(e) { console.warn('prefillLpg', e); }
       try { if (prefillProvisionsData()) prefillDirty = true; } catch(e) { console.warn('prefillProvisions', e); }
       try { if (prefillSafetyData()) prefillDirty = true; } catch(e) { console.warn('prefillSafety', e); }
+      try { if (prefillPassageLogData()) prefillDirty = true; } catch(e) { console.warn('prefillPassageLog', e); }
         if (prefillDirty) save();
         await pushToCloud();
       }
@@ -8196,6 +8725,13 @@ function renderSettings() {
         <span style="color:var(--label3);font-size:15px">›</span>
       </div>
       ${settingsRow('account', 'Account',             acctRight,  acctExpanded)}
+      ${settingsRow('chartplotter', 'Chartplotter integration', '',
+        subRow(`<div style="font-size:11px;color:var(--label3);margin-bottom:6px">Connect the Log Book to your Raymarine Axiom via SignalK to auto-fill GPS position, COG, SOG, and wind data.</div>`) +
+        subRow(`<div class="mi-label" style="margin-top:0">Axiom IP address</div>
+          <input class="mi" id="st-ray-ip" value="${esc(data.settings?.raymarineIP || '192.168.0.1')}" placeholder="192.168.0.1" inputmode="decimal">
+          <button class="btn btn-s btn-sm" style="margin-top:6px" onclick="event.stopPropagation();saveLbSetting('raymarineIP','st-ray-ip')">Save IP</button>`) +
+        subRow(`<div style="display:flex;align-items:center;gap:8px"><button class="btn btn-s btn-sm" onclick="event.stopPropagation();lbTestRaymarine()">Test connection</button><span id="st-ray-test-result" style="font-size:12px"></span></div>`, false)
+      )}
     </div>
     <div style="text-align:center;padding:4px 0 16px">
       <button onclick="showPrivacyPolicy()" style="background:none;border:none;color:var(--label3);font-family:var(--font);font-size:13px;cursor:pointer;text-decoration:underline">Privacy Policy</button>
