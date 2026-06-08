@@ -6082,52 +6082,79 @@ function getCoastalLog() {
   return data.coastalLog;
 }
 
-const COASTAL_EVENTS = ['Departed','Anchored','Waypoint passed','Fuel stop','Port entry','Port exit','Notable event'];
-const COASTAL_ICONS  = {'Departed':'⛵','Anchored':'⚓','Waypoint passed':'📍','Fuel stop':'⛽','Port entry':'🟢','Port exit':'🔴','Notable event':'⭐'};
+const COASTAL_EVENTS = ['Departed','Waypoint passed','Arrived','Port entry','Port exit','Notable event'];
+const COASTAL_ICONS  = {'Departed':'⛵','Waypoint passed':'📍','Arrived':'⚓','Port entry':'🟢','Port exit':'🔴','Notable event':'⭐'};
+const COASTAL_COLORS = {'Departed':'#378ADD','Waypoint passed':'#BA7517','Arrived':'#639922','Port entry':'#BA7517','Port exit':'#BA7517','Notable event':'#BA7517'};
 
 function renderCoastalLog() {
-  const entries = [...getCoastalLog()].sort((a, b) => a.timestamp < b.timestamp ? 1 : -1);
+  const all = [...getCoastalLog()].sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
   const newBtn = `<div style="padding:4px 12px 4px">
     <button onclick="showNewCoastalEntry()" style="width:100%;background:var(--blue);color:#fff;border:none;border-radius:12px;padding:12px;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">+ Log event</button>
   </div>`;
-  if (!entries.length) return `<div style="padding-bottom:80px">${newBtn}
+  if (!all.length) return `<div style="padding-bottom:80px">${newBtn}
     <div style="text-align:center;padding:40px 20px;color:var(--label3);font-size:14px">No events logged yet.<br>Tap "+ Log event" to start.</div>
   </div>`;
-  const byDate = {};
-  entries.forEach(e => {
-    const d = e.timestamp
-      ? new Date(e.timestamp).toLocaleDateString('en-GB', {weekday:'short', day:'2-digit', month:'short', year:'numeric'})
-      : 'Unknown date';
-    if (!byDate[d]) byDate[d] = [];
-    byDate[d].push(e);
+
+  // Group by passageName, preserve chronological order within group
+  const groupMap = {};
+  const groupOrder = [];
+  all.forEach(e => {
+    const key = e.passageName || '';
+    if (!groupMap[key]) { groupMap[key] = []; groupOrder.push(key); }
+    groupMap[key].push(e);
   });
-  const sections = Object.entries(byDate).map(([date, dayEntries]) =>
-    `<div style="margin:6px 12px 4px;font-size:11px;font-weight:700;color:var(--label3);text-transform:uppercase;letter-spacing:.4px">${date}</div>` +
-    dayEntries.map(e => renderCoastalEntryRow(e)).join('')
-  ).join('');
+
+  // Render newest-first: reverse the group order
+  const sections = [...groupOrder].reverse().map(key => {
+    const entries = groupMap[key]; // chronological
+    const departE  = entries.find(e => e.eventType === 'Departed');
+    const arrivedE = [...entries].reverse().find(e => e.eventType === 'Arrived');
+    let totalNm = 0;
+    for (let i = 1; i < entries.length; i++) {
+      const a = entries[i-1], b = entries[i];
+      if (a.position?.lat != null && b.position?.lat != null)
+        totalNm += haversineNm(a.position.lat, a.position.lon, b.position.lat, b.position.lon);
+    }
+    let durationStr = '';
+    if (departE?.timestamp && arrivedE?.timestamp) {
+      const ms = new Date(arrivedE.timestamp) - new Date(departE.timestamp);
+      const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+      durationStr = `${h}h ${m}m`;
+    }
+    const dateStr = entries[0]?.timestamp
+      ? new Date(entries[0].timestamp).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) : '';
+    const nmStr = totalNm > 0.1 ? totalNm.toFixed(1) + ' nm' : '';
+    const meta = [dateStr, nmStr, durationStr].filter(Boolean).join(' · ');
+    const isNamed = key !== '';
+    const header = isNamed
+      ? `<div style="margin:10px 12px 4px;padding:8px 12px;background:var(--surface2);border-radius:10px;border:1px solid var(--sep)">
+          <div style="font-size:13px;font-weight:700;color:var(--label)">${esc(key)}</div>
+          ${meta ? `<div style="font-size:11px;color:var(--label3);margin-top:2px">${meta}</div>` : ''}
+        </div>`
+      : `<div style="margin:10px 12px 4px;font-size:11px;font-weight:600;color:var(--label3)">Unlabelled</div>`;
+    // Show newest entries first within the group
+    return header + [...entries].reverse().map(e => renderCoastalEntryRow(e)).join('');
+  }).join('');
+
   return `<div style="padding-bottom:80px">${newBtn}${sections}</div>`;
 }
 
 function renderCoastalEntryRow(e) {
   const ts = e.timestamp ? new Date(e.timestamp) : null;
   const timeStr = ts ? ts.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '—';
-  const icon = COASTAL_ICONS[e.eventType] || '•';
+  const color = COASTAL_COLORS[e.eventType] || '#9ca3af';
   const posStr = (e.position?.lat != null && e.position?.lon != null)
     ? fmtLat(e.position.lat) + ' ' + fmtLon(e.position.lon) : '';
-  const srcBadge = e.positionSource === 'gps'
-    ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(34,197,94,.15);color:#15803d;font-weight:700">GPS</span>`
-    : e.positionSource === 'manual'
-    ? `<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--label3);font-weight:600">Manual</span>` : '';
-  return `<div style="margin:0 12px 6px;background:var(--surface);border:1.5px solid var(--sep);border-radius:12px;padding:10px 12px;display:flex;align-items:flex-start;gap:10px">
-    <div style="font-size:20px;margin-top:1px;flex-shrink:0">${icon}</div>
+  const sogStr = e.sog != null ? ` · ${e.sog} kn` : '';
+  return `<div style="margin:0 12px 5px;background:var(--surface);border:1.5px solid var(--sep);border-radius:12px;padding:8px 12px;display:flex;align-items:flex-start;gap:10px">
+    <div style="margin-top:4px;flex-shrink:0;width:9px;height:9px;border-radius:50%;background:${color}"></div>
     <div style="flex:1;min-width:0">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        <span style="font-size:13px;font-weight:700;color:var(--label)">${esc(e.eventType || '—')}</span>
-        <span style="font-size:11px;color:var(--label3)">${timeStr}</span>
-        ${srcBadge}
+        <span style="font-size:12px;font-weight:700;color:${color}">${esc(e.eventType || '—')}</span>
+        <span style="font-size:11px;color:var(--label3)">${timeStr}${sogStr}</span>
       </div>
-      ${posStr ? `<div style="font-size:11px;color:var(--label3);margin-top:2px">${esc(posStr)}</div>` : ''}
-      ${e.notes ? `<div style="font-size:12px;color:var(--label2);margin-top:3px">${esc(e.notes)}</div>` : ''}
+      ${posStr ? `<div style="font-size:10px;color:var(--label3);margin-top:1px">${esc(posStr)}</div>` : ''}
+      ${e.notes ? `<div style="font-size:12px;color:var(--label2);margin-top:2px">${esc(e.notes)}</div>` : ''}
     </div>
     <button onclick="showEditCoastalEntry('${e.id}')" style="background:none;border:1.5px solid var(--sep);border-radius:8px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--label3);flex-shrink:0;margin-top:1px">✏</button>
   </div>`;
@@ -6139,7 +6166,14 @@ function _coastalEntryForm(e) {
     `<option value="${t}"${e?.eventType===t?' selected':''}>${COASTAL_ICONS[t]} ${t}</option>`).join('');
   const lat = e?.position?.lat != null ? String(e.position.lat.toFixed(5)) : '';
   const lon = e?.position?.lon != null ? String(e.position.lon.toFixed(5)) : '';
-  return `<div class="mi-label">Time</div>
+  // Auto-suggest passage name from last entry (unless last event was Arrived)
+  const log = getCoastalLog();
+  const lastE = log.length ? log[log.length - 1] : null;
+  const autoName = !e && lastE && lastE.eventType !== 'Arrived' ? (lastE.passageName || '') : '';
+  const passageVal = e?.passageName ?? autoName;
+  return `<div class="mi-label">Passage name</div>
+    <input class="mi" id="lbc-passage" value="${esc(passageVal)}" placeholder="e.g. Paros → Naxos">
+    <div class="mi-label">Time</div>
     <input class="mi" id="lbc-ts" type="datetime-local" value="${tsVal}">
     <div class="mi-label">Event type</div>
     <select class="mi" id="lbc-evt"><option value="">— select —</option>${evtOpts}</select>
@@ -6151,6 +6185,8 @@ function _coastalEntryForm(e) {
       </div>
       <input type="hidden" id="lbc-pos-source" value="${esc(e?.positionSource || 'gps')}">
     </div>
+    <div class="mi-label">SOG kn</div>
+    <input class="mi" id="lbc-sog" value="${e?.sog != null ? e.sog : ''}" placeholder="e.g. 5.7" type="number" step="0.1" min="0">
     <div class="mi-label">Notes</div>
     <textarea class="mi" id="lbc-notes" rows="2" placeholder="Optional">${esc(e?.notes || '')}</textarea>`;
 }
@@ -6159,11 +6195,14 @@ function lbcReadForm() {
   const latV = document.getElementById('lbc-lat')?.value;
   const lonV = document.getElementById('lbc-lon')?.value;
   const lat = parseFloat(latV), lon = parseFloat(lonV);
+  const sogV = document.getElementById('lbc-sog')?.value;
   return {
+    passageName:    document.getElementById('lbc-passage')?.value.trim() || '',
     timestamp:      new Date(document.getElementById('lbc-ts')?.value || '').toISOString(),
     eventType:      document.getElementById('lbc-evt')?.value || '',
     position:       (!isNaN(lat) && !isNaN(lon)) ? { lat, lon } : null,
     positionSource: document.getElementById('lbc-pos-source')?.value || 'manual',
+    sog:            sogV !== '' && sogV != null ? parseFloat(sogV) : null,
     notes:          document.getElementById('lbc-notes')?.value.trim() || '',
   };
 }
@@ -6202,9 +6241,14 @@ function showEditCoastalEntry(eid) {
 function saveCoastalEntry() {
   const evt = document.getElementById('lbc-evt')?.value;
   if (!evt) { showToast('Select an event type', true); return; }
-  getCoastalLog().push({ id: uid(), ...lbcReadForm() });
+  const entry = { id: uid(), ...lbcReadForm() };
+  getCoastalLog().push(entry);
   save(); hideModal();
-  document.getElementById('mainContent').innerHTML = renderPassageLog();
+  if (entry.eventType === 'Arrived' && entry.passageName) {
+    setTimeout(() => showCoastalPassageSummary(entry), 60);
+  } else {
+    document.getElementById('mainContent').innerHTML = renderPassageLog();
+  }
 }
 function saveEditCoastalEntry(eid) {
   const log = getCoastalLog(), idx = log.findIndex(x => x.id === eid); if (idx < 0) return;
@@ -6216,6 +6260,64 @@ function deleteCoastalEntry(eid) {
   data.coastalLog = getCoastalLog().filter(x => x.id !== eid);
   save(); hideModal();
   document.getElementById('mainContent').innerHTML = renderPassageLog();
+}
+
+function showCoastalPassageSummary(arrivedEntry) {
+  const passageEntries = getCoastalLog()
+    .filter(e => e.passageName === arrivedEntry.passageName)
+    .sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
+  let totalNm = 0;
+  for (let i = 1; i < passageEntries.length; i++) {
+    const a = passageEntries[i-1], b = passageEntries[i];
+    if (a.position?.lat != null && b.position?.lat != null)
+      totalNm += haversineNm(a.position.lat, a.position.lon, b.position.lat, b.position.lon);
+  }
+  const departE = passageEntries.find(e => e.eventType === 'Departed');
+  let durationStr = '—', avgSogStr = '—', departTimeStr = '—';
+  if (departE?.timestamp && arrivedEntry.timestamp) {
+    const ms = new Date(arrivedEntry.timestamp) - new Date(departE.timestamp);
+    const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+    durationStr = `${h}h ${m}m`;
+    if (totalNm > 0 && ms > 0) avgSogStr = (totalNm / (ms / 3600000)).toFixed(1) + ' kn';
+    departTimeStr = new Date(departE.timestamp).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+  }
+  const dateStr = (departE || passageEntries[0])?.timestamp
+    ? new Date((departE || passageEntries[0]).timestamp).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) : '';
+  const timeline = passageEntries.map(e => {
+    const ts = e.timestamp ? new Date(e.timestamp) : null;
+    const tStr = ts ? ts.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '—';
+    const color = COASTAL_COLORS[e.eventType] || '#9ca3af';
+    const icon = COASTAL_ICONS[e.eventType] || '•';
+    return `<div style="display:flex;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid var(--sep)">
+      <span style="font-size:11px;color:var(--label3);flex-shrink:0;width:34px">${tStr}</span>
+      <span style="font-size:13px;flex-shrink:0">${icon}</span>
+      <span style="font-size:12px;font-weight:600;color:${color};flex-shrink:0">${esc(e.eventType)}</span>
+      ${e.notes ? `<span style="font-size:11px;color:var(--label3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.notes)}</span>` : ''}
+    </div>`;
+  }).join('');
+  showModal('Passage complete', `
+    <div style="text-align:center;padding:4px 0 12px">
+      <div style="font-size:17px;font-weight:800;color:var(--label)">${esc(arrivedEntry.passageName)}</div>
+      ${dateStr ? `<div style="font-size:12px;color:var(--label3);margin-top:2px">${dateStr}</div>` : ''}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:12px;border:1px solid var(--sep)">
+      ${[
+        [totalNm > 0.1 ? totalNm.toFixed(1) : '—', 'nm sailed'],
+        [durationStr, 'duration'],
+        [avgSogStr, 'avg SOG'],
+      ].map(([v, l], i) => `<div style="padding:10px 4px;text-align:center${i < 2 ? ';border-right:1px solid var(--sep)' : ''}">
+        <div style="font-size:15px;font-weight:700;color:var(--label)">${esc(v)}</div>
+        <div style="font-size:9px;color:var(--label3)">${l}</div>
+      </div>`).join('')}
+    </div>
+    <div style="font-size:11px;color:var(--label3);margin-bottom:8px">Departed: <strong style="color:var(--label)">${departTimeStr}</strong></div>
+    <div style="background:var(--surface2);border-radius:10px;padding:6px 10px;margin-bottom:12px">
+      ${timeline || '<div style="padding:6px 0;font-size:12px;color:var(--label3)">No timeline entries</div>'}
+    </div>
+    ${arrivedEntry.notes ? `<div style="background:rgba(99,153,34,.08);border-left:3px solid #639922;border-radius:0 8px 8px 0;padding:8px 12px;font-size:13px;font-style:italic;color:var(--label2);margin-bottom:12px">"${esc(arrivedEntry.notes)}"</div>` : ''}
+    <div class="modal-btns">
+      <button class="btn btn-p" onclick="hideModal();document.getElementById('mainContent').innerHTML=renderPassageLog()">Done</button>
+    </div>`);
 }
 
 // ── Prefill ──
@@ -6267,13 +6369,17 @@ function prefillPassageLogData() {
     dirty = true;
   }
   if (!getCoastalLog().some(e => e.eventType)) {
-    const dAgoTs = n => new Date(Date.now() - n * 86400000).toISOString();
+    const ts = (daysAgo, hoursOffset = 0) =>
+      new Date(Date.now() - daysAgo * 86400000 + hoursOffset * 3600000).toISOString();
     const samples = [
-      { eventType:'Departed',       timestamp: dAgoTs(3),   position:{lat:37.1232,lon:-8.6130}, positionSource:'gps',    notes:'Left Portimão marina, heading east (Example)' },
-      { eventType:'Waypoint passed',timestamp: dAgoTs(3)-3600000, position:{lat:37.0852,lon:-8.4070}, positionSource:'gps', notes:'Passed Cabo de Santa Maria (Example)' },
-      { eventType:'Anchored',       timestamp: dAgoTs(2),   position:{lat:37.0180,lon:-7.9760}, positionSource:'gps',    notes:'Anchored at Isla Canela, calm overnight (Example)' },
-      { eventType:'Port entry',     timestamp: dAgoTs(1),   position:{lat:36.9950,lon:-7.7060}, positionSource:'gps',    notes:'Arrived Ayamonte marina (Example)' },
-      { eventType:'Fuel stop',      timestamp: dAgoTs(1)+7200000, position:{lat:36.9940,lon:-7.7050}, positionSource:'gps', notes:'Took on 80L diesel (Example)' },
+      // Passage 1: Portimão → Ayamonte (completed, 3 days ago)
+      { passageName:'Portimão → Ayamonte (Example)', eventType:'Departed',       timestamp:ts(3,0),   position:{lat:37.1232,lon:-8.6130}, positionSource:'gps', sog:0,   notes:'Left Portimão marina, heading east (Example)' },
+      { passageName:'Portimão → Ayamonte (Example)', eventType:'Waypoint passed',timestamp:ts(3,4),   position:{lat:37.0852,lon:-8.4070}, positionSource:'gps', sog:5.2, notes:'Passed Cabo de Santa Maria (Example)' },
+      { passageName:'Portimão → Ayamonte (Example)', eventType:'Arrived',        timestamp:ts(3,7),   position:{lat:37.1810,lon:-7.4040}, positionSource:'gps', sog:4.8, notes:'Anchored off Isla Canela (Example)' },
+      // Passage 2: Ayamonte → Huelva (completed, 1 day ago)
+      { passageName:'Ayamonte → Huelva (Example)',   eventType:'Departed',       timestamp:ts(1,8),   position:{lat:37.1810,lon:-7.4040}, positionSource:'gps', sog:0,   notes:'Departed anchorage, tide-assisted exit (Example)' },
+      { passageName:'Ayamonte → Huelva (Example)',   eventType:'Port entry',     timestamp:ts(1,13),  position:{lat:37.2580,lon:-6.9500}, positionSource:'gps', sog:4.5, notes:'Entered Huelva marina (Example)' },
+      { passageName:'Ayamonte → Huelva (Example)',   eventType:'Arrived',        timestamp:ts(1,13.5),position:{lat:37.2580,lon:-6.9500}, positionSource:'gps', sog:0,   notes:'Berthed at Huelva, good crossing (Example)' },
     ];
     samples.forEach(s => getCoastalLog().push({ id: uid(), ...s }));
     dirty = true;
