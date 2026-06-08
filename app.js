@@ -5674,6 +5674,46 @@ function fmtLon(v) {
   return `${d}°${((a - d) * 60).toFixed(2)}'${v >= 0 ? 'E' : 'W'}`;
 }
 
+// ── Offshore stats helpers ──
+
+function lbCalcNmGps(entries) {
+  const gps = [...entries].filter(e => e.position?.lat != null && e.timestamp)
+    .sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
+  let nm = 0;
+  for (let i = 1; i < gps.length; i++)
+    nm += haversineNm(gps[i-1].position.lat, gps[i-1].position.lon,
+                      gps[i].position.lat,   gps[i].position.lon);
+  return nm;
+}
+
+function lbCalc24hWindows(entries) {
+  const gps = [...entries].filter(e => e.position?.lat != null && e.timestamp)
+    .sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
+  if (gps.length < 2) return [];
+  const windows = [];
+  for (let i = 0; i < gps.length - 1; i++) {
+    const t0 = new Date(gps[i].timestamp).getTime();
+    let nm = 0, j = i + 1;
+    while (j < gps.length) {
+      if (new Date(gps[j].timestamp).getTime() - t0 > 86400000) break;
+      nm += haversineNm(gps[j-1].position.lat, gps[j-1].position.lon,
+                        gps[j].position.lat,   gps[j].position.lon);
+      j++;
+    }
+    if (nm > 0) windows.push(nm);
+  }
+  return windows;
+}
+
+function parseDestCoords(str) {
+  if (!str) return null;
+  const m = str.match(/(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)/);
+  if (!m) return null;
+  const lat = parseFloat(m[1]), lon = parseFloat(m[2]);
+  if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+  return { lat, lon };
+}
+
 // ── Render ──
 
 function renderPassageLog() {
@@ -5690,33 +5730,58 @@ function renderPassageLog() {
 
 function renderOffshoreLog() {
   const pl = getPassageLog();
-  const passages = [...pl.passages].reverse();
+  const active    = [...pl.passages].filter(p => !p.completed).reverse();
+  const completed = [...pl.passages].filter(p =>  p.completed).reverse();
   const newBtn = `<div style="padding:4px 12px 4px">
     <button onclick="showNewPassage()" style="width:100%;background:var(--blue);color:#fff;border:none;border-radius:12px;padding:12px;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">+ New passage</button>
   </div>`;
-  if (!passages.length) return `<div style="padding-bottom:80px">${newBtn}
+  if (!active.length && !completed.length) return `<div style="padding-bottom:80px">${newBtn}
     <div style="text-align:center;padding:40px 20px;color:var(--label3);font-size:14px">No passages yet.<br>Tap "+ New passage" to begin logging.</div>
   </div>`;
-  return `<div style="padding-bottom:80px">${newBtn}${passages.map(p => renderPassage(p)).join('')}</div>`;
+  const completedSection = completed.length ? `
+    <div style="margin:8px 12px 4px;font-size:11px;font-weight:700;color:var(--label3);text-transform:uppercase;letter-spacing:.4px">Completed passages</div>
+    ${completed.map(p => renderPassage(p)).join('')}` : '';
+  return `<div style="padding-bottom:80px">${newBtn}${active.map(p => renderPassage(p)).join('')}${completedSection}</div>`;
 }
 
 function renderPassage(p) {
   if (!ui.logbookOpen) ui.logbookOpen = {};
   const open = !!ui.logbookOpen[p.id];
   const entries = [...(p.entries || [])].sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
-  const totalNm = entries.reduce((s, e) => s + (parseFloat(e.distanceRun) || 0), 0);
+  const totalNm = lbCalcNmGps(entries);
   const sogVals = entries.filter(e => e.sog != null).map(e => parseFloat(e.sog));
   const avgSog = sogVals.length ? (sogVals.reduce((a, b) => a + b, 0) / sogVals.length).toFixed(1) : '—';
   let duration = '—';
-  if (p.startDate && p.endDate) {
-    const d = Math.round((new Date(p.endDate) - new Date(p.startDate)) / 86400000);
+  if (p.startDate && (p.endDate || p.completed)) {
+    const end = p.completedAt ? new Date(p.completedAt) : (p.endDate ? new Date(p.endDate) : new Date());
+    const d = Math.round((end - new Date(p.startDate + 'T00:00:00')) / 86400000);
     duration = d === 0 ? '<1d' : `${d}d`;
+  } else if (p.startDate && !p.completed) {
+    const d = Math.round((Date.now() - new Date(p.startDate + 'T00:00:00')) / 86400000);
+    duration = d === 0 ? 'Day 1' : `${d}d`;
   }
   const toggle = `ui.logbookOpen=ui.logbookOpen||{};ui.logbookOpen['${p.id}']=!${open};document.getElementById('mainContent').innerHTML=renderPassageLog()`;
+  const completedBadge = p.completed
+    ? `<span style="font-size:10px;font-weight:700;color:#639922;background:rgba(99,153,34,.12);border-radius:8px;padding:1px 6px;flex-shrink:0">✓ Done</span>`
+    : '';
+  const actionBar = p.completed
+    ? `<div style="padding:8px 12px;border-bottom:1px solid var(--sep);display:flex;align-items:center;gap:6px">
+        <button onclick="event.stopPropagation();exportPassage('${p.id}')" style="background:var(--surface2);color:var(--label);border:1.5px solid var(--sep);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer">🖨 Export</button>
+        <button onclick="event.stopPropagation();showDeletePassage('${p.id}')" style="background:none;color:var(--red);border:1.5px solid var(--sep);border-radius:8px;padding:5px 10px;font-size:11px;font-family:var(--font);cursor:pointer">✕ Delete</button>
+      </div>`
+    : `<div style="padding:8px 12px;border-bottom:1px solid var(--sep);display:flex;align-items:center;gap:6px">
+        <button onclick="event.stopPropagation();exportPassage('${p.id}')" style="background:var(--surface2);color:var(--label);border:1.5px solid var(--sep);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer">🖨 Export</button>
+        <button onclick="event.stopPropagation();showDeletePassage('${p.id}')" style="background:none;color:var(--red);border:1.5px solid var(--sep);border-radius:8px;padding:5px 8px;font-size:11px;font-family:var(--font);cursor:pointer">✕</button>
+        <button onclick="event.stopPropagation();showCompletePassage('${p.id}')" style="background:rgba(99,153,34,.1);color:#639922;border:1.5px solid rgba(99,153,34,.3);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer">✓ Complete</button>
+        <button onclick="event.stopPropagation();showNewEntry('${p.id}')" style="margin-left:auto;background:var(--blue);color:#fff;border:none;border-radius:8px;padding:5px 14px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">+ New entry</button>
+      </div>`;
+  const liveRecap = (!p.completed && open && entries.length) ? renderLiveRecap(p) : '';
   return `<div style="margin:0 12px 12px;background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;overflow:hidden">
     <div onclick="${toggle}" style="padding:12px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;-webkit-user-select:none">
       <div style="min-width:0;flex:1">
-        <div style="font-size:14px;font-weight:700;color:var(--label);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name || 'Unnamed passage')}</div>
+        <div style="font-size:14px;font-weight:700;color:var(--label);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:6px">
+          <span style="overflow:hidden;text-overflow:ellipsis;min-width:0">${esc(p.name || 'Unnamed passage')}</span>${completedBadge}
+        </div>
         <div style="font-size:11px;color:var(--label3);margin-top:2px">${esc(p.from || '?')} → ${esc(p.to || '?')} · ${esc(p.startDate || '?')}</div>
       </div>
       <span style="color:var(--label3);font-size:15px;margin-left:8px;flex-shrink:0">${open ? '▲' : '▼'}</span>
@@ -5733,11 +5798,8 @@ function renderPassage(p) {
         <div style="font-size:9px;color:var(--label3)">${l}</div>
       </div>`).join('')}
     </div>
-    <div style="padding:8px 12px;border-bottom:1px solid var(--sep);display:flex;justify-content:flex-start;align-items:center;gap:6px">
-      <button onclick="event.stopPropagation();exportPassage('${p.id}')" style="background:var(--surface2);color:var(--label);border:1.5px solid var(--sep);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;font-family:var(--font);cursor:pointer">🖨 Export</button>
-      <button onclick="event.stopPropagation();showDeletePassage('${p.id}')" style="background:none;color:var(--red);border:1.5px solid var(--sep);border-radius:8px;padding:5px 10px;font-size:11px;font-family:var(--font);cursor:pointer">✕ Delete</button>
-      <button onclick="event.stopPropagation();showNewEntry('${p.id}')" style="margin-left:auto;background:var(--blue);color:#fff;border:none;border-radius:8px;padding:5px 14px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">+ New entry</button>
-    </div>
+    ${actionBar}
+    ${liveRecap}
     ${[...entries].reverse().map(e => renderPassageEntryRow(e, p.id)).join('') ||
       '<div style="padding:14px;text-align:center;font-size:12px;color:var(--label3)">No entries yet — tap "+ New entry" to start</div>'}
     ` : ''}
@@ -5777,6 +5839,7 @@ function showNewPassage() {
     <div class="mi-label">Passage name</div><input class="mi" id="lbp-name" placeholder="e.g. Lisbon to Madeira">
     <div class="mi-label">From</div><input class="mi" id="lbp-from" placeholder="Departure port">
     <div class="mi-label">To</div><input class="mi" id="lbp-to" placeholder="Destination port">
+    <div class="mi-label">Destination coords (optional)</div><input class="mi" id="lbp-dest" placeholder="e.g. 32.63, -16.90 — for live progress">
     <div class="mi-label">Start date</div><input class="mi" id="lbp-start" type="date" value="${today}">
     <div class="mi-label">End date (optional)</div><input class="mi" id="lbp-end" type="date">
     <div class="modal-btns">
@@ -5790,10 +5853,11 @@ function saveNewPassage() {
   const pl = getPassageLog();
   const p = {
     id: uid(), name,
-    from:      document.getElementById('lbp-from')?.value.trim() || '',
-    to:        document.getElementById('lbp-to')?.value.trim()   || '',
-    startDate: document.getElementById('lbp-start')?.value       || '',
-    endDate:   document.getElementById('lbp-end')?.value         || '',
+    from:        document.getElementById('lbp-from')?.value.trim()  || '',
+    to:          document.getElementById('lbp-to')?.value.trim()    || '',
+    destination: document.getElementById('lbp-dest')?.value.trim()  || '',
+    startDate:   document.getElementById('lbp-start')?.value        || '',
+    endDate:     document.getElementById('lbp-end')?.value          || '',
     entries: []
   };
   pl.passages.push(p);
@@ -5814,6 +5878,154 @@ function deletePassage(pid) {
   pl.passages = pl.passages.filter(p => p.id !== pid);
   save(); hideModal();
   document.getElementById('mainContent').innerHTML = renderPassageLog();
+}
+
+function renderLiveRecap(p) {
+  const entries = [...(p.entries || [])].filter(e => e.position?.lat != null && e.timestamp)
+    .sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
+  // Day of passage
+  const dayNum = p.startDate
+    ? Math.max(1, Math.ceil((Date.now() - new Date(p.startDate + 'T00:00:00').getTime()) / 86400000))
+    : null;
+  // nm done from GPS track
+  let nmDone = 0;
+  for (let i = 1; i < entries.length; i++)
+    nmDone += haversineNm(entries[i-1].position.lat, entries[i-1].position.lon,
+                          entries[i].position.lat,   entries[i].position.lon);
+  // nm to destination
+  let nmToDest = null;
+  const destCoords = parseDestCoords(p.destination);
+  if (destCoords && entries.length) {
+    const last = entries[entries.length - 1];
+    nmToDest = haversineNm(last.position.lat, last.position.lon, destCoords.lat, destCoords.lon);
+  }
+  // Progress bar (nm done / straight-line total)
+  let progressFrac = null;
+  if (destCoords && entries.length && nmDone > 0) {
+    const first = entries[0];
+    const directDist = haversineNm(first.position.lat, first.position.lon, destCoords.lat, destCoords.lon);
+    progressFrac = Math.min(1, nmDone / Math.max(1, nmDone + directDist));
+  }
+  // 24h windows
+  const windows = lbCalc24hWindows(entries);
+  const best24h = windows.length ? Math.max(...windows).toFixed(1) + ' nm' : '—';
+  // Avg SOG last 24h
+  const now = Date.now();
+  const last24 = entries.filter(e => now - new Date(e.timestamp).getTime() <= 86400000);
+  let last24Nm = 0;
+  for (let i = 1; i < last24.length; i++)
+    last24Nm += haversineNm(last24[i-1].position.lat, last24[i-1].position.lon,
+                            last24[i].position.lat,   last24[i].position.lon);
+  const avgSog24 = last24.length >= 2 ? (last24Nm / 24).toFixed(1) + ' kn' : '—';
+  const progressBar = progressFrac != null
+    ? `<div style="background:var(--sep);border-radius:4px;height:6px;margin:6px 0 10px;overflow:hidden">
+        <div style="height:100%;width:${(progressFrac*100).toFixed(1)}%;background:#639922;border-radius:4px"></div>
+      </div>` : '';
+  const stats = [
+    [nmDone > 0 ? nmDone.toFixed(1) + ' nm' : '—', 'nm travelled'],
+    [nmToDest != null ? nmToDest.toFixed(1) + ' nm' : '—', 'nm to dest'],
+    [best24h, 'best 24h run'],
+    [avgSog24, 'avg SOG 24h'],
+  ];
+  return `<div style="background:rgba(55,138,221,.06);border-bottom:1px solid var(--sep);padding:10px 12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <span style="font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.4px">Live Recap</span>
+      ${dayNum ? `<span style="font-size:10px;font-weight:600;color:var(--label3);background:var(--surface2);border-radius:10px;padding:1px 7px">Day ${dayNum}</span>` : ''}
+    </div>
+    ${progressBar}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      ${stats.map(([v, l]) => `<div style="background:var(--surface);border-radius:8px;padding:7px 10px">
+        <div style="font-size:14px;font-weight:700;color:var(--label)">${esc(v)}</div>
+        <div style="font-size:9px;color:var(--label3);margin-top:1px;text-transform:uppercase;letter-spacing:.2px">${l}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function showCompletePassage(pid) {
+  showModal('Complete passage', `
+    <div style="padding:8px 0 12px;font-size:14px;color:var(--label)">Mark this passage as complete and see final stats?</div>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" style="background:#639922;border-color:#639922" onclick="completePassage('${pid}')">Complete</button>
+    </div>`);
+}
+
+function completePassage(pid) {
+  const pl = getPassageLog();
+  const p = pl.passages.find(x => x.id === pid);
+  if (!p) return;
+  p.completed = true;
+  p.completedAt = new Date().toISOString();
+  if (!p.endDate) p.endDate = new Date().toISOString().slice(0, 10);
+  save(); hideModal();
+  setTimeout(() => showPassageFinalStats(p), 60);
+}
+
+function showPassageFinalStats(p) {
+  const entries = [...(p.entries || [])].filter(e => e.timestamp)
+    .sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
+  const gpsE = entries.filter(e => e.position?.lat != null);
+  const totalNm = lbCalcNmGps(entries);
+  // Total time
+  let totalTimeStr = '—', avgSpeedStr = '—';
+  if (entries.length >= 2) {
+    const ms = new Date(entries[entries.length-1].timestamp).getTime() - new Date(entries[0].timestamp).getTime();
+    const days = Math.floor(ms / 86400000);
+    const hrs  = Math.floor((ms % 86400000) / 3600000);
+    const mins = Math.floor((ms % 3600000) / 60000);
+    totalTimeStr = days > 0 ? `${days}d ${hrs}h ${mins}m` : `${hrs}h ${mins}m`;
+    if (totalNm > 0 && ms > 0) avgSpeedStr = (totalNm / (ms / 3600000)).toFixed(1) + ' kn';
+  }
+  // 24h records
+  const windows = lbCalc24hWindows(gpsE);
+  const best24h    = windows.length ? Math.max(...windows).toFixed(1) + ' nm' : '—';
+  const slowest24h = windows.length >= 2 ? Math.min(...windows).toFixed(1) + ' nm' : '—';
+  // Max SOG
+  const sogVals  = entries.filter(e => e.sog != null).map(e => parseFloat(e.sog));
+  const maxSog   = sogVals.length ? Math.max(...sogVals).toFixed(1) + ' kn' : '—';
+  // Avg wind
+  const windVals = entries.filter(e => e.windSpeed != null).map(e => parseFloat(e.windSpeed));
+  const avgWind  = windVals.length ? (windVals.reduce((a, b) => a + b, 0) / windVals.length).toFixed(1) + ' kn' : '—';
+  // Timestamps
+  const fmtUtc = ts => {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric', timeZone:'UTC' }) +
+           ' ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', timeZone:'UTC' }) + ' UTC';
+  };
+  showModal('Passage complete', `
+    <div style="text-align:center;padding:8px 0 16px">
+      <div style="font-size:48px;font-weight:800;color:#639922;line-height:1">${totalNm.toFixed(1)}</div>
+      <div style="font-size:13px;color:var(--label3);margin-top:2px">nautical miles sailed</div>
+      <div style="font-size:14px;font-weight:600;color:var(--label);margin-top:6px">${esc(p.name || '')}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      ${[['Total time', totalTimeStr], ['Avg speed', avgSpeedStr]].map(([l, v]) => `
+        <div style="background:var(--surface2);border-radius:10px;padding:10px 12px;text-align:center">
+          <div style="font-size:17px;font-weight:700;color:var(--label)">${esc(v)}</div>
+          <div style="font-size:10px;color:var(--label3)">${l}</div>
+        </div>`).join('')}
+    </div>
+    <div style="background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:var(--label2);padding:8px 12px 4px;text-transform:uppercase;letter-spacing:.3px">Records</div>
+      ${[
+        ['Fastest 24h run', best24h, '#639922'],
+        ['Slowest 24h run', slowest24h, null],
+        ['Max SOG', maxSog, null],
+        ['Avg wind', avgWind, null],
+        ['Total entries', String(entries.length), null],
+        ['Departed (UTC)', fmtUtc(entries[0]?.timestamp), null],
+        ['Arrived (UTC)', fmtUtc(p.completedAt || entries[entries.length-1]?.timestamp), null],
+      ].map(([l, v, c]) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-top:1px solid var(--sep)">
+          <span style="font-size:12px;color:var(--label3)">${l}</span>
+          <span style="font-size:12px;font-weight:600;color:${c || 'var(--label)'}">${esc(v)}</span>
+        </div>`).join('')}
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-p" onclick="hideModal();document.getElementById('mainContent').innerHTML=renderPassageLog()">Done</button>
+    </div>`);
 }
 
 // ── Entry form ──
@@ -6326,46 +6538,77 @@ function prefillPassageLogData() {
   if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL) return false;
   let dirty = false;
   if (!getPassageLog().passages.some(p => p.name)) {
-    const dAgoTs = n => new Date(Date.now() - n * 86400000).toISOString();
+    const hAgoTs   = h => new Date(Date.now() - h * 3600000).toISOString();
+    const dAgoTs   = n => new Date(Date.now() - n * 86400000).toISOString();
     const dAgoDate = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
-    const passage = {
+
+    // ── Passage 1: Active in-progress — Cascais → Lanzarote ──
+    // Started 4 days ago, entries every 8 h, last entry a few hours ago
+    const activeEntries = [
+      { h:96, lat:38.693, lon:-9.424,  cog:200, sog:0.0, wd:210, ws:14, sea:'Slight',   baro:1018, wl:'Captain (Example)',    notes:'Departed Cascais marina, NE wind building (Example)',         fuel:'480L', water:'200L' },
+      { h:88, lat:37.891, lon:-9.764,  cog:198, sog:7.1, wd:205, ws:18, sea:'Slight',   baro:1017, wl:'First mate (Example)', notes:'Clear of the bay, sails up (Example)',                        fuel:'478L', water:'198L' },
+      { h:80, lat:37.088, lon:-10.105, cog:196, sog:7.3, wd:200, ws:20, sea:'Moderate', baro:1015, wl:'Captain (Example)',    notes:'N wind 20 kn, close-hauled (Example)',                        fuel:'475L', water:'195L' },
+      { h:72, lat:36.286, lon:-10.445, cog:197, sog:6.8, wd:195, ws:18, sea:'Moderate', baro:1015, wl:'First mate (Example)', notes:'Day 1 complete, 150 nm (Example)',                             fuel:'473L', water:'192L' },
+      { h:64, lat:35.484, lon:-10.785, cog:196, sog:7.0, wd:190, ws:16, sea:'Slight',   baro:1016, wl:'Captain (Example)',    notes:'Wind easing, increased headsail (Example)',                   fuel:'470L', water:'189L' },
+      { h:56, lat:34.681, lon:-11.125, cog:195, sog:7.2, wd:192, ws:15, sea:'Slight',   baro:1017, wl:'First mate (Example)', notes:'Smooth broad reach overnight (Example)',                      fuel:'468L', water:'186L' },
+      { h:48, lat:33.879, lon:-11.466, cog:196, sog:7.1, wd:190, ws:17, sea:'Moderate', baro:1014, wl:'Captain (Example)',    notes:'Day 2 complete — 150 nm today (Example)',                     fuel:'466L', water:'183L' },
+      { h:40, lat:33.077, lon:-11.806, cog:195, sog:6.9, wd:200, ws:16, sea:'Slight',   baro:1015, wl:'First mate (Example)', notes:'Calm night, NE swell 1.5m (Example)',                         fuel:'464L', water:'180L' },
+      { h:32, lat:32.274, lon:-12.146, cog:194, sog:7.4, wd:195, ws:18, sea:'Moderate', baro:1013, wl:'Captain (Example)',    notes:'Freshened up overnight, flying (Example)',                    fuel:'461L', water:'178L' },
+      { h:24, lat:31.472, lon:-12.486, cog:196, sog:7.1, wd:190, ws:17, sea:'Moderate', baro:1014, wl:'First mate (Example)', notes:'Day 3 complete, on track for Lanzarote (Example)',             fuel:'459L', water:'175L' },
+      { h:16, lat:30.670, lon:-12.827, cog:195, sog:6.8, wd:195, ws:15, sea:'Slight',   baro:1016, wl:'Captain (Example)',    notes:'Wind shifted E, adjusted course (Example)',                   fuel:'456L', water:'172L' },
+      { h:8,  lat:29.867, lon:-13.167, cog:194, sog:7.0, wd:190, ws:16, sea:'Slight',   baro:1016, wl:'First mate (Example)', notes:'Clear skies, Fuerteventura on the horizon (Example)',         fuel:'454L', water:'169L' },
+      { h:4,  lat:29.466, lon:-13.337, cog:195, sog:7.2, wd:190, ws:17, sea:'Slight',   baro:1015, wl:'Captain (Example)',    notes:'Day 4 — Lanzarote landfall expected tomorrow morning (Example)', fuel:'452L', water:'166L' },
+    ].map(r => ({
+      id: uid(), timestamp: hAgoTs(r.h),
+      position: { lat: r.lat, lon: r.lon }, positionSource: 'gps',
+      cog: r.cog, sog: r.sog, windDir: r.wd, windSpeed: r.ws,
+      seaState: r.sea, barometer: r.baro,
+      watchLeader: r.wl, notes: r.notes,
+      fuelSoundings: r.fuel, waterSoundings: r.water
+    }));
+    getPassageLog().passages.push({
       id: uid(),
-      name:      'Cape Town to Grenada (Example)',
-      from:      'Cape Town, South Africa',
-      to:        "St. George's, Grenada",
-      startDate: dAgoDate(90),
-      endDate:   dAgoDate(60),
-      entries: [
-        {
-          id: uid(), timestamp: dAgoTs(90),
-          position: { lat: -33.9269, lon: 18.4242 }, positionSource: 'gps',
-          cog: 340, sog: 6.5, windDir: 100, windSpeed: 8,
-          seaState: 'Slight', barometer: 1016,
-          watchLeader: 'Captain (Example)',
-          notes: 'Departed Cape Town, heading NW (Example)',
-          fuelSoundings: '480L', waterSoundings: '200L', distanceRun: 0
-        },
-        {
-          id: uid(), timestamp: dAgoTs(85),
-          position: { lat: -15.24, lon: 7.31 }, positionSource: 'gps',
-          cog: 295, sog: 7.2, windDir: 50, windSpeed: 18,
-          seaState: 'Moderate', barometer: 1013,
-          watchLeader: 'First mate (Example)',
-          notes: 'SE trades established, good progress (Example)',
-          fuelSoundings: '455L', waterSoundings: '185L', distanceRun: 1247
-        },
-        {
-          id: uid(), timestamp: dAgoTs(78),
-          position: { lat: 2.51, lon: -12.78 }, positionSource: 'gps',
-          cog: 285, sog: 6.8, windDir: 35, windSpeed: 12,
-          seaState: 'Slight', barometer: 1010,
-          watchLeader: 'Captain (Example)',
-          notes: 'Crossed equator this morning, NE trades beginning (Example)',
-          fuelSoundings: '420L', waterSoundings: '158L', distanceRun: 1089
-        }
-      ]
-    };
-    getPassageLog().passages.push(passage);
+      name:        'Cascais to Lanzarote (Example)',
+      from:        'Cascais, Portugal',
+      to:          'Arrecife, Lanzarote',
+      destination: '28.96, -13.55',
+      startDate:   dAgoDate(4),
+      endDate:     '',
+      entries:     activeEntries
+    });
+
+    // ── Passage 2: Completed — Cape Town to Grenada ──
+    // 30-day bluewater passage, completed 60 days ago, 9 entries every ~3-4 days
+    const ctgEntries = [
+      { d:90, lat:-33.927, lon:18.424,  cog:340, sog:6.5, wd:100, ws:8,  sea:'Slight',   baro:1016, wl:'Captain (Example)',    notes:'Departed Cape Town marina, heading NW into Atlantic (Example)',          fuel:'800L', water:'350L' },
+      { d:86, lat:-27.795, lon:7.736,   cog:315, sog:7.2, wd:95,  ws:16, sea:'Moderate', baro:1014, wl:'First mate (Example)', notes:'SE trades established, cracking reach (Example)',                       fuel:'775L', water:'328L' },
+      { d:82, lat:-21.663, lon:-2.952,  cog:305, sog:7.5, wd:85,  ws:20, sea:'Moderate', baro:1013, wl:'Captain (Example)',    notes:'Consistent 20 kn SE, boat surfing swells (Example)',                    fuel:'748L', water:'305L' },
+      { d:78, lat:-15.531, lon:-13.640, cog:295, sog:7.0, wd:80,  ws:18, sea:'Moderate', baro:1012, wl:'First mate (Example)', notes:'Approaching ITCZ, squalls at night (Example)',                          fuel:'722L', water:'281L' },
+      { d:74, lat:-9.399,  lon:-24.328, cog:288, sog:5.8, wd:60,  ws:10, sea:'Slight',   baro:1009, wl:'Captain (Example)',    notes:'Light winds in ITCZ, motoring sections (Example)',                      fuel:'690L', water:'258L' },
+      { d:70, lat:-3.267,  lon:-35.016, cog:280, sog:7.4, wd:30,  ws:18, sea:'Moderate', baro:1011, wl:'First mate (Example)', notes:'NE trades kicking in, fast progress (Example)',                         fuel:'665L', water:'234L' },
+      { d:66, lat:2.865,   lon:-45.704, cog:278, sog:7.8, wd:25,  ws:22, sea:'Rough',    baro:1012, wl:'Captain (Example)',    notes:'Crossed equator — crew King Neptune ceremony (Example)',                fuel:'638L', water:'210L' },
+      { d:62, lat:8.997,   lon:-56.392, cog:270, sog:7.1, wd:20,  ws:18, sea:'Moderate', baro:1013, wl:'First mate (Example)', notes:'Flying NE trades, 170 nm day (Example)',                                fuel:'612L', water:'186L' },
+      { d:60, lat:12.060,  lon:-61.730, cog:270, sog:0.0, wd:15,  ws:12, sea:'Slight',   baro:1014, wl:'Captain (Example)',    notes:"Arrived St. George's Grenada — 5,421 nm, 30 days (Example)",           fuel:'588L', water:'163L' },
+    ].map(r => ({
+      id: uid(), timestamp: dAgoTs(r.d),
+      position: { lat: r.lat, lon: r.lon }, positionSource: 'gps',
+      cog: r.cog, sog: r.sog, windDir: r.wd, windSpeed: r.ws,
+      seaState: r.sea, barometer: r.baro,
+      watchLeader: r.wl, notes: r.notes,
+      fuelSoundings: r.fuel, waterSoundings: r.water
+    }));
+    getPassageLog().passages.push({
+      id: uid(),
+      name:        'Cape Town to Grenada (Example)',
+      from:        'Cape Town, South Africa',
+      to:          "St. George's, Grenada",
+      destination: '12.06, -61.73',
+      startDate:   dAgoDate(90),
+      endDate:     dAgoDate(60),
+      completed:   true,
+      completedAt: dAgoTs(60),
+      entries:     ctgEntries
+    });
     dirty = true;
   }
   if (!getCoastalLog().some(e => e.eventType)) {
