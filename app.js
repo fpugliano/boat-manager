@@ -6629,96 +6629,64 @@ function showCoastalPassageSummary(arrivedEntry) {
 function prefillPassageLogData() {
   if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL) return false;
   let dirty = false;
+
   if (!getPassageLog().passages.some(p => p.name)) {
     const hAgoTs   = h => new Date(Date.now() - h * 3600000).toISOString();
-    const dAgoTs   = n => new Date(Date.now() - n * 86400000).toISOString();
     const dAgoDate = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
-
-    // ── Passage 1: Active in-progress — Cascais → Lanzarote ──
-    // Started 4 days ago, entries every 8 h, last entry a few hours ago
-    const activeEntries = [
-      { h:96, lat:38.693, lon:-9.424,  cog:200, sog:0.0, wd:210, ws:14, sea:'Slight',   baro:1018, wl:'Captain (Example)',    notes:'Departed Cascais marina, NE wind building (Example)',         fuel:'480L', water:'200L' },
-      { h:88, lat:37.891, lon:-9.764,  cog:198, sog:7.1, wd:205, ws:18, sea:'Slight',   baro:1017, wl:'First mate (Example)', notes:'Clear of the bay, sails up (Example)',                        fuel:'478L', water:'198L' },
-      { h:80, lat:37.088, lon:-10.105, cog:196, sog:7.3, wd:200, ws:20, sea:'Moderate', baro:1015, wl:'Captain (Example)',    notes:'N wind 20 kn, close-hauled (Example)',                        fuel:'475L', water:'195L' },
-      { h:72, lat:36.286, lon:-10.445, cog:197, sog:6.8, wd:195, ws:18, sea:'Moderate', baro:1015, wl:'First mate (Example)', notes:'Day 1 complete, 150 nm (Example)',                             fuel:'473L', water:'192L' },
-      { h:64, lat:35.484, lon:-10.785, cog:196, sog:7.0, wd:190, ws:16, sea:'Slight',   baro:1016, wl:'Captain (Example)',    notes:'Wind easing, increased headsail (Example)',                   fuel:'470L', water:'189L' },
-      { h:56, lat:34.681, lon:-11.125, cog:195, sog:7.2, wd:192, ws:15, sea:'Slight',   baro:1017, wl:'First mate (Example)', notes:'Smooth broad reach overnight (Example)',                      fuel:'468L', water:'186L' },
-      { h:48, lat:33.879, lon:-11.466, cog:196, sog:7.1, wd:190, ws:17, sea:'Moderate', baro:1014, wl:'Captain (Example)',    notes:'Day 2 complete — 150 nm today (Example)',                     fuel:'466L', water:'183L' },
-      { h:40, lat:33.077, lon:-11.806, cog:195, sog:6.9, wd:200, ws:16, sea:'Slight',   baro:1015, wl:'First mate (Example)', notes:'Calm night, NE swell 1.5m (Example)',                         fuel:'464L', water:'180L' },
-      { h:32, lat:32.274, lon:-12.146, cog:194, sog:7.4, wd:195, ws:18, sea:'Moderate', baro:1013, wl:'Captain (Example)',    notes:'Freshened up overnight, flying (Example)',                    fuel:'461L', water:'178L' },
-      { h:24, lat:31.472, lon:-12.486, cog:196, sog:7.1, wd:190, ws:17, sea:'Moderate', baro:1014, wl:'First mate (Example)', notes:'Day 3 complete, on track for Lanzarote (Example)',             fuel:'459L', water:'175L' },
-      { h:16, lat:30.670, lon:-12.827, cog:195, sog:6.8, wd:195, ws:15, sea:'Slight',   baro:1016, wl:'Captain (Example)',    notes:'Wind shifted E, adjusted course (Example)',                   fuel:'456L', water:'172L' },
-      { h:8,  lat:29.867, lon:-13.167, cog:194, sog:7.0, wd:190, ws:16, sea:'Slight',   baro:1016, wl:'First mate (Example)', notes:'Clear skies, Fuerteventura on the horizon (Example)',         fuel:'454L', water:'169L' },
-      { h:4,  lat:29.466, lon:-13.337, cog:195, sog:7.2, wd:190, ws:17, sea:'Slight',   baro:1015, wl:'Captain (Example)',    notes:'Day 4 — Lanzarote landfall expected tomorrow morning (Example)', fuel:'452L', water:'166L' },
-    ].map(r => ({
-      id: uid(), timestamp: hAgoTs(r.h),
+    const mkEntry  = r => ({
+      id: uid(), timestamp: r.ts,
       position: { lat: r.lat, lon: r.lon }, positionSource: 'gps',
       cog: r.cog, sog: r.sog, windDir: r.wd, windSpeed: r.ws,
       seaState: r.sea, barometer: r.baro,
       watchLeader: r.wl, notes: r.notes,
       fuelSoundings: r.fuel, waterSoundings: r.water
-    }));
-    getPassageLog().passages.push({
-      id: uid(),
-      name:        'Cascais to Lanzarote (Example)',
-      from:        'Cascais, Portugal',
-      to:          'Arrecife, Lanzarote',
-      destination: '28.96, -13.55',
-      startDate:   dAgoDate(4),
-      endDate:     '',
-      entries:     activeEntries
     });
 
-    // ── Passage 2: Completed — Cape Town to Grenada ──
-    // 30-day bluewater passage, completed 60 days ago, 9 entries every ~3-4 days
-    const ctgEntries = [
-      { d:90, lat:-33.927, lon:18.424,  cog:340, sog:6.5, wd:100, ws:8,  sea:'Slight',   baro:1016, wl:'Captain (Example)',    notes:'Departed Cape Town marina, heading NW into Atlantic (Example)',          fuel:'800L', water:'350L' },
-      { d:86, lat:-27.795, lon:7.736,   cog:315, sog:7.2, wd:95,  ws:16, sea:'Moderate', baro:1014, wl:'First mate (Example)', notes:'SE trades established, cracking reach (Example)',                       fuel:'775L', water:'328L' },
-      { d:82, lat:-21.663, lon:-2.952,  cog:305, sog:7.5, wd:85,  ws:20, sea:'Moderate', baro:1013, wl:'Captain (Example)',    notes:'Consistent 20 kn SE, boat surfing swells (Example)',                    fuel:'748L', water:'305L' },
-      { d:78, lat:-15.531, lon:-13.640, cog:295, sog:7.0, wd:80,  ws:18, sea:'Moderate', baro:1012, wl:'First mate (Example)', notes:'Approaching ITCZ, squalls at night (Example)',                          fuel:'722L', water:'281L' },
-      { d:74, lat:-9.399,  lon:-24.328, cog:288, sog:5.8, wd:60,  ws:10, sea:'Slight',   baro:1009, wl:'Captain (Example)',    notes:'Light winds in ITCZ, motoring sections (Example)',                      fuel:'690L', water:'258L' },
-      { d:70, lat:-3.267,  lon:-35.016, cog:280, sog:7.4, wd:30,  ws:18, sea:'Moderate', baro:1011, wl:'First mate (Example)', notes:'NE trades kicking in, fast progress (Example)',                         fuel:'665L', water:'234L' },
-      { d:66, lat:2.865,   lon:-45.704, cog:278, sog:7.8, wd:25,  ws:22, sea:'Rough',    baro:1012, wl:'Captain (Example)',    notes:'Crossed equator — crew King Neptune ceremony (Example)',                fuel:'638L', water:'210L' },
-      { d:62, lat:8.997,   lon:-56.392, cog:270, sog:7.1, wd:20,  ws:18, sea:'Moderate', baro:1013, wl:'First mate (Example)', notes:'Flying NE trades, 170 nm day (Example)',                                fuel:'612L', water:'186L' },
-      { d:60, lat:12.060,  lon:-61.730, cog:270, sog:0.0, wd:15,  ws:12, sea:'Slight',   baro:1014, wl:'Captain (Example)',    notes:"Arrived St. George's Grenada — 5,421 nm, 30 days (Example)",           fuel:'588L', water:'163L' },
-    ].map(r => ({
-      id: uid(), timestamp: dAgoTs(r.d),
-      position: { lat: r.lat, lon: r.lon }, positionSource: 'gps',
-      cog: r.cog, sog: r.sog, windDir: r.wd, windSpeed: r.ws,
-      seaState: r.sea, barometer: r.baro,
-      watchLeader: r.wl, notes: r.notes,
-      fuelSoundings: r.fuel, waterSoundings: r.water
-    }));
+    // ── Offshore 1: In-progress — Paros → Rhodes ──
+    // Started 3 days ago, 4 entries every ~18 hours, Meltemi NW 20-28 kts
     getPassageLog().passages.push({
       id: uid(),
-      name:        'Cape Town to Grenada (Example)',
-      from:        'Cape Town, South Africa',
-      to:          "St. George's, Grenada",
-      destination: '12.06, -61.73',
-      startDate:   dAgoDate(90),
-      endDate:     dAgoDate(60),
-      completed:   true,
-      completedAt: dAgoTs(60),
-      entries:     ctgEntries
+      name: 'Paros → Rhodes (Example)', from: 'Paros, Greece', to: 'Rhodes, Greece',
+      destination: '36.4417, 28.225', startDate: dAgoDate(3), endDate: '',
+      entries: [
+        { ts:hAgoTs(72), lat:37.0867, lon:25.1633, cog:128, sog:0.0, wd:335, ws:22, sea:'Slight',   baro:1016, wl:'Captain (Example)',    notes:'Departed Parikia, Meltemi building (Example)',    fuel:'320L', water:'150L' },
+        { ts:hAgoTs(54), lat:36.850,  lon:26.150,  cog:125, sog:7.4, wd:330, ws:26, sea:'Rough',    baro:1018, wl:'First mate (Example)', notes:'Meltemi 25kts, 2 reefs in main (Example)',        fuel:'318L', water:'148L' },
+        { ts:hAgoTs(36), lat:36.600,  lon:27.080,  cog:130, sog:6.8, wd:325, ws:25, sea:'Moderate', baro:1017, wl:'Captain (Example)',    notes:'Good progress, Karpathos to starboard (Example)', fuel:'316L', water:'146L' },
+        { ts:hAgoTs(18), lat:36.400,  lon:27.850,  cog:128, sog:7.2, wd:340, ws:20, sea:'Moderate', baro:1016, wl:'First mate (Example)', notes:'Wind easing, shook out reef (Example)',           fuel:'314L', water:'144L' },
+      ].map(mkEntry)
+    });
+
+    // ── Offshore 2: Completed — Cape Town → Grenada ──
+    // 38-day Atlantic passage Jan–Feb 2019, 6 entries (SE trades → ITCZ → NE trades)
+    getPassageLog().passages.push({
+      id: uid(),
+      name: 'Cape Town → Grenada (Example)', from: 'Cape Town, South Africa', to: "St George's, Grenada",
+      destination: '12.0017, -61.7633', startDate: '2019-01-15', endDate: '2019-02-21',
+      completed: true, completedAt: '2019-02-21T14:20:00.000Z',
+      entries: [
+        { ts:'2019-01-15T08:30:00.000Z', lat:-33.9267, lon:18.4250,  cog:340, sog:0.0, wd:100, ws:8,  sea:'Slight',   baro:1016, wl:'Captain (Example)',    notes:'Departed Cape Town, heading NW (Example)',                    fuel:'800L', water:'350L' },
+        { ts:'2019-01-21T08:30:00.000Z', lat:-22.5000, lon:8.5000,   cog:295, sog:7.2, wd:115, ws:18, sea:'Moderate', baro:1014, wl:'First mate (Example)', notes:'SE trades established, good progress (Example)',              fuel:'775L', water:'328L' },
+        { ts:'2019-01-28T08:30:00.000Z', lat:-2.0000,  lon:-4.0000,  cog:280, sog:6.5, wd:85,  ws:12, sea:'Slight',   baro:1010, wl:'Captain (Example)',    notes:'Crossed equator this morning, NE trades building (Example)', fuel:'748L', water:'305L' },
+        { ts:'2019-02-03T08:30:00.000Z', lat:7.5000,   lon:-20.0000, cog:270, sog:7.8, wd:45,  ws:22, sea:'Moderate', baro:1014, wl:'First mate (Example)', notes:'Flying fish on deck (Example)',                               fuel:'722L', water:'281L' },
+        { ts:'2019-02-10T08:30:00.000Z', lat:10.5000,  lon:-40.0000, cog:268, sog:6.0, wd:30,  ws:20, sea:'Moderate', baro:1015, wl:'Captain (Example)',    notes:'Squall overnight, back to steady 20kts (Example)',           fuel:'695L', water:'258L' },
+        { ts:'2019-02-21T14:20:00.000Z', lat:12.0017,  lon:-61.7633, cog:268, sog:0.0, wd:20,  ws:12, sea:'Slight',   baro:1016, wl:'First mate (Example)', notes:'Landfall Grenada, anchoring in Prickly Bay (Example)',        fuel:'668L', water:'234L' },
+      ].map(mkEntry)
     });
     dirty = true;
   }
+
   if (!getCoastalLog().some(e => e.eventType)) {
-    const ts = (daysAgo, hoursOffset = 0) =>
-      new Date(Date.now() - daysAgo * 86400000 + hoursOffset * 3600000).toISOString();
-    const samples = [
-      // Passage 1: Portimão → Ayamonte (completed, 3 days ago)
-      { passageName:'Portimão → Ayamonte (Example)', eventType:'Departed',       timestamp:ts(3,0),   position:{lat:37.1232,lon:-8.6130}, positionSource:'gps', sog:0,   notes:'Left Portimão marina, heading east (Example)' },
-      { passageName:'Portimão → Ayamonte (Example)', eventType:'Notable event',  timestamp:ts(3,4),   position:{lat:37.0852,lon:-8.4070}, positionSource:'gps', sog:5.2, notes:'Passed Cabo de Santa Maria (Example)' },
-      { passageName:'Portimão → Ayamonte (Example)', eventType:'Arrived',        timestamp:ts(3,7),   position:{lat:37.1810,lon:-7.4040}, positionSource:'gps', sog:4.8, notes:'Anchored off Isla Canela (Example)' },
-      // Passage 2: Ayamonte → Huelva (completed, 1 day ago)
-      { passageName:'Ayamonte → Huelva (Example)',   eventType:'Departed',       timestamp:ts(1,8),   position:{lat:37.1810,lon:-7.4040}, positionSource:'gps', sog:0,   notes:'Departed anchorage, tide-assisted exit (Example)' },
-      { passageName:'Ayamonte → Huelva (Example)',   eventType:'Notable event',  timestamp:ts(1,13),  position:{lat:37.2580,lon:-6.9500}, positionSource:'gps', sog:4.5, notes:'Entered Huelva marina (Example)' },
-      { passageName:'Ayamonte → Huelva (Example)',   eventType:'Arrived',        timestamp:ts(1,13.5),position:{lat:37.2580,lon:-6.9500}, positionSource:'gps', sog:0,   notes:'Berthed at Huelva, good crossing (Example)' },
-    ];
-    samples.forEach(s => getCoastalLog().push({ id: uid(), ...s }));
+    // Coastal 1: Portimão → Ayamonte (completed, fixed Jun 2026 dates)
+    // Coastal 2: Ayamonte → Huelva (in progress, departed Jun 8 2026)
+    [
+      { passageName:'Portimão → Ayamonte (Example)', eventType:'Departed',      timestamp:'2026-06-05T20:17:00.000Z', position:{lat:37.12333,lon:-8.52833}, positionSource:'gps', sog:0,   notes:'Left Portimão marina, heading east (Example)' },
+      { passageName:'Portimão → Ayamonte (Example)', eventType:'Notable event', timestamp:'2026-06-06T00:17:00.000Z', position:{lat:37.08500,lon:-8.40667}, positionSource:'gps', sog:5.2, notes:'Passed Cabo de Santa Maria (Example)' },
+      { passageName:'Portimão → Ayamonte (Example)', eventType:'Arrived',       timestamp:'2026-06-06T03:17:00.000Z', position:{lat:37.18167,lon:-7.40333}, positionSource:'gps', sog:4.8, notes:'Anchored off Isla Canela (Example)' },
+      { passageName:'Ayamonte → Huelva (Example)',   eventType:'Departed',      timestamp:'2026-06-08T04:17:00.000Z', position:{lat:37.18167,lon:-7.40333}, positionSource:'gps', sog:0,   notes:'Departed anchorage, tide-assisted exit (Example)' },
+    ].forEach(s => getCoastalLog().push({ id: uid(), ...s }));
     dirty = true;
   }
+
   return dirty;
 }
 
