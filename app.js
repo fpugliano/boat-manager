@@ -5775,7 +5775,7 @@ function renderPassage(p) {
         <button onclick="event.stopPropagation();showCompletePassage('${p.id}')" style="background:rgba(99,153,34,.1);color:#639922;border:1.5px solid rgba(99,153,34,.3);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer">✓ Complete</button>
         <button onclick="event.stopPropagation();showNewEntry('${p.id}')" style="margin-left:auto;background:var(--blue);color:#fff;border:none;border-radius:8px;padding:5px 14px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">+ New entry</button>
       </div>`;
-  const liveRecap = (!p.completed && open && entries.length) ? renderLiveRecap(p) : '';
+  const recap = (open && entries.length) ? (p.completed ? renderCompletedRecap(p) : renderLiveRecap(p)) : '';
   return `<div style="margin:0 12px 12px;background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;overflow:hidden">
     <div onclick="${toggle}" style="padding:12px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;-webkit-user-select:none">
       <div style="min-width:0;flex:1">
@@ -5799,8 +5799,8 @@ function renderPassage(p) {
       </div>`).join('')}
     </div>
     ${actionBar}
-    ${liveRecap}
-    ${[...entries].reverse().map(e => renderPassageEntryRow(e, p.id)).join('') ||
+    ${recap}
+    ${entries.map(e => renderPassageEntryRow(e, p.id)).join('') ||
       '<div style="padding:14px;text-align:center;font-size:12px;color:var(--label3)">No entries yet — tap "+ New entry" to start</div>'}
     ` : ''}
   </div>`;
@@ -5938,6 +5938,66 @@ function renderLiveRecap(p) {
         <div style="font-size:14px;font-weight:700;color:var(--label)">${esc(v)}</div>
         <div style="font-size:9px;color:var(--label3);margin-top:1px;text-transform:uppercase;letter-spacing:.2px">${l}</div>
       </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function renderCompletedRecap(p) {
+  const entries = [...(p.entries || [])].filter(e => e.timestamp)
+    .sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
+  const gpsE = entries.filter(e => e.position?.lat != null);
+  const totalNm = lbCalcNmGps(entries);
+  let totalTimeStr = '—', avgSpeedStr = '—';
+  if (entries.length >= 2) {
+    const ms = new Date(entries[entries.length-1].timestamp).getTime() - new Date(entries[0].timestamp).getTime();
+    const days = Math.floor(ms / 86400000);
+    const hrs  = Math.floor((ms % 86400000) / 3600000);
+    const mins = Math.floor((ms % 3600000) / 60000);
+    totalTimeStr = days > 0 ? `${days}d ${hrs}h` : `${hrs}h ${mins}m`;
+    if (totalNm > 0 && ms > 0) avgSpeedStr = (totalNm / (ms / 3600000)).toFixed(1) + ' kn';
+  }
+  const windows    = lbCalc24hWindows(gpsE);
+  const best24h    = windows.length      ? Math.max(...windows).toFixed(1) + ' nm' : '—';
+  const slowest24h = windows.length >= 2 ? Math.min(...windows).toFixed(1) + ' nm' : '—';
+  const sogVals    = entries.filter(e => e.sog != null).map(e => parseFloat(e.sog));
+  const maxSog     = sogVals.length  ? Math.max(...sogVals).toFixed(1) + ' kn' : '—';
+  const windVals   = entries.filter(e => e.windSpeed != null).map(e => parseFloat(e.windSpeed));
+  const avgWind    = windVals.length ? (windVals.reduce((a, b) => a + b, 0) / windVals.length).toFixed(1) + ' kn' : '—';
+  const fmtUtc = ts => {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', timeZone:'UTC' }) + ' ' +
+           d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', timeZone:'UTC' }) + ' UTC';
+  };
+  const records = [
+    ['Fastest 24h', best24h, '#639922'],
+    ['Slowest 24h', slowest24h, null],
+    ['Max SOG', maxSog, null],
+    ['Avg wind', avgWind, null],
+    ['Total entries', String(entries.length), null],
+    ['Departed', fmtUtc(entries[0]?.timestamp), null],
+    ['Arrived',  fmtUtc(p.completedAt || entries[entries.length-1]?.timestamp), null],
+  ];
+  return `<div style="background:rgba(99,153,34,.06);border-bottom:1px solid rgba(99,153,34,.2);padding:12px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+      <div style="text-align:center;min-width:64px">
+        <div style="font-size:34px;font-weight:800;color:#639922;line-height:1">${totalNm.toFixed(1)}</div>
+        <div style="font-size:9px;color:var(--label3);text-transform:uppercase;letter-spacing:.3px;margin-top:1px">nm sailed</div>
+      </div>
+      <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:5px">
+        ${[['Total time', totalTimeStr], ['Avg speed', avgSpeedStr]].map(([l, v]) => `
+          <div style="background:var(--surface);border-radius:8px;padding:6px 8px">
+            <div style="font-size:12px;font-weight:700;color:var(--label)">${esc(v)}</div>
+            <div style="font-size:9px;color:var(--label3)">${l}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div style="background:var(--surface);border-radius:8px;overflow:hidden">
+      ${records.map(([l, v, c]) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 10px;border-bottom:1px solid var(--sep)">
+          <span style="font-size:11px;color:var(--label3)">${l}</span>
+          <span style="font-size:11px;font-weight:600;color:${c || 'var(--label)'}">${esc(v)}</span>
+        </div>`).join('')}
     </div>
   </div>`;
 }
