@@ -6354,9 +6354,9 @@ function getCoastalLog() {
   return data.coastalLog;
 }
 
-const COASTAL_EVENTS = ['Departed','Waypoint passed','Arrived','Port entry','Port exit','Notable event'];
-const COASTAL_ICONS  = {'Departed':'⛵','Waypoint passed':'📍','Arrived':'⚓','Port entry':'🟢','Port exit':'🔴','Notable event':'⭐'};
-const COASTAL_COLORS = {'Departed':'#378ADD','Waypoint passed':'#BA7517','Arrived':'#639922','Port entry':'#BA7517','Port exit':'#BA7517','Notable event':'#BA7517'};
+const COASTAL_EVENTS = ['Departed','Arrived','Notable event'];
+const COASTAL_ICONS  = {'Departed':'⛵','Arrived':'⚓','Notable event':'⭐'};
+const COASTAL_COLORS = {'Departed':'#378ADD','Arrived':'#639922','Notable event':'#BA7517'};
 
 function renderCoastalLog() {
   const all = [...getCoastalLog()].sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
@@ -6398,10 +6398,17 @@ function renderCoastalLog() {
     const nmStr = totalNm > 0.1 ? totalNm.toFixed(1) + ' nm' : '';
     const meta = [dateStr, nmStr, durationStr].filter(Boolean).join(' · ');
     const isNamed = key !== '';
+    const badge = arrivedE
+      ? `<span style="font-size:10px;font-weight:700;color:#639922;background:rgba(99,153,34,.12);border-radius:8px;padding:1px 7px;flex-shrink:0">Completed</span>`
+      : (departE
+        ? `<span style="font-size:10px;font-weight:700;color:#BA7517;background:rgba(186,117,23,.1);border-radius:8px;padding:1px 7px;flex-shrink:0">In progress</span>`
+        : '');
     const header = isNamed
-      ? `<div style="margin:10px 12px 4px;padding:8px 12px;background:var(--surface2);border-radius:10px;border:1px solid var(--sep)">
-          <div style="font-size:13px;font-weight:700;color:var(--label)">${esc(key)}</div>
-          ${meta ? `<div style="font-size:11px;color:var(--label3);margin-top:2px">${meta}</div>` : ''}
+      ? `<div style="margin:10px 12px 4px;padding:8px 12px;background:var(--surface2);border-radius:10px;border:1px solid var(--sep);display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <div style="min-width:0;flex:1">
+            <div style="font-size:13px;font-weight:700;color:var(--label)">${esc(key)}</div>
+            ${meta ? `<div style="font-size:11px;color:var(--label3);margin-top:2px">${meta}</div>` : ''}
+          </div>${badge}
         </div>`
       : `<div style="margin:10px 12px 4px;font-size:11px;font-weight:600;color:var(--label3)">Unlabelled</div>`;
     const summaryCard = arrivedE ? renderCoastalPassageSummaryCard(entries, totalNm, durationStr) : '';
@@ -6412,61 +6419,78 @@ function renderCoastalLog() {
   return `<div style="padding-bottom:80px">${newBtn}${sections}</div>`;
 }
 
+function lbcParseFromTo(passageName) {
+  if (!passageName) return { from: '', to: '' };
+  const s = passageName.replace(/\s*\(Example\)\s*$/, '').trim();
+  const m = s.match(/^(.+?)\s*→\s*(.+)$/);
+  return m ? { from: m[1].trim(), to: m[2].trim() } : { from: s, to: '' };
+}
+
 function renderCoastalPassageSummaryCard(entries, totalNm, durationStr) {
   const departE  = entries.find(e => e.eventType === 'Departed');
   const arrivedE = [...entries].reverse().find(e => e.eventType === 'Arrived');
-  const fmtT = ts => ts ? new Date(ts).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '—';
-  // Stats row
+  const fmtUtc = ts => ts
+    ? new Date(ts).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', timeZone:'UTC'}) + ' UTC'
+    : '—';
   let avgSogStr = '—';
   if (departE?.timestamp && arrivedE?.timestamp && totalNm > 0) {
     const ms = new Date(arrivedE.timestamp) - new Date(departE.timestamp);
-    if (ms > 0) avgSogStr = (totalNm / (ms / 3600000)).toFixed(1) + ' kn';
+    if (ms > 0) avgSogStr = (totalNm / (ms / 3600000)).toFixed(1) + ' kts';
   }
-  const nmStr = totalNm > 0.1 ? totalNm.toFixed(1) + ' nm' : '—';
-  const statsRow = [nmStr, durationStr || '—', avgSogStr].map((v, i) =>
-    `<span style="font-size:11px;font-weight:600;color:var(--label)">${esc(v)}</span><span style="font-size:10px;color:var(--label3);margin-left:2px">${['nm','duration','avg SOG'][i]}</span>`
-  ).join('<span style="color:var(--sep);margin:0 6px">·</span>');
-  // Timeline strip — all events in order
-  const strip = entries.map((e, i) => {
-    const icon  = COASTAL_ICONS[e.eventType]  || '•';
-    const color = COASTAL_COLORS[e.eventType] || '#9ca3af';
-    const t = fmtT(e.timestamp);
-    const isLast = i === entries.length - 1;
-    return `<span style="display:inline-flex;align-items:center;gap:3px;white-space:nowrap">` +
-      `<span style="font-size:12px">${icon}</span>` +
-      `<span style="font-size:10px;font-weight:600;color:${color}">${esc(e.eventType)}</span>` +
-      `<span style="font-size:10px;color:var(--label3)">${t}</span>` +
-      `</span>` +
-      (isLast ? '' : `<span style="color:var(--label3);font-size:10px;margin:0 4px">→</span>`);
-  }).join('');
-  return `<div style="margin:0 12px 6px;background:rgba(99,153,34,.06);border:1.5px solid rgba(99,153,34,.22);border-left:4px solid #639922;border-radius:10px;padding:9px 12px">
-    <div style="display:flex;align-items:center;gap:4px;margin-bottom:7px;flex-wrap:wrap">
-      ${statsRow}
-    </div>
-    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px;overflow:hidden">
-      ${strip}
+  const nmVal = totalNm > 0.1 ? totalNm.toFixed(1) : '—';
+  const { from: fromPort, to: toPort } = lbcParseFromTo(entries[0]?.passageName);
+  // Top: three stat boxes
+  const statBoxes = [
+    [nmVal,           'nm sailed',  '#639922'],
+    [durationStr||'—','duration',   null],
+    [avgSogStr,       'avg speed',  null],
+  ].map(([v, l, c], i) => `
+    <div style="flex:1;padding:10px 8px;text-align:center${i < 2 ? ';border-right:1px solid var(--sep)' : ''}">
+      <div style="font-size:15px;font-weight:700;color:${c || 'var(--label)'}">
+        ${esc(String(v).split(' ')[0])}<span style="font-size:11px;font-weight:500;color:var(--label3);margin-left:2px">${esc(String(v).split(' ').slice(1).join(' '))}</span>
+      </div>
+      <div style="font-size:9px;color:var(--label3);margin-top:1px;text-transform:uppercase;letter-spacing:.3px">${l}</div>
+    </div>`).join('');
+  // Bottom: two columns
+  const col = (dot, label, color, time, place) => `
+    <div style="flex:1;padding:9px 10px;display:flex;align-items:flex-start;gap:8px">
+      <div style="margin-top:3px;width:8px;height:8px;border-radius:50%;background:${dot};flex-shrink:0"></div>
+      <div>
+        <div style="font-size:10px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.3px">${label}</div>
+        <div style="font-size:11px;font-weight:600;color:var(--label);margin-top:1px">${esc(time)}</div>
+        ${place ? `<div style="font-size:10px;color:var(--label3);margin-top:1px">${esc(place)}</div>` : ''}
+      </div>
+    </div>`;
+  return `<div style="margin:0 12px 6px;background:var(--surface);border:1px solid var(--sep);border-radius:12px;overflow:hidden">
+    <div style="display:flex;border-bottom:1px solid var(--sep)">${statBoxes}</div>
+    <div style="display:flex">
+      ${col('#378ADD','Departed','#378ADD', fmtUtc(departE?.timestamp), fromPort)}
+      <div style="width:1px;background:var(--sep);flex-shrink:0"></div>
+      ${col('#639922','Arrived','#639922', fmtUtc(arrivedE?.timestamp), toPort)}
     </div>
   </div>`;
 }
 
 function renderCoastalEntryRow(e) {
   const ts = e.timestamp ? new Date(e.timestamp) : null;
-  const timeStr = ts ? ts.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '—';
+  const timeStr = ts
+    ? ts.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', timeZone:'UTC'}) + ' UTC'
+    : '—';
   const color = COASTAL_COLORS[e.eventType] || '#9ca3af';
   const posStr = (e.position?.lat != null && e.position?.lon != null)
     ? fmtLat(e.position.lat) + ' ' + fmtLon(e.position.lon) : '';
   const sogStr = e.sog != null ? ` · ${e.sog} kn` : '';
-  return `<div style="margin:0 12px 5px;background:var(--surface);border:1.5px solid var(--sep);border-radius:12px;padding:8px 12px;display:flex;align-items:flex-start;gap:10px">
+  return `<div style="margin:0 12px 5px;background:var(--surface);border:1px solid var(--sep);border-radius:12px;padding:8px 12px;display:flex;align-items:flex-start;gap:10px">
     <div style="margin-top:4px;flex-shrink:0;width:9px;height:9px;border-radius:50%;background:${color}"></div>
     <div style="flex:1;min-width:0">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <span style="font-size:12px;font-weight:700;color:${color}">${esc(e.eventType || '—')}</span>
         <span style="font-size:11px;color:var(--label3)">${timeStr}${sogStr}</span>
       </div>
-      ${posStr ? `<div style="font-size:10px;color:var(--label3);margin-top:1px">${esc(posStr)}</div>` : ''}
-      ${e.notes ? `<div style="font-size:12px;color:var(--label2);margin-top:2px">${esc(e.notes)}</div>` : ''}
+      ${posStr ? `<div style="font-size:10px;color:var(--label3);margin-top:2px;font-family:monospace">${esc(posStr)}</div>` : ''}
+      ${e.notes ? `<div style="font-size:12px;color:var(--label2);margin-top:3px">${esc(e.notes)}</div>` : ''}
     </div>
-    <button onclick="showEditCoastalEntry('${e.id}')" style="background:none;border:1.5px solid var(--sep);border-radius:8px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--label3);flex-shrink:0;margin-top:1px">✏</button>
+    <button onclick="showEditCoastalEntry('${e.id}')" style="background:none;border:1px solid var(--sep);border-radius:8px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--label3);flex-shrink:0;margin-top:1px">✏</button>
   </div>`;
 }
 
@@ -6583,49 +6607,19 @@ function showCoastalPassageSummary(arrivedEntry) {
       totalNm += haversineNm(a.position.lat, a.position.lon, b.position.lat, b.position.lon);
   }
   const departE = passageEntries.find(e => e.eventType === 'Departed');
-  let durationStr = '—', avgSogStr = '—', departTimeStr = '—';
+  let durationStr = '—';
   if (departE?.timestamp && arrivedEntry.timestamp) {
     const ms = new Date(arrivedEntry.timestamp) - new Date(departE.timestamp);
     const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
     durationStr = `${h}h ${m}m`;
-    if (totalNm > 0 && ms > 0) avgSogStr = (totalNm / (ms / 3600000)).toFixed(1) + ' kn';
-    departTimeStr = new Date(departE.timestamp).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
   }
-  const dateStr = (departE || passageEntries[0])?.timestamp
-    ? new Date((departE || passageEntries[0]).timestamp).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) : '';
-  const timeline = passageEntries.map(e => {
-    const ts = e.timestamp ? new Date(e.timestamp) : null;
-    const tStr = ts ? ts.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '—';
-    const color = COASTAL_COLORS[e.eventType] || '#9ca3af';
-    const icon = COASTAL_ICONS[e.eventType] || '•';
-    return `<div style="display:flex;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid var(--sep)">
-      <span style="font-size:11px;color:var(--label3);flex-shrink:0;width:34px">${tStr}</span>
-      <span style="font-size:13px;flex-shrink:0">${icon}</span>
-      <span style="font-size:12px;font-weight:600;color:${color};flex-shrink:0">${esc(e.eventType)}</span>
-      ${e.notes ? `<span style="font-size:11px;color:var(--label3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.notes)}</span>` : ''}
-    </div>`;
-  }).join('');
+  const card = renderCoastalPassageSummaryCard(passageEntries, totalNm, durationStr);
   showModal('Passage complete', `
-    <div style="text-align:center;padding:4px 0 12px">
-      <div style="font-size:17px;font-weight:800;color:var(--label)">${esc(arrivedEntry.passageName)}</div>
-      ${dateStr ? `<div style="font-size:12px;color:var(--label3);margin-top:2px">${dateStr}</div>` : ''}
+    <div style="text-align:center;padding:4px 0 10px">
+      <div style="font-size:16px;font-weight:800;color:var(--label)">${esc(arrivedEntry.passageName)}</div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:12px;border:1px solid var(--sep)">
-      ${[
-        [totalNm > 0.1 ? totalNm.toFixed(1) : '—', 'nm sailed'],
-        [durationStr, 'duration'],
-        [avgSogStr, 'avg SOG'],
-      ].map(([v, l], i) => `<div style="padding:10px 4px;text-align:center${i < 2 ? ';border-right:1px solid var(--sep)' : ''}">
-        <div style="font-size:15px;font-weight:700;color:var(--label)">${esc(v)}</div>
-        <div style="font-size:9px;color:var(--label3)">${l}</div>
-      </div>`).join('')}
-    </div>
-    <div style="font-size:11px;color:var(--label3);margin-bottom:8px">Departed: <strong style="color:var(--label)">${departTimeStr}</strong></div>
-    <div style="background:var(--surface2);border-radius:10px;padding:6px 10px;margin-bottom:12px">
-      ${timeline || '<div style="padding:6px 0;font-size:12px;color:var(--label3)">No timeline entries</div>'}
-    </div>
-    ${arrivedEntry.notes ? `<div style="background:rgba(99,153,34,.08);border-left:3px solid #639922;border-radius:0 8px 8px 0;padding:8px 12px;font-size:13px;font-style:italic;color:var(--label2);margin-bottom:12px">"${esc(arrivedEntry.notes)}"</div>` : ''}
-    <div class="modal-btns">
+    ${card}
+    <div class="modal-btns" style="margin-top:12px">
       <button class="btn btn-p" onclick="hideModal();document.getElementById('mainContent').innerHTML=renderPassageLog()">Done</button>
     </div>`);
 }
@@ -6715,11 +6709,11 @@ function prefillPassageLogData() {
     const samples = [
       // Passage 1: Portimão → Ayamonte (completed, 3 days ago)
       { passageName:'Portimão → Ayamonte (Example)', eventType:'Departed',       timestamp:ts(3,0),   position:{lat:37.1232,lon:-8.6130}, positionSource:'gps', sog:0,   notes:'Left Portimão marina, heading east (Example)' },
-      { passageName:'Portimão → Ayamonte (Example)', eventType:'Waypoint passed',timestamp:ts(3,4),   position:{lat:37.0852,lon:-8.4070}, positionSource:'gps', sog:5.2, notes:'Passed Cabo de Santa Maria (Example)' },
+      { passageName:'Portimão → Ayamonte (Example)', eventType:'Notable event',  timestamp:ts(3,4),   position:{lat:37.0852,lon:-8.4070}, positionSource:'gps', sog:5.2, notes:'Passed Cabo de Santa Maria (Example)' },
       { passageName:'Portimão → Ayamonte (Example)', eventType:'Arrived',        timestamp:ts(3,7),   position:{lat:37.1810,lon:-7.4040}, positionSource:'gps', sog:4.8, notes:'Anchored off Isla Canela (Example)' },
       // Passage 2: Ayamonte → Huelva (completed, 1 day ago)
       { passageName:'Ayamonte → Huelva (Example)',   eventType:'Departed',       timestamp:ts(1,8),   position:{lat:37.1810,lon:-7.4040}, positionSource:'gps', sog:0,   notes:'Departed anchorage, tide-assisted exit (Example)' },
-      { passageName:'Ayamonte → Huelva (Example)',   eventType:'Port entry',     timestamp:ts(1,13),  position:{lat:37.2580,lon:-6.9500}, positionSource:'gps', sog:4.5, notes:'Entered Huelva marina (Example)' },
+      { passageName:'Ayamonte → Huelva (Example)',   eventType:'Notable event',  timestamp:ts(1,13),  position:{lat:37.2580,lon:-6.9500}, positionSource:'gps', sog:4.5, notes:'Entered Huelva marina (Example)' },
       { passageName:'Ayamonte → Huelva (Example)',   eventType:'Arrived',        timestamp:ts(1,13.5),position:{lat:37.2580,lon:-6.9500}, positionSource:'gps', sog:0,   notes:'Berthed at Huelva, good crossing (Example)' },
     ];
     samples.forEach(s => getCoastalLog().push({ id: uid(), ...s }));
