@@ -4127,9 +4127,13 @@ function prefillWatermakerData() {
 
 function prefillShipyardData() {
   if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL) return false;
-  const sy = data.shipyard;
-  if (sy && (sy.history?.length || sy.quotes?.length)) return false;
   if (!data.shipyard) data.shipyard = {};
+  const sy = data.shipyard;
+  const hasCurrent = !!(sy.current?.name);
+  const hasQuotes  = !!(sy.quotes?.length);
+  const hasHistory = !!(sy.history?.length);
+  if (hasCurrent && hasQuotes && hasHistory) return false;
+
   const dRel = (yearsAgo, extraDays = 0) => {
     const d = new Date();
     d.setFullYear(d.getFullYear() - yearsAgo);
@@ -4146,66 +4150,72 @@ function prefillShipyardData() {
     return d.toISOString().slice(0, 10);
   };
 
-  data.shipyard.current = {
-    name:         'Palma Boat Yard (Example)',
-    location:     'Palma de Mallorca, Spain',
-    startDate:    dAbs(-25),
-    endDate:      dAbs(5),
-    actualCost:   '€3,500',
-    depositPaid:  '€1,200',
-    balanceDue:   '€2,300',
-    notes:        'Annual haul-out. Antifouling bottom paint, hull inspection, anode replacement, propeller polish (Example)',
-  };
+  if (!hasCurrent) {
+    data.shipyard.current = {
+      name:         'Palma Boat Yard (Example)',
+      location:     'Palma de Mallorca, Spain',
+      startDate:    dAbs(-25),
+      endDate:      dAbs(5),
+      actualCost:   '€3,500',
+      depositPaid:  '€1,200',
+      balanceDue:   '€2,300',
+      notes:        'Annual haul-out. Antifouling bottom paint, hull inspection, anode replacement, propeller polish (Example)',
+    };
+  }
 
-  data.shipyard.quotes = [
-    {
-      id: uid(),
-      name:     'Palma Boat Yard (Example)',
-      location: 'Palma de Mallorca, Spain',
-      price:    '€3,500',
-      notes:    'Antifouling + hull inspection + anodes (Example)',
-      selected: true,
-    },
-    {
-      id: uid(),
-      name:     'Port Adriano Marina (Example)',
-      location: 'Calvià, Mallorca',
-      price:    '€4,100',
-      notes:    'Full antifouling + osmosis treatment + anodes (Example)',
-      selected: false,
-    },
-    {
-      id: uid(),
-      name:     'Club de Mar (Example)',
-      location: 'Palma de Mallorca, Spain',
-      price:    '€2,950',
-      notes:    'Basic antifouling only, no extras (Example)',
-      selected: false,
-    },
-  ];
+  if (!hasQuotes) {
+    data.shipyard.quotes = [
+      {
+        id: uid(),
+        name:     'Palma Boat Yard (Example)',
+        location: 'Palma de Mallorca, Spain',
+        price:    '€3,500',
+        notes:    'Antifouling + hull inspection + anodes (Example)',
+        selected: true,
+      },
+      {
+        id: uid(),
+        name:     'Port Adriano Marina (Example)',
+        location: 'Calvià, Mallorca',
+        price:    '€4,100',
+        notes:    'Full antifouling + osmosis treatment + anodes (Example)',
+        selected: false,
+      },
+      {
+        id: uid(),
+        name:     'Club de Mar (Example)',
+        location: 'Palma de Mallorca, Spain',
+        price:    '€2,950',
+        notes:    'Basic antifouling only, no extras (Example)',
+        selected: false,
+      },
+    ];
+  }
 
-  data.shipyard.history = [
-    {
-      id: uid(),
-      year:     seasonLabel(2),
-      name:     'Gouvia Marina Boatyard (Example)',
-      location: 'Corfu, Greece',
-      start:    dRel(2),
-      end:      dRel(2, 18),
-      cost:     '€2,800',
-      notes:    'Antifouling, hull inspection, saildrive service, cutlass bearing replacement (Example)',
-    },
-    {
-      id: uid(),
-      year:     seasonLabel(1),
-      name:     'Marina de Lagos (Example)',
-      location: 'Lagos, Portugal',
-      start:    dRel(1),
-      end:      dRel(1, 14),
-      cost:     '€3,100',
-      notes:    'Antifouling, waterline repaint, propeller polish, engine raw-water impeller (Example)',
-    },
-  ];
+  if (!hasHistory) {
+    data.shipyard.history = [
+      {
+        id: uid(),
+        year:     seasonLabel(2),
+        name:     'Gouvia Marina Boatyard (Example)',
+        location: 'Corfu, Greece',
+        start:    dRel(2),
+        end:      dRel(2, 18),
+        cost:     '€2,800',
+        notes:    'Antifouling, hull inspection, saildrive service, cutlass bearing replacement (Example)',
+      },
+      {
+        id: uid(),
+        year:     seasonLabel(1),
+        name:     'Marina de Lagos (Example)',
+        location: 'Lagos, Portugal',
+        start:    dRel(1),
+        end:      dRel(1, 14),
+        cost:     '€3,100',
+        notes:    'Antifouling, waterline repaint, propeller polish, engine raw-water impeller (Example)',
+      },
+    ];
+  }
   return true;
 }
 
