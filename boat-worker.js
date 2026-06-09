@@ -285,6 +285,27 @@ export default {
       return json(val ? JSON.parse(val) : { count: 0, estCostUsd: 0 });
     }
 
+    // DELETE /api/admin/cleanup-test-accounts — one-time admin cleanup
+    if (method === 'DELETE' && path === '/api/admin/cleanup-test-accounts') {
+      const pw = request.headers.get('X-Admin-Password');
+      if (!pw || pw !== env.ADMIN_PASSWORD) return json({ error: 'Forbidden' }, 403);
+      const TARGET_NAMES = new Set(['TestFinal','TestSafety','TestAIimport','TestPassport','TestUsage!','MyBoat','boat']);
+      const list = await env.BOAT_DATA.list({ prefix: 'analytics:users:' });
+      const deleted = [];
+      for (const item of list.keys) {
+        const val = await env.BOAT_DATA.get(item.name);
+        if (!val) continue;
+        let rec;
+        try { rec = JSON.parse(val); } catch(e) { continue; }
+        if (!TARGET_NAMES.has(rec.boatName)) continue;
+        const hash = item.name.slice('analytics:users:'.length);
+        await env.BOAT_DATA.delete(item.name);
+        await env.BOAT_DATA.delete(hash);
+        deleted.push({ boatName: rec.boatName, hash });
+      }
+      return json({ deleted: deleted.length, accounts: deleted });
+    }
+
     return json({ error: 'Not found' }, 404);
   },
 };

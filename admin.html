@@ -34,6 +34,10 @@
     <thead><tr><th>Signup</th><th>Last active</th><th>Boat name</th><th>Country</th><th>AI Imports</th></tr></thead>
     <tbody id="tbody"></tbody>
   </table>
+  <div id="cleanup-section" style="margin:32px 0 16px;border-top:1px solid #ddd;padding-top:20px">
+    <button id="cleanup-btn" onclick="cleanupTestAccounts()" style="background:#b91c1c;color:#fff;border:none;padding:8px 16px;font-size:14px;font-family:monospace;cursor:pointer;border-radius:4px">🗑 Clean up test accounts</button>
+    <div id="cleanup-result" style="margin-top:10px;font-size:13px"></div>
+  </div>
 </div>
 
 <script>
@@ -100,6 +104,38 @@ async function load() {
 
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function cleanupTestAccounts() {
+  const pw = document.getElementById('pw').value.trim();
+  const targets = ['TestFinal','TestSafety','TestAIimport','TestPassport','TestUsage!','MyBoat','boat'];
+  const ok = confirm(
+    'This will permanently delete KV data and analytics records for accounts with these exact boat names:\n\n' +
+    targets.join('\n') +
+    '\n\nThis cannot be undone. Proceed?'
+  );
+  if (!ok) return;
+  const btn = document.getElementById('cleanup-btn');
+  const res = document.getElementById('cleanup-result');
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  res.textContent = '';
+  try {
+    const r = await fetch(`${WORKER}/api/admin/cleanup-test-accounts`, {
+      method: 'DELETE',
+      headers: { 'X-Admin-Password': pw }
+    });
+    if (r.status === 403) throw new Error('Wrong password');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    const names = data.accounts.map(a => esc(a.boatName)).join(', ') || 'none found';
+    res.innerHTML = `✓ Deleted <b>${data.deleted}</b> account(s): ${names}`;
+    btn.textContent = '✓ Done';
+  } catch(e) {
+    res.textContent = 'Error: ' + e.message;
+    btn.disabled = false;
+    btn.textContent = '🗑 Clean up test accounts';
+  }
 }
 </script>
 </body>
