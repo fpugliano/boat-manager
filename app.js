@@ -6519,8 +6519,6 @@ function _coastalEntryForm(e) {
       </div>
       <input type="hidden" id="lbc-pos-source" value="${esc(e?.positionSource || 'gps')}">
     </div>
-    <div class="mi-label">SOG kn</div>
-    <input class="mi" id="lbc-sog" value="${e?.sog != null ? e.sog : ''}" placeholder="e.g. 5.7" type="number" step="0.1" min="0">
     <div class="mi-label">Notes</div>
     <textarea class="mi" id="lbc-notes" rows="2" placeholder="Optional">${esc(e?.notes || '')}</textarea>`;
 }
@@ -6529,14 +6527,12 @@ function lbcReadForm() {
   const latV = document.getElementById('lbc-lat')?.value;
   const lonV = document.getElementById('lbc-lon')?.value;
   const lat = parseFloat(latV), lon = parseFloat(lonV);
-  const sogV = document.getElementById('lbc-sog')?.value;
   return {
     passageName:    document.getElementById('lbc-passage')?.value.trim() || '',
     timestamp:      new Date(document.getElementById('lbc-ts')?.value || '').toISOString(),
     eventType:      document.getElementById('lbc-evt')?.value || '',
     position:       (!isNaN(lat) && !isNaN(lon)) ? { lat, lon } : null,
     positionSource: document.getElementById('lbc-pos-source')?.value || 'manual',
-    sog:            sogV !== '' && sogV != null ? parseFloat(sogV) : null,
     notes:          document.getElementById('lbc-notes')?.value.trim() || '',
   };
 }
