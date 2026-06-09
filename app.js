@@ -5746,7 +5746,7 @@ function renderOffshoreLog() {
 
 function renderPassage(p) {
   if (!ui.logbookOpen) ui.logbookOpen = {};
-  const open = !!ui.logbookOpen[p.id];
+  const open = ui.logbookOpen[p.id] !== false;
   const entries = [...(p.entries || [])].sort((a, b) => a.timestamp < b.timestamp ? -1 : 1);
   const totalNm = lbCalcNmGps(entries);
   const sogVals = entries.filter(e => e.sog != null).map(e => parseFloat(e.sog));
@@ -7672,6 +7672,13 @@ function migrateData() {
   try { (data.spareParts || []).forEach(p => { const n = normCat(p.category); if (n !== p.category) { p.category = n; dirty = true; } }); } catch(e) { console.warn('migrate spareParts', e); }
   try { if (migrateToSingleLog()) dirty = true; } catch(e) { console.warn('migrateToSingleLog', e); }
   try { (data.maintenance?.log||[]).forEach(e => { const n=normalizeMaintTask(e.task); if(n!==e.task){e.task=n;dirty=true;} }); } catch(e) { console.warn('migrateMaintTasks',e); }
+  // Remap removed coastal event types → Notable event
+  try {
+    const removed = new Set(['Waypoint passed','Port entry','Port exit']);
+    (data.coastalLog || []).forEach(e => {
+      if (removed.has(e.eventType)) { e.eventType = 'Notable event'; dirty = true; }
+    });
+  } catch(e) { console.warn('migrateCoastalEvents', e); }
   // Seed belt history — owner only
   if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL) {
     if (!data.maintenance) data.maintenance = { engines:{}, sched:{}, log:[] };
