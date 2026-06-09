@@ -7827,6 +7827,23 @@ function migrateData() {
       dirty = true;
     }
   } catch(e) { console.warn('maintLogFixV4', e); }
+  // Backfill second example Schengen person for non-owner accounts that only have one
+  try {
+    if (localStorage.getItem(EMAIL_KEY) !== OWNER_EMAIL) {
+      const persons = data.schengen?.persons;
+      if (persons?.length === 1 && persons[0].name === 'Alex Smith') {
+        const dAgo = n => { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); };
+        persons.push({ name:'Maria Santos', activePassport:0,
+          passports:[{flag:'🇬🇧', country:'United Kingdom', eu:false}],
+          log:[
+            {id:uid(), type:'in',  date:dAgo(90), passport:'🇬🇧', location:'France (Marseille)'},
+            {id:uid(), type:'out', date:dAgo(45), passport:'',    location:'Tunisia'}
+          ]
+        });
+        dirty = true;
+      }
+    }
+  } catch(e) { console.warn('migrateSchengenSecondPerson', e); }
   if (dirty) save();
 }
 
