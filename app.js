@@ -1558,23 +1558,27 @@ function getActiveCategories() {
 
 function maintTaskKeywords(taskId) {
   return {
-    mt_oil:          ['oil filter','lube filter','engine oil','oil change','lube oil','crankcase'],
-    mt_oilfilter:    ['engine oil filter replacement','oil filter only'],
-    mt_sailoil:      ['sail drive oil','saildrive oil','gear oil','saildrive','sail drive'],
-    mt_ffuel:        ['fuel filter'],
-    mt_impeller:     ['impeller'],
-    mt_impeller_rep: ['impeller replace','replace impeller','new impeller'],
-    mt_belts_ins:    ['inspect belt','adjust belt','belt tension','belt inspect','belt adjust'],
-    mt_belts_rep:    ['replace belt','belt replace','new belt'],
-    mt_mixelbow:     ['mixing elbow','water mixing elbow','exhaust mixing elbow'],
-    mt_coolant:      ['coolant','antifreeze','fresh water coolant'],
-    mt_hex:          ['heat exchanger'],
-    mt_valve:        ['valve clearance','valve'],
-    mt_rawpump:      ['raw water pump','sea water pump','cooling water pump'],
-    mt_rwbelt_ins:   ['pump belt check','check pump belt','water pump belt check'],
-    mt_rwbelt_rep:   ['pump belt replace','replace pump belt','water pump belt replace'],
-    mt_sdseals:      ['oil seal','saildrive seal','sail drive seal','lip seal'],
-    mt_sdshaft:      ['saildrive shaft','sail drive shaft','shaft seal'],
+    mt_oil:        ['engine oil', 'oil change', 'lube oil', 'crankcase', 'oil filter', 'oil & filter', 'oil and filter'],
+    mt_oilfilter:  ['oil filter', 'oilfilter', 'engine oil filter'],
+    mt_coolant:    ['coolant', 'antifreeze', 'fresh water coolant'],
+    mt_ffuel:      ['fuel filter', 'diesel filter', 'racor', 'separ', 'fuel water filter'],
+    mt_impeller:   ['impeller', 'raw water pump impeller', 'raw water impeller'],
+    mt_belts_rep:  ['belt', 'belts', 'engine belt'],
+    mt_rwbelt_rep: ['raw water pump belt', 'pump belt', 'water pump belt', 'raw water belt'],
+    mt_mixelbow:   ['mixing elbow', 'water mixing elbow', 'exhaust elbow'],
+    mt_hex:        ['heat exchanger'],
+    mt_sailoil:    ['gear oil', 'sail drive oil', 'saildrive oil'],
+    mt_sdseals:    ['lip seal', 'saildrive seal', 'sail drive seal', 'oil seal'],
+    mt_sdshaft:    ['saildrive shaft', 'sail drive shaft', 'propeller shaft'],
+    gs_oil:        ['genset oil', 'generator oil', 'genset oil change'],
+    gs_oilfilter:  ['genset oil filter', 'generator oil filter'],
+    gs_coolant:    ['genset coolant', 'generator coolant'],
+    gs_ffuel:      ['genset fuel filter', 'generator fuel filter'],
+    gs_impeller:   ['genset impeller', 'generator impeller', 'genset raw water'],
+    gs_belts_rep:  ['genset belt', 'generator belt'],
+    gs_rwbelt_rep: ['genset raw water belt', 'generator raw water belt', 'genset pump belt'],
+    gs_hex:        ['genset heat exchanger', 'generator heat exchanger'],
+    gs_mixelbow:   ['genset mixing elbow', 'generator mixing elbow'],
   }[taskId] || [];
 }
 
@@ -1721,8 +1725,11 @@ function calcMaintStatus(task, eid) {
     const color = daysLeft <= 0 ? 'red' : daysLeft <= intDays*0.25 ? 'orange' : 'green';
     return { color, label: daysLeft <= 0 ? `${Math.abs(daysLeft)}d overdue` : `${daysLeft}d left` };
   }
-  const lastHrs  = entry ? (parseFloat(entry.hours)||0) : 0;
-  const remaining = lastHrs === 0 ? (intHrs - engHours) : (lastHrs + intHrs - engHours);
+  if (!entry) {
+    return { color:'grey', label:'No log entry' };
+  }
+  const lastHrs   = parseFloat(entry.hours) || 0;
+  const remaining = lastHrs + intHrs - engHours;
   const color = remaining <= 0 ? 'red' : remaining <= intHrs*0.25 ? 'orange' : 'green';
   return { color, label: remaining <= 0 ? `${Math.abs(remaining)}h overdue` : `${remaining}h` };
 }
@@ -2022,7 +2029,7 @@ function renderMaintenance() {
     }).join('')}
   </div>`;
   // ── Coming up ──
-  const colorRank = {red:2, orange:1, green:0};
+  const colorRank = {red:2, orange:1, green:0, grey:-1};
   const activeCatTasks = new Set(
     MAINT_CATEGORIES.filter(c => getActiveCategories().includes(c.id)).flatMap(c => c.tasks)
   );
@@ -2048,7 +2055,7 @@ function renderMaintenance() {
   });
   const allTaskRows = [...taskRows, ...customTaskRows];
   const showAll = ui.maintShowAll;
-  const visible = showAll ? allTaskRows : allTaskRows.filter(r => r.worstColor !== 'green');
+  const visible = showAll ? allTaskRows : allTaskRows.filter(r => r.worstColor !== 'green' && r.worstColor !== 'grey');
   const hiddenN = allTaskRows.filter(r => r.worstColor === 'green').length;
   const portHours = data.maintenance?.engines?.port?.hours || 0;
   const stbdHours = data.maintenance?.engines?.starboard?.hours || 0;
