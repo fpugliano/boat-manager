@@ -497,9 +497,19 @@ function getAlerts() {
   getEngines().forEach(eid => {
     MAINT_TASKS.forEach(task => {
       const s = calcMaintStatus(task, eid);
-      if (s.color === 'red') {
-        alerts.push({color:'red', days: task.intHrs ? -(parseFloat(s.label)||0) : -1, text:`${engLabel(eid)}: ${task.task} — ${s.label}`});
+      if (s && s.color === 'red') {
+        const intHrs = data.maintenance?.intervals?.[task.id]?.hrs ?? task.intHrs;
+        alerts.push({color:'red', days: intHrs ? -(parseFloat(s.label)||0) : -1, text:`${engLabel(eid)}: ${task.task} — ${s.label}`});
       }
+    });
+    (data.maintenance?.customIntervalTasks||[]).forEach(cit => {
+      ['check','replace'].forEach(type => {
+        const s = calcCustomIntervalStatus(cit, type, eid);
+        if (s && s.color === 'red') {
+          const lbl = type === 'check' ? `${cit.name} — check` : `${cit.name} — replace`;
+          alerts.push({color:'red', days:-(parseFloat(s.label)||0), text:`${engLabel(eid)}: ${lbl} — ${s.label}`});
+        }
+      });
     });
   });
   return alerts.sort((a,b) => a.days - b.days);
@@ -1504,32 +1514,64 @@ function removeShipyardHistory(i) {
 // ── Simplified maintenance tasks ──────────────────────────
 
 const MAINT_TASKS = [
-  { id:'mt_oil',      task:'Engine oil & filter',                intHrs:150,  intDays:null, intLabel:'Every 150h' },
-  { id:'mt_sailoil',  task:'Sail drive gear oil',                intHrs:150,  intDays:null, intLabel:'Every 150h' },
-  { id:'mt_ffuel',    task:'Fuel filters (primary & secondary)', intHrs:250,  intDays:null, intLabel:'Every 250h' },
-  { id:'mt_impeller', task:'Impeller',                           intHrs:250,  intDays:null, intLabel:'Every 250h' },
-  { id:'mt_belts_ins', task:'Inspect & adjust belt tension',      intHrs:250,  intDays:null, intLabel:'Every 250h' },
-  { id:'mt_belts_rep', task:'Replace belts',                      intHrs:1000, intDays:null, intLabel:'Every 1000h' },
-  { id:'mt_coolant',  task:'Yanmar coolant',                     intHrs:null, intDays:365,  intLabel:'Every 12 months' },
-  { id:'mt_hex',      task:'Heat exchanger service',             intHrs:1000, intDays:null, intLabel:'Every 1000h' },
-  { id:'mt_valve',    task:'Valve clearance',                    intHrs:1000, intDays:null, intLabel:'Every 1000h' },
-  { id:'mt_rawpump',  task:'Raw water pump',                     intHrs:1000, intDays:null, intLabel:'Every 1000h' },
-  { id:'mt_sdseals',  task:'Sail drive oil seals',               intHrs:1000, intDays:null, intLabel:'Every 1000h' },
+  { id:'mt_oil',          task:'Engine oil',                         intHrs:150,  intDays:null, intLabel:'Every 150h' },
+  { id:'mt_oilfilter',    task:'Engine oil filter',                  intHrs:null, intDays:null, intLabel:'' },
+  { id:'mt_sailoil',      task:'Sail drive oil',                     intHrs:150,  intDays:null, intLabel:'Every 150h' },
+  { id:'mt_ffuel',        task:'Fuel filters (primary & secondary)', intHrs:250,  intDays:null, intLabel:'Every 250h' },
+  { id:'mt_impeller',     task:'Impeller',                           intHrs:250,  intDays:null, intLabel:'Every 250h' },
+  { id:'mt_impeller_rep', task:'Impeller replace',                   intHrs:null, intDays:null, intLabel:'' },
+  { id:'mt_belts_ins',    task:'Inspect & adjust belt tension',      intHrs:250,  intDays:null, intLabel:'Every 250h' },
+  { id:'mt_belts_rep',    task:'Replace belts',                      intHrs:1000, intDays:null, intLabel:'Every 1000h' },
+  { id:'mt_mixelbow',     task:'Water mixing elbow',                 intHrs:null, intDays:null, intLabel:'' },
+  { id:'mt_coolant',      task:'Engine coolant',                     intHrs:null, intDays:365,  intLabel:'Every 12 months' },
+  { id:'mt_hex',          task:'Heat exchanger service',             intHrs:1000, intDays:null, intLabel:'Every 1000h' },
+  { id:'mt_valve',        task:'Valve clearance',                    intHrs:1000, intDays:null, intLabel:'Every 1000h' },
+  { id:'mt_rawpump',      task:'Raw water pump',                     intHrs:1000, intDays:null, intLabel:'Every 1000h' },
+  { id:'mt_rwbelt_ins',   task:'Raw water pump belt check',          intHrs:null, intDays:null, intLabel:'' },
+  { id:'mt_rwbelt_rep',   task:'Raw water pump belt replace',        intHrs:null, intDays:null, intLabel:'' },
+  { id:'mt_sdseals',      task:'Sail drive lip seals',               intHrs:1000, intDays:null, intLabel:'Every 1000h' },
+  { id:'mt_sdshaft',      task:'Sail drive shaft',                   intHrs:null, intDays:null, intLabel:'' },
+];
+
+const INTERVAL_CONFIG = [
+  { section:'Engine', rows:[
+    { label:'Engine oil',         checkId:null,            replaceId:'mt_oil',         unit:'h' },
+    { label:'Engine oil filter',  checkId:null,            replaceId:'mt_oilfilter',   unit:'h' },
+    { label:'Engine belt',        checkId:'mt_belts_ins',  replaceId:'mt_belts_rep',   unit:'h' },
+    { label:'Water mixing elbow', checkId:'mt_mixelbow',   replaceId:null,             unit:'h' },
+    { label:'Heat exchanger',     checkId:null,            replaceId:'mt_hex',         unit:'h' },
+    { label:'Engine coolant',     checkId:null,            replaceId:'mt_coolant',     unit:'m' },
+  ]},
+  { section:'Raw Water Pump', rows:[
+    { label:'Impeller',  checkId:'mt_impeller',   replaceId:'mt_impeller_rep', unit:'h' },
+    { label:'Belt',      checkId:'mt_rwbelt_ins', replaceId:'mt_rwbelt_rep',   unit:'h' },
+  ]},
+  { section:'Sail Drive', rows:[
+    { label:'Sail drive oil', checkId:null,          replaceId:'mt_sailoil',  unit:'h' },
+    { label:'Lip seals',      checkId:null,          replaceId:'mt_sdseals',  unit:'h' },
+    { label:'Shaft',          checkId:'mt_sdshaft',  replaceId:null,          unit:'h' },
+  ]},
 ];
 
 function maintTaskKeywords(taskId) {
   return {
-    mt_oil:      ['oil filter','lube filter','engine oil','oil change','lube oil','crankcase'],
-    mt_sailoil:  ['sail drive oil','saildrive oil','gear oil','saildrive','sail drive'],
-    mt_ffuel:    ['fuel filter'],
-    mt_impeller: ['impeller'],
-    mt_belts_ins: ['inspect belt','adjust belt','belt tension','belt inspect','belt adjust'],
-    mt_belts_rep: ['replace belt','belt replace','new belt'],
-    mt_coolant:  ['coolant','antifreeze','fresh water coolant'],
-    mt_hex:      ['heat exchanger'],
-    mt_valve:    ['valve clearance','valve'],
-    mt_rawpump:  ['raw water pump','sea water pump','cooling water pump'],
-    mt_sdseals:  ['oil seal','saildrive seal','sail drive seal'],
+    mt_oil:          ['oil filter','lube filter','engine oil','oil change','lube oil','crankcase'],
+    mt_oilfilter:    ['engine oil filter replacement','oil filter only'],
+    mt_sailoil:      ['sail drive oil','saildrive oil','gear oil','saildrive','sail drive'],
+    mt_ffuel:        ['fuel filter'],
+    mt_impeller:     ['impeller'],
+    mt_impeller_rep: ['impeller replace','replace impeller','new impeller'],
+    mt_belts_ins:    ['inspect belt','adjust belt','belt tension','belt inspect','belt adjust'],
+    mt_belts_rep:    ['replace belt','belt replace','new belt'],
+    mt_mixelbow:     ['mixing elbow','water mixing elbow','exhaust mixing elbow'],
+    mt_coolant:      ['coolant','antifreeze','fresh water coolant'],
+    mt_hex:          ['heat exchanger'],
+    mt_valve:        ['valve clearance','valve'],
+    mt_rawpump:      ['raw water pump','sea water pump','cooling water pump'],
+    mt_rwbelt_ins:   ['pump belt check','check pump belt','water pump belt check'],
+    mt_rwbelt_rep:   ['pump belt replace','replace pump belt','water pump belt replace'],
+    mt_sdseals:      ['oil seal','saildrive seal','sail drive seal','lip seal'],
+    mt_sdshaft:      ['saildrive shaft','sail drive shaft','shaft seal'],
   }[taskId] || [];
 }
 
@@ -1664,17 +1706,51 @@ function lastMaintEntry(taskId, eid) {
 }
 
 function calcMaintStatus(task, eid) {
-  const engHours = data.maintenance?.engines?.[eid]?.hours || 0;
-  const entry    = lastMaintEntry(task.id, eid);
-  if (task.intDays) {
+  const engHours  = data.maintenance?.engines?.[eid]?.hours || 0;
+  const entry     = lastMaintEntry(task.id, eid);
+  const customInt = data.maintenance?.intervals?.[task.id];
+  const intDays   = customInt?.days !== undefined ? customInt.days : task.intDays;
+  const intHrs    = customInt?.hrs  !== undefined ? customInt.hrs  : task.intHrs;
+  if (!intHrs && !intDays) return null;
+  if (intDays) {
     if (!entry) return { color:'red', label:'Never done' };
-    const daysLeft = Math.ceil(((parseISODate(entry.date)||new Date(entry.date)).getTime() + task.intDays*86400000 - Date.now()) / 86400000);
-    const color = daysLeft <= 0 ? 'red' : daysLeft <= task.intDays*0.25 ? 'orange' : 'green';
+    const daysLeft = Math.ceil(((parseISODate(entry.date)||new Date(entry.date)).getTime() + intDays*86400000 - Date.now()) / 86400000);
+    const color = daysLeft <= 0 ? 'red' : daysLeft <= intDays*0.25 ? 'orange' : 'green';
     return { color, label: daysLeft <= 0 ? `${Math.abs(daysLeft)}d overdue` : `${daysLeft}d left` };
   }
   const lastHrs  = entry ? (parseFloat(entry.hours)||0) : 0;
-  const remaining = lastHrs === 0 ? (task.intHrs - engHours) : (lastHrs + task.intHrs - engHours);
-  const color = remaining <= 0 ? 'red' : remaining <= task.intHrs*0.25 ? 'orange' : 'green';
+  const remaining = lastHrs === 0 ? (intHrs - engHours) : (lastHrs + intHrs - engHours);
+  const color = remaining <= 0 ? 'red' : remaining <= intHrs*0.25 ? 'orange' : 'green';
+  return { color, label: remaining <= 0 ? `${Math.abs(remaining)}h overdue` : `${remaining}h` };
+}
+
+function getMaintIntervalLabel(task) {
+  const customInt = data.maintenance?.intervals?.[task.id];
+  const intDays = customInt?.days !== undefined ? customInt.days : task.intDays;
+  const intHrs  = customInt?.hrs  !== undefined ? customInt.hrs  : task.intHrs;
+  if (!intHrs && !intDays) return '';
+  if (intDays) {
+    const months = Math.round(intDays / 30.5);
+    return months >= 2 ? `Every ${months} months` : `Every ${intDays}d`;
+  }
+  return `Every ${intHrs}h`;
+}
+
+function calcCustomIntervalStatus(cit, type, eid) {
+  const engHours = data.maintenance?.engines?.[eid]?.hours || 0;
+  const intHrs   = type === 'check' ? cit.checkHrs : cit.replaceHrs;
+  if (!intHrs) return null;
+  const name = cit.name.toLowerCase();
+  const log  = getMaintLog();
+  const hits = log.filter(e => {
+    const t = (e.task||'').toLowerCase();
+    const engOk = !(e.engines||[]).length || (e.engines||[]).includes(eid);
+    return (t === name || t.startsWith(name + ' —') || t.startsWith(name + ' -')) && engOk;
+  });
+  const entry   = hits.reduce((best, e) => (parseFloat(e.hours)||0) > (parseFloat(best?.hours)||0) ? e : null, null);
+  const lastHrs = entry ? (parseFloat(entry.hours)||0) : 0;
+  const remaining = lastHrs === 0 ? (intHrs - engHours) : (lastHrs + intHrs - engHours);
+  const color = remaining <= 0 ? 'red' : remaining <= intHrs*0.25 ? 'orange' : 'green';
   return { color, label: remaining <= 0 ? `${Math.abs(remaining)}h overdue` : `${remaining}h` };
 }
 
@@ -1944,17 +2020,33 @@ function renderMaintenance() {
   </div>`;
   // ── Coming up ──
   const colorRank = {red:2, orange:1, green:0};
-  const taskRows = MAINT_TASKS.map(task => {
-    const statuses = eids.map(eid => ({eid, ...calcMaintStatus(task, eid)}));
+  const taskRows = MAINT_TASKS.flatMap(task => {
+    const rawStatuses = eids.map(eid => { const s = calcMaintStatus(task, eid); return s ? {eid, ...s} : null; });
+    const statuses = rawStatuses.filter(Boolean);
+    if (!statuses.length) return [];
     const worst = statuses.reduce((a,b) => (colorRank[b.color]||0) > (colorRank[a.color]||0) ? b : a);
-    return {task, statuses, worstColor: worst.color};
+    return [{task, statuses, worstColor: worst.color}];
   });
+  const customTaskRows = (data.maintenance?.customIntervalTasks||[]).flatMap(cit => {
+    const rows = [];
+    ['check','replace'].forEach(type => {
+      const intHrs = type === 'check' ? cit.checkHrs : cit.replaceHrs;
+      if (!intHrs) return;
+      const statuses = eids.map(eid => { const s = calcCustomIntervalStatus(cit, type, eid); return s ? {eid, ...s} : null; }).filter(Boolean);
+      if (!statuses.length) return;
+      const worst = statuses.reduce((a,b) => (colorRank[b.color]||0) > (colorRank[a.color]||0) ? b : a);
+      const taskName = cit.checkHrs && cit.replaceHrs ? `${cit.name} — ${type}` : cit.name;
+      rows.push({task:{task:taskName, _intLabel:`Every ${intHrs}h`}, statuses, worstColor:worst.color});
+    });
+    return rows;
+  });
+  const allTaskRows = [...taskRows, ...customTaskRows];
   const showAll = ui.maintShowAll;
-  const visible = showAll ? taskRows : taskRows.filter(r => r.worstColor !== 'green');
-  const hiddenN = taskRows.filter(r => r.worstColor === 'green').length;
+  const visible = showAll ? allTaskRows : allTaskRows.filter(r => r.worstColor !== 'green');
+  const hiddenN = allTaskRows.filter(r => r.worstColor === 'green').length;
   const comingRows = visible.map(({task, statuses}) =>
     `<div class="maint-row2">
-      <div class="maint-task-name">${esc(task.task)}<span class="maint-int-lbl">${esc(task.intLabel)}</span></div>
+      <div class="maint-task-name">${esc(task.task)}<span class="maint-int-lbl">${esc(task._intLabel || getMaintIntervalLabel(task))}</span></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${statuses.map(s => `<span class="msb msb-${s.color}">${isCat?eLbl[s.eid]+' ':''}${esc(s.label)}</span>`).join('')}
       </div>
@@ -2019,6 +2111,7 @@ function renderMaintenance() {
       <div class="sec-hd" style="margin:0">Maintenance Log</div>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:11px;color:var(--label3)">${display.length} ${display.length===1?'entry':'entries'}</span>
+        <button onclick="showIntervalsModal()" style="font-size:12px;background:none;border:1.5px solid var(--sep);border-radius:8px;padding:4px 8px;cursor:pointer;font-family:var(--font);color:var(--label2);line-height:1.4">⚙ Intervals</button>
         <button onclick="printMaintLog()" style="font-size:12px;background:none;border:1.5px solid var(--sep);border-radius:8px;padding:4px 8px;cursor:pointer;font-family:var(--font);color:var(--label2);line-height:1.4">🖨 Print</button>
         <button class="btn btn-p btn-sm" onclick="showAddMaintEntry()">+ Add entry</button>
       </div>
@@ -2035,6 +2128,147 @@ function renderMaintenance() {
       ${logRows}
     </div>`;
   return hoursHtml + renderMaintGauges() + comingUpHtml + logHtml;
+}
+
+function showIntervalsModal() {
+  const intervals  = data.maintenance?.intervals || {};
+  const customTasks = data.maintenance?.customIntervalTasks || [];
+  const inpStyle = 'width:52px;text-align:center;border:1.5px solid var(--sep);border-radius:8px;padding:5px 4px;font-family:var(--font);font-size:13px;background:var(--bg);color:var(--label);-moz-appearance:textfield;appearance:textfield';
+
+  function getVal(taskId, unit) {
+    if (!taskId) return '';
+    const cust = intervals[taskId];
+    const task = MAINT_TASKS.find(t => t.id === taskId);
+    if (cust) return unit === 'm' ? Math.round((cust.days || 365) / 30.5) : (cust.hrs || '');
+    if (!task) return '';
+    return unit === 'm' ? (task.intDays ? Math.round(task.intDays / 30.5) : '') : (task.intHrs || '');
+  }
+
+  function renderRow(row) {
+    const unit = row.unit === 'm' ? 'mo' : 'h';
+    const checkHtml = row.checkId ? `<div style="display:flex;align-items:center;gap:4px">
+        <span style="font-size:11px;color:var(--label3);min-width:46px">Check</span>
+        <input type="number" min="1" id="int_${row.checkId}" value="${getVal(row.checkId, row.unit)}" placeholder="—" style="${inpStyle}">
+        <span style="font-size:11px;color:var(--label3)">${unit}</span>
+      </div>` : '';
+    const replHtml = row.replaceId ? `<div style="display:flex;align-items:center;gap:4px">
+        <span style="font-size:11px;color:var(--label3);min-width:46px">Replace</span>
+        <input type="number" min="1" id="int_${row.replaceId}" value="${getVal(row.replaceId, row.unit)}" placeholder="—" style="${inpStyle}">
+        <span style="font-size:11px;color:var(--label3)">${unit}</span>
+      </div>` : '';
+    return `<div style="padding:8px 0;border-bottom:1px solid var(--sep)">
+      <div style="font-size:13px;font-weight:500;color:var(--label);margin-bottom:6px">${esc(row.label)}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">${checkHtml}${replHtml}</div>
+    </div>`;
+  }
+
+  const sectionsHtml = INTERVAL_CONFIG.map(sec => `
+    <div style="font-size:11px;font-weight:800;color:var(--label3);text-transform:uppercase;letter-spacing:.06em;padding:14px 0 2px">${esc(sec.section)}</div>
+    ${sec.rows.map(renderRow).join('')}
+  `).join('');
+
+  const customHtml = customTasks.map(cit => `
+    <div style="padding:8px 0;border-bottom:1px solid var(--sep)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:13px;font-weight:500;color:var(--label)">${esc(cit.name)}</span>
+        <button onclick="deleteCustomIntervalTask('${esc(cit.id)}')" style="font-size:12px;color:#EF4444;background:none;border:none;cursor:pointer;font-family:var(--font);padding:0;line-height:1">✕ Remove</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="font-size:11px;color:var(--label3);min-width:46px">Check</span>
+          <input type="number" min="1" id="cit_check_${esc(cit.id)}" value="${cit.checkHrs||''}" placeholder="—" style="${inpStyle}">
+          <span style="font-size:11px;color:var(--label3)">h</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="font-size:11px;color:var(--label3);min-width:46px">Replace</span>
+          <input type="number" min="1" id="cit_replace_${esc(cit.id)}" value="${cit.replaceHrs||''}" placeholder="—" style="${inpStyle}">
+          <span style="font-size:11px;color:var(--label3)">h</span>
+        </div>
+      </div>
+    </div>`).join('');
+
+  const html = `
+    <div style="max-height:65vh;overflow-y:auto;padding-right:2px;margin-bottom:12px">
+      ${sectionsHtml}
+      <div style="font-size:11px;font-weight:800;color:var(--label3);text-transform:uppercase;letter-spacing:.06em;padding:14px 0 2px">Custom Tasks</div>
+      ${customHtml || ''}
+      <div style="padding:10px 0">
+        <div style="font-size:12px;font-weight:600;color:var(--label2);margin-bottom:8px">Add custom task</div>
+        <input class="mi" id="new_cit_name" placeholder="Task name" style="margin-bottom:8px">
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:4px">
+            <span style="font-size:11px;color:var(--label3);min-width:46px">Check</span>
+            <input type="number" min="1" id="new_cit_check" placeholder="—" style="${inpStyle}">
+            <span style="font-size:11px;color:var(--label3)">h</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span style="font-size:11px;color:var(--label3);min-width:46px">Replace</span>
+            <input type="number" min="1" id="new_cit_replace" placeholder="—" style="${inpStyle}">
+            <span style="font-size:11px;color:var(--label3)">h</span>
+          </div>
+        </div>
+        <button onclick="addCustomIntervalTask()" class="btn btn-s btn-sm">+ Add task</button>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveIntervals()">Save intervals</button>
+    </div>`;
+
+  showModal('⚙ Maintenance Intervals', html);
+}
+
+function saveIntervals() {
+  if (!data.maintenance) data.maintenance = {};
+  if (!data.maintenance.intervals) data.maintenance.intervals = {};
+  const ints = data.maintenance.intervals;
+
+  INTERVAL_CONFIG.forEach(sec => {
+    sec.rows.forEach(row => {
+      [['checkId'], ['replaceId']].forEach(([key]) => {
+        const taskId = row[key];
+        if (!taskId) return;
+        const el  = document.getElementById('int_' + taskId);
+        const val = el ? parseInt(el.value) : NaN;
+        if (val > 0) {
+          ints[taskId] = row.unit === 'm' ? { days: Math.round(val * 30.5) } : { hrs: val };
+        } else {
+          delete ints[taskId];
+        }
+      });
+    });
+  });
+
+  (data.maintenance.customIntervalTasks||[]).forEach(cit => {
+    const cv = parseInt(document.getElementById('cit_check_'   + cit.id)?.value);
+    const rv = parseInt(document.getElementById('cit_replace_' + cit.id)?.value);
+    cit.checkHrs   = cv > 0 ? cv : null;
+    cit.replaceHrs = rv > 0 ? rv : null;
+  });
+
+  save(); hideModal();
+  document.getElementById('mainContent').innerHTML = renderMaintenance();
+  showToast('Intervals saved');
+}
+
+function addCustomIntervalTask() {
+  const name = document.getElementById('new_cit_name')?.value?.trim();
+  if (!name) { showToast('Enter a task name', true); return; }
+  const cv = parseInt(document.getElementById('new_cit_check')?.value);
+  const rv = parseInt(document.getElementById('new_cit_replace')?.value);
+  if (!(cv > 0) && !(rv > 0)) { showToast('Enter at least one interval', true); return; }
+  if (!data.maintenance) data.maintenance = {};
+  if (!data.maintenance.customIntervalTasks) data.maintenance.customIntervalTasks = [];
+  data.maintenance.customIntervalTasks.push({ id:uid(), name, checkHrs: cv > 0 ? cv : null, replaceHrs: rv > 0 ? rv : null });
+  save();
+  showIntervalsModal();
+}
+
+function deleteCustomIntervalTask(id) {
+  if (!data.maintenance?.customIntervalTasks) return;
+  data.maintenance.customIntervalTasks = data.maintenance.customIntervalTasks.filter(t => t.id !== id);
+  save();
+  showIntervalsModal();
 }
 
 function printMaintLog() {
