@@ -2044,14 +2044,15 @@ function renderMaintenance() {
   const showAll = ui.maintShowAll;
   const visible = showAll ? allTaskRows : allTaskRows.filter(r => r.worstColor !== 'green');
   const hiddenN = allTaskRows.filter(r => r.worstColor === 'green').length;
-  const comingRows = visible.map(({task, statuses}) =>
-    `<div class="maint-row2">
+  const comingRows = visible.map(({task, statuses, worstColor}) => {
+    const worst = statuses.reduce((a,b) => (colorRank[b.color]||0) > (colorRank[a.color]||0) ? b : a);
+    return `<div class="maint-row2">
       <div class="maint-task-name">${esc(task.task)}<span class="maint-int-lbl">${esc(task._intLabel || getMaintIntervalLabel(task))}</span></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${statuses.map(s => `<span class="msb msb-${s.color}">${isCat?eLbl[s.eid]+' ':''}${esc(s.label)}</span>`).join('')}
+        <span class="msb msb-${worst.color}">${esc(worst.label)}</span>
       </div>
-    </div>`
-  ).join('');
+    </div>`;
+  }).join('');
   const comingUpHtml = `
     <div class="sec-hd">Coming up</div>
     <div class="card">
@@ -2111,7 +2112,6 @@ function renderMaintenance() {
       <div class="sec-hd" style="margin:0">Maintenance Log</div>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:11px;color:var(--label3)">${display.length} ${display.length===1?'entry':'entries'}</span>
-        <button onclick="showIntervalsModal()" style="font-size:12px;background:none;border:1.5px solid var(--sep);border-radius:8px;padding:4px 8px;cursor:pointer;font-family:var(--font);color:var(--label2);line-height:1.4">⚙ Intervals</button>
         <button onclick="printMaintLog()" style="font-size:12px;background:none;border:1.5px solid var(--sep);border-radius:8px;padding:4px 8px;cursor:pointer;font-family:var(--font);color:var(--label2);line-height:1.4">🖨 Print</button>
         <button class="btn btn-p btn-sm" onclick="showAddMaintEntry()">+ Add entry</button>
       </div>
@@ -2127,16 +2127,24 @@ function renderMaintenance() {
       </div>
       ${logRows}
     </div>`;
-  return hoursHtml + renderMaintGauges() + comingUpHtml + logHtml;
+  const intervalsCardHtml = `
+  <div onclick="showIntervalsModal()" style="background:#E6F1FB;border-radius:12px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;border:0.5px solid #B5D4F4;cursor:pointer">
+    <div>
+      <div style="font-size:12px;font-weight:600;color:#0C447C">Service intervals</div>
+      <div style="font-size:11px;color:#185FA5;margin-top:1px">${MAINT_TASKS.filter(t => t.intHrs || t.intDays).length} tasks · ${(data.maintenance?.customIntervalTasks||[]).length} custom</div>
+    </div>
+    <button onclick="event.stopPropagation();showIntervalsModal()" style="font-size:12px;background:#185FA5;color:#fff;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:var(--font);font-weight:600">Edit ›</button>
+  </div>`;
+  return hoursHtml + renderMaintGauges() + comingUpHtml + intervalsCardHtml + logHtml;
 }
 
 function showIntervalsModal() {
-  const intervals  = data.maintenance?.intervals || {};
+  const intervals   = data.maintenance?.intervals || {};
   const customTasks = data.maintenance?.customIntervalTasks || [];
-  const inpStyle = 'width:52px;text-align:center;border:1.5px solid var(--sep);border-radius:8px;padding:5px 4px;font-family:var(--font);font-size:13px;background:var(--bg);color:var(--label);-moz-appearance:textfield;appearance:textfield';
+
+  const inpStyle = 'width:58px;text-align:center;border:0.5px solid var(--sep);border-radius:8px;padding:5px 4px;font-family:var(--font);font-size:13px;background:var(--bg);color:var(--label);-moz-appearance:textfield;appearance:textfield';
 
   function getVal(taskId, unit) {
-    if (!taskId) return '';
     const cust = intervals[taskId];
     const task = MAINT_TASKS.find(t => t.id === taskId);
     if (cust) return unit === 'm' ? Math.round((cust.days || 365) / 30.5) : (cust.hrs || '');
@@ -2144,78 +2152,71 @@ function showIntervalsModal() {
     return unit === 'm' ? (task.intDays ? Math.round(task.intDays / 30.5) : '') : (task.intHrs || '');
   }
 
-  function renderRow(row) {
-    const unit = row.unit === 'm' ? 'mo' : 'h';
-    const checkHtml = row.checkId ? `<div style="display:flex;align-items:center;gap:4px">
-        <span style="font-size:11px;color:var(--label3);min-width:46px">Check</span>
-        <input type="number" min="1" id="int_${row.checkId}" value="${getVal(row.checkId, row.unit)}" placeholder="—" style="${inpStyle}">
-        <span style="font-size:11px;color:var(--label3)">${unit}</span>
-      </div>` : '';
-    const replHtml = row.replaceId ? `<div style="display:flex;align-items:center;gap:4px">
-        <span style="font-size:11px;color:var(--label3);min-width:46px">Replace</span>
-        <input type="number" min="1" id="int_${row.replaceId}" value="${getVal(row.replaceId, row.unit)}" placeholder="—" style="${inpStyle}">
-        <span style="font-size:11px;color:var(--label3)">${unit}</span>
-      </div>` : '';
-    return `<div style="padding:8px 0;border-bottom:1px solid var(--sep)">
-      <div style="font-size:13px;font-weight:500;color:var(--label);margin-bottom:6px">${esc(row.label)}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:10px">${checkHtml}${replHtml}</div>
-    </div>`;
-  }
+  const SIMPLE_CONFIG = [
+    { section: 'Lubricating system', rows: [
+      { id: 'mt_oil',      label: 'Engine oil',      unit: 'h' },
+      { id: 'mt_sailoil',  label: 'Sail drive oil',  unit: 'h' },
+      { id: 'mt_ffuel',    label: 'Fuel filters',    unit: 'h' },
+      { id: 'mt_impeller', label: 'Impeller',        unit: 'h' },
+    ]},
+    { section: 'Engine', rows: [
+      { id: 'mt_valve',    label: 'Valve clearance', unit: 'h', sub: 'Check & adjust' },
+      { id: 'mt_hex',      label: 'Heat exchanger',  unit: 'h' },
+      { id: 'mt_coolant',  label: 'Engine coolant',  unit: 'm' },
+      { id: 'mt_belts_rep',label: 'Belts',           unit: 'h' },
+      { id: 'mt_rawpump',  label: 'Raw water pump',  unit: 'h' },
+      { id: 'mt_sdseals',  label: 'Sail drive lip seals', unit: 'h' },
+    ]},
+  ];
 
-  const sectionsHtml = INTERVAL_CONFIG.map(sec => `
-    <div style="font-size:11px;font-weight:800;color:var(--label3);text-transform:uppercase;letter-spacing:.06em;padding:14px 0 2px">${esc(sec.section)}</div>
-    ${sec.rows.map(renderRow).join('')}
-  `).join('');
+  const sectionsHtml = SIMPLE_CONFIG.map(sec => `
+    <div style="font-size:10px;font-weight:800;color:var(--label3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">${esc(sec.section)}</div>
+    <div class="card" style="margin-bottom:14px">
+      ${sec.rows.map(row => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:0.5px solid var(--sep)">
+          <div>
+            <div style="font-size:13px;font-weight:500;color:var(--label)">${esc(row.label)}</div>
+            ${row.sub ? `<div style="font-size:10px;color:var(--label3);margin-top:1px">${esc(row.sub)}</div>` : ''}
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="number" min="1" id="int_${row.id}" value="${getVal(row.id, row.unit)}" placeholder="—" style="${inpStyle}">
+            <span style="font-size:12px;color:var(--label3);width:16px">${row.unit}</span>
+          </div>
+        </div>`).join('').replace(/border-bottom[^;]+;([^<]*<\/div>\s*$)/, '$1')}
+    </div>`).join('');
 
   const customHtml = customTasks.map(cit => `
-    <div style="padding:8px 0;border-bottom:1px solid var(--sep)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <span style="font-size:13px;font-weight:500;color:var(--label)">${esc(cit.name)}</span>
-        <button onclick="deleteCustomIntervalTask('${esc(cit.id)}')" style="font-size:12px;color:#EF4444;background:none;border:none;cursor:pointer;font-family:var(--font);padding:0;line-height:1">✕ Remove</button>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:10px">
-        <div style="display:flex;align-items:center;gap:4px">
-          <span style="font-size:11px;color:var(--label3);min-width:46px">Check</span>
-          <input type="number" min="1" id="cit_check_${esc(cit.id)}" value="${cit.checkHrs||''}" placeholder="—" style="${inpStyle}">
-          <span style="font-size:11px;color:var(--label3)">h</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:4px">
-          <span style="font-size:11px;color:var(--label3);min-width:46px">Replace</span>
-          <input type="number" min="1" id="cit_replace_${esc(cit.id)}" value="${cit.replaceHrs||''}" placeholder="—" style="${inpStyle}">
-          <span style="font-size:11px;color:var(--label3)">h</span>
-        </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:0.5px solid var(--sep)">
+      <div style="font-size:13px;font-weight:500;color:var(--label)">${esc(cit.name)}</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <input type="number" min="1" id="cit_${esc(cit.id)}" value="${cit.replaceHrs||''}" placeholder="—" style="${inpStyle}">
+        <span style="font-size:12px;color:var(--label3);width:16px">h</span>
+        <button onclick="deleteCustomIntervalTask('${esc(cit.id)}')" style="background:none;border:none;color:#E24B4A;font-size:15px;cursor:pointer;padding:0 0 0 2px;line-height:1" title="Remove">✕</button>
       </div>
     </div>`).join('');
 
   const html = `
     <div style="max-height:65vh;overflow-y:auto;padding-right:2px;margin-bottom:12px">
       ${sectionsHtml}
-      <div style="font-size:11px;font-weight:800;color:var(--label3);text-transform:uppercase;letter-spacing:.06em;padding:14px 0 2px">Custom Tasks</div>
-      ${customHtml || ''}
-      <div style="padding:10px 0">
-        <div style="font-size:12px;font-weight:600;color:var(--label2);margin-bottom:8px">Add custom task</div>
-        <input class="mi" id="new_cit_name" placeholder="Task name" style="margin-bottom:8px">
-        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px">
-          <div style="display:flex;align-items:center;gap:4px">
-            <span style="font-size:11px;color:var(--label3);min-width:46px">Check</span>
-            <input type="number" min="1" id="new_cit_check" placeholder="—" style="${inpStyle}">
-            <span style="font-size:11px;color:var(--label3)">h</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:4px">
-            <span style="font-size:11px;color:var(--label3);min-width:46px">Replace</span>
-            <input type="number" min="1" id="new_cit_replace" placeholder="—" style="${inpStyle}">
-            <span style="font-size:11px;color:var(--label3)">h</span>
+      <div style="font-size:10px;font-weight:800;color:var(--label3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Custom tasks</div>
+      <div class="card" style="margin-bottom:4px">
+        ${customHtml}
+        <div style="padding:10px 14px">
+          <input class="mi" id="new_cit_name" placeholder="Task name" style="margin-bottom:8px">
+          <div style="display:flex;gap:8px">
+            <input type="number" min="1" id="new_cit_hrs" placeholder="Interval" style="flex:1;text-align:center;border:0.5px solid var(--sep);border-radius:8px;padding:7px 4px;font-size:13px;background:var(--bg);color:var(--label);-moz-appearance:textfield;appearance:textfield">
+            <span style="font-size:12px;color:var(--label3);align-self:center">h</span>
+            <button onclick="addCustomIntervalTask()" class="btn btn-s btn-sm" style="white-space:nowrap">+ Add</button>
           </div>
         </div>
-        <button onclick="addCustomIntervalTask()" class="btn btn-s btn-sm">+ Add task</button>
       </div>
     </div>
-    <div style="display:flex;justify-content:flex-end;gap:8px">
-      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
-      <button class="btn btn-p" onclick="saveIntervals()">Save intervals</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-s" style="flex:1" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" style="flex:2" onclick="saveIntervals()">Save</button>
     </div>`;
 
-  showModal('⚙ Maintenance Intervals', html);
+  showModal('Service intervals', html);
 }
 
 function saveIntervals() {
@@ -2223,27 +2224,35 @@ function saveIntervals() {
   if (!data.maintenance.intervals) data.maintenance.intervals = {};
   const ints = data.maintenance.intervals;
 
-  INTERVAL_CONFIG.forEach(sec => {
+  const SIMPLE_CONFIG = [
+    { section: 'Lubricating system', rows: [
+      { id: 'mt_oil', unit: 'h' }, { id: 'mt_sailoil', unit: 'h' },
+      { id: 'mt_ffuel', unit: 'h' }, { id: 'mt_impeller', unit: 'h' },
+    ]},
+    { section: 'Engine', rows: [
+      { id: 'mt_valve', unit: 'h' }, { id: 'mt_hex', unit: 'h' },
+      { id: 'mt_coolant', unit: 'm' }, { id: 'mt_belts_rep', unit: 'h' },
+      { id: 'mt_rawpump', unit: 'h' }, { id: 'mt_sdseals', unit: 'h' },
+    ]},
+  ];
+
+  SIMPLE_CONFIG.forEach(sec => {
     sec.rows.forEach(row => {
-      [['checkId'], ['replaceId']].forEach(([key]) => {
-        const taskId = row[key];
-        if (!taskId) return;
-        const el  = document.getElementById('int_' + taskId);
-        const val = el ? parseInt(el.value) : NaN;
-        if (val > 0) {
-          ints[taskId] = row.unit === 'm' ? { days: Math.round(val * 30.5) } : { hrs: val };
-        } else {
-          delete ints[taskId];
-        }
-      });
+      const el  = document.getElementById('int_' + row.id);
+      const val = el ? parseInt(el.value) : NaN;
+      if (val > 0) {
+        ints[row.id] = row.unit === 'm' ? { days: Math.round(val * 30.5) } : { hrs: val };
+      } else {
+        delete ints[row.id];
+      }
     });
   });
 
-  (data.maintenance.customIntervalTasks||[]).forEach(cit => {
-    const cv = parseInt(document.getElementById('cit_check_'   + cit.id)?.value);
-    const rv = parseInt(document.getElementById('cit_replace_' + cit.id)?.value);
-    cit.checkHrs   = cv > 0 ? cv : null;
-    cit.replaceHrs = rv > 0 ? rv : null;
+  (data.maintenance.customIntervalTasks || []).forEach(cit => {
+    const el  = document.getElementById('cit_' + cit.id);
+    const val = el ? parseInt(el.value) : NaN;
+    cit.replaceHrs = val > 0 ? val : null;
+    cit.checkHrs   = null;
   });
 
   save(); hideModal();
@@ -2254,12 +2263,11 @@ function saveIntervals() {
 function addCustomIntervalTask() {
   const name = document.getElementById('new_cit_name')?.value?.trim();
   if (!name) { showToast('Enter a task name', true); return; }
-  const cv = parseInt(document.getElementById('new_cit_check')?.value);
-  const rv = parseInt(document.getElementById('new_cit_replace')?.value);
-  if (!(cv > 0) && !(rv > 0)) { showToast('Enter at least one interval', true); return; }
+  const hrs = parseInt(document.getElementById('new_cit_hrs')?.value);
+  if (!(hrs > 0)) { showToast('Enter an interval in hours', true); return; }
   if (!data.maintenance) data.maintenance = {};
   if (!data.maintenance.customIntervalTasks) data.maintenance.customIntervalTasks = [];
-  data.maintenance.customIntervalTasks.push({ id:uid(), name, checkHrs: cv > 0 ? cv : null, replaceHrs: rv > 0 ? rv : null });
+  data.maintenance.customIntervalTasks.push({ id: uid(), name, replaceHrs: hrs, checkHrs: null });
   save();
   showIntervalsModal();
 }
