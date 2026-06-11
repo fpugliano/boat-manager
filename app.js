@@ -2050,13 +2050,23 @@ function renderMaintenance() {
   const showAll = ui.maintShowAll;
   const visible = showAll ? allTaskRows : allTaskRows.filter(r => r.worstColor !== 'green');
   const hiddenN = allTaskRows.filter(r => r.worstColor === 'green').length;
-  const comingRows = visible.map(({task, statuses, worstColor}) => {
+  const portHours = data.maintenance?.engines?.port?.hours || 0;
+  const stbdHours = data.maintenance?.engines?.starboard?.hours || 0;
+  const hoursDiverge = isCat && Math.abs(portHours - stbdHours) > 30;
+
+  const comingRows = visible.map(({task, statuses}) => {
     const worst = statuses.reduce((a,b) => (colorRank[b.color]||0) > (colorRank[a.color]||0) ? b : a);
+    let badgesHtml;
+    if (hoursDiverge && statuses.length > 1) {
+      badgesHtml = statuses.map(s =>
+        `<span class="msb msb-${s.color}">${esc(eLbl[s.eid])} ${esc(s.label)}</span>`
+      ).join('');
+    } else {
+      badgesHtml = `<span class="msb msb-${worst.color}">${esc(worst.label)}</span>`;
+    }
     return `<div class="maint-row2">
       <div class="maint-task-name">${esc(task.task)}<span class="maint-int-lbl">${esc(task._intLabel || getMaintIntervalLabel(task))}</span></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <span class="msb msb-${worst.color}">${esc(worst.label)}</span>
-      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${badgesHtml}</div>
     </div>`;
   }).join('');
   const comingUpHtml = `
