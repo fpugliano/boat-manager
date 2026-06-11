@@ -9255,6 +9255,94 @@ async function aiImportApply(btn) {
         id:uid(), type:f.type||'', qty:Number(f.qty)||1, expiry:f.expiry||'', notes:f.notes||''
       }));
     }
+    // Life Rafts
+    if (Array.isArray(p.safety?.lifeRafts) && p.safety.lifeRafts.length) {
+      if (!data.safety) data.safety = { flares: [], lifeRafts: [] };
+      if (!data.safety.lifeRafts) data.safety.lifeRafts = [];
+      p.safety.lifeRafts.forEach(r => data.safety.lifeRafts.push({
+        id: uid(), brand: r.brand || '', model: r.model || '',
+        persons: Number(r.persons) || 0, expiry: r.expiry || '',
+        serialNumber: r.serialNumber || '', notes: r.notes || '',
+        revisions: Array.isArray(r.revisions) ? r.revisions : []
+      }));
+    }
+
+    // Systems
+    if (Array.isArray(p.systems) && p.systems.length) {
+      if (!data.systems) data.systems = [];
+      p.systems.forEach(s => data.systems.push({
+        id: uid(), cat: s.cat || 'Electronics', category: s.cat || 'Electronics',
+        make: s.make || '', model: s.model || '', serialNumber: s.serialNumber || '',
+        location: s.location || '', notes: s.notes || '', installDate: s.installDate || '',
+        lastService: '', warrantyExpiry: s.warrantyExpiry || '', manualUrl: '', photos: []
+      }));
+    }
+
+    // Watermaker
+    if (p.watermaker && typeof p.watermaker === 'object') {
+      if (!data.watermaker) data.watermaker = { currentReading: 0, lastChangeReading: 0, targetHours: 60, charcoalChangedDate: null, inventory: { micron20: 0, micron5: 0, charcoal: 0 } };
+      const wm = p.watermaker;
+      if (wm.currentReading != null)    data.watermaker.currentReading    = Number(wm.currentReading) || 0;
+      if (wm.lastChangeReading != null) data.watermaker.lastChangeReading = Number(wm.lastChangeReading) || 0;
+      if (wm.targetHours != null)       data.watermaker.targetHours       = Number(wm.targetHours) || 60;
+      if (wm.inventory) {
+        if (!data.watermaker.inventory) data.watermaker.inventory = { micron20: 0, micron5: 0, charcoal: 0 };
+        if (wm.inventory.micron20 != null) data.watermaker.inventory.micron20 = Number(wm.inventory.micron20) || 0;
+        if (wm.inventory.micron5  != null) data.watermaker.inventory.micron5  = Number(wm.inventory.micron5)  || 0;
+        if (wm.inventory.charcoal != null) data.watermaker.inventory.charcoal = Number(wm.inventory.charcoal) || 0;
+      }
+      if (Array.isArray(wm.micronHistory) && wm.micronHistory.length) {
+        if (!data.watermaker.micronHistory) data.watermaker.micronHistory = [];
+        wm.micronHistory.forEach(h => data.watermaker.micronHistory.push({
+          id: uid(), date: h.date || '', location: h.location || '', reading: Number(h.reading) || 0
+        }));
+      }
+    }
+
+    // LPG
+    if (Array.isArray(p.lpg?.history) && p.lpg.history.length) {
+      if (!data.lpg) data.lpg = { bottles: [], history: [] };
+      if (!data.lpg.history) data.lpg.history = [];
+      p.lpg.history.forEach(h => data.lpg.history.push({
+        id: uid(), date: h.date || '', location: h.location || '',
+        bottles: Number(h.bottles) || 0, kg: Number(h.kg) || 0,
+        pricePerKg: Number(h.pricePerKg) || 0, notes: h.notes || ''
+      }));
+    }
+
+    // Shipyard
+    if (p.shipyard && typeof p.shipyard === 'object') {
+      if (!data.shipyard) data.shipyard = { current: {}, quotes: [], history: [] };
+      if (p.shipyard.current) {
+        ['name','location','startDate','endDate','actualCost','depositPaid','balanceDue','notes','contact','website']
+          .forEach(k => { if (p.shipyard.current[k]) data.shipyard.current[k] = p.shipyard.current[k]; });
+      }
+      if (Array.isArray(p.shipyard.history)) p.shipyard.history.forEach(h => data.shipyard.history.push({ ...h, id: uid() }));
+      if (Array.isArray(p.shipyard.quotes))  p.shipyard.quotes.forEach(q  => data.shipyard.quotes.push({ ...q,  id: uid() }));
+    }
+
+    // Upgrades
+    if (Array.isArray(p.upgrades?.seasons) && p.upgrades.seasons.length) {
+      if (!data.upgrades) data.upgrades = { seasons: [] };
+      if (!data.upgrades.seasons) data.upgrades.seasons = [];
+      p.upgrades.seasons.forEach(s => data.upgrades.seasons.push({
+        id: uid(), name: s.name || 'Imported', location: s.location || '',
+        items: Array.isArray(s.items)
+          ? s.items.map(it => ({ id: uid(), text: it.text || '', cost: it.cost || '', checked: false }))
+          : []
+      }));
+    }
+
+    // Vessel document
+    if (p.documents?.vessel && typeof p.documents.vessel === 'object') {
+      if (!data.documents) data.documents = {};
+      if (!data.documents.vessel) data.documents.vessel = {};
+      ['vesselName','officialNumber','imoNumber','callSign','hailingPort','flagRegistry','hullMaterial',
+       'boatType','loa','breadth','depth','grossTonnage','netTonnage','yearCompleted','placeBuilt',
+       'engine','owners','managingOwner','issueDate','expiryDate']
+        .forEach(k => { if (p.documents.vessel[k]) data.documents.vessel[k] = p.documents.vessel[k]; });
+    }
+
     migrateData();
     await save(); await pushToCloud();
     renderApp();
@@ -9269,6 +9357,13 @@ async function aiImportApply(btn) {
     if (cusImport && Object.values(cusImport).some(v=>v)) lines.push('eTEPAY updated → Boat Docs');
     if (insImport && Object.values(insImport).some(v=>v)) lines.push('Insurance updated → Boat Docs');
     if (p.safety?.flares?.length) lines.push(`${p.safety.flares.length} ${p.safety.flares.length===1?'flare':'flares'} added → Safety`);
+    if (p.safety?.lifeRafts?.length)     lines.push(`${p.safety.lifeRafts.length} life raft${p.safety.lifeRafts.length!==1?'s':''} → Safety`);
+    if (p.systems?.length)               lines.push(`${p.systems.length} system${p.systems.length!==1?'s':''} → Systems`);
+    if (p.watermaker)                    lines.push('Watermaker updated → Water Maker');
+    if (p.lpg?.history?.length)          lines.push(`${p.lpg.history.length} LPG refill${p.lpg.history.length!==1?'s':''} → LPG`);
+    if (p.shipyard?.current?.name)       lines.push(`Shipyard: ${p.shipyard.current.name} → Shipyard`);
+    if (p.upgrades?.seasons?.length)     lines.push(`${p.upgrades.seasons.reduce((n,s)=>n+(s.items?.length||0),0)} repair items → Upgrades`);
+    if (p.documents?.vessel?.vesselName) lines.push('Vessel document updated → Boat Docs');
 
     const modalBody = document.getElementById('modalBody');
     if (modalBody) modalBody.innerHTML = `
