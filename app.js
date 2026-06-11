@@ -1514,44 +1514,47 @@ function removeShipyardHistory(i) {
 // ── Simplified maintenance tasks ──────────────────────────
 
 const MAINT_TASKS = [
-  { id:'mt_oil',          task:'Engine oil',                         intHrs:150,  intDays:null, intLabel:'Every 150h' },
-  { id:'mt_oilfilter',    task:'Engine oil filter',                  intHrs:null, intDays:null, intLabel:'' },
-  { id:'mt_sailoil',      task:'Sail drive oil',                     intHrs:150,  intDays:null, intLabel:'Every 150h' },
-  { id:'mt_ffuel',        task:'Fuel filters (primary & secondary)', intHrs:250,  intDays:null, intLabel:'Every 250h' },
-  { id:'mt_impeller',     task:'Impeller',                           intHrs:250,  intDays:null, intLabel:'Every 250h' },
-  { id:'mt_impeller_rep', task:'Impeller replace',                   intHrs:null, intDays:null, intLabel:'' },
-  { id:'mt_belts_ins',    task:'Inspect & adjust belt tension',      intHrs:250,  intDays:null, intLabel:'Every 250h' },
-  { id:'mt_belts_rep',    task:'Replace belts',                      intHrs:1000, intDays:null, intLabel:'Every 1000h' },
-  { id:'mt_mixelbow',     task:'Water mixing elbow',                 intHrs:null, intDays:null, intLabel:'' },
-  { id:'mt_coolant',      task:'Engine coolant',                     intHrs:null, intDays:365,  intLabel:'Every 12 months' },
-  { id:'mt_hex',          task:'Heat exchanger service',             intHrs:1000, intDays:null, intLabel:'Every 1000h' },
-  { id:'mt_valve',        task:'Valve clearance',                    intHrs:1000, intDays:null, intLabel:'Every 1000h' },
-  { id:'mt_rawpump',      task:'Raw water pump',                     intHrs:1000, intDays:null, intLabel:'Every 1000h' },
-  { id:'mt_rwbelt_ins',   task:'Raw water pump belt check',          intHrs:null, intDays:null, intLabel:'' },
-  { id:'mt_rwbelt_rep',   task:'Raw water pump belt replace',        intHrs:null, intDays:null, intLabel:'' },
-  { id:'mt_sdseals',      task:'Sail drive lip seals',               intHrs:1000, intDays:null, intLabel:'Every 1000h' },
-  { id:'mt_sdshaft',      task:'Sail drive shaft',                   intHrs:null, intDays:null, intLabel:'' },
+  // Engine
+  { id:'mt_oil',        task:'Engine oil',               intHrs:150,  intDays:null, intLabel:'Every 150h' },
+  { id:'mt_oilfilter',  task:'Engine oil filter',        intHrs:150,  intDays:null, intLabel:'Every 150h' },
+  { id:'mt_coolant',    task:'Engine coolant',           intHrs:null, intDays:365,  intLabel:'Every 12 months' },
+  { id:'mt_ffuel',      task:'Fuel filters',             intHrs:250,  intDays:null, intLabel:'Every 250h' },
+  { id:'mt_impeller',   task:'Raw water pump impeller',  intHrs:250,  intDays:null, intLabel:'Every 250h' },
+  { id:'mt_belts_rep',  task:'Engine belt',              intHrs:1000, intDays:null, intLabel:'Every 1000h' },
+  { id:'mt_rwbelt_rep', task:'Raw water pump belt',      intHrs:1000, intDays:null, intLabel:'Every 1000h' },
+  { id:'mt_hex',        task:'Heat exchanger',           intHrs:1000, intDays:null, intLabel:'Every 1000h' },
+  { id:'mt_mixelbow',   task:'Mixing elbow',             intHrs:1000, intDays:null, intLabel:'Every 1000h' },
+  // Sail Drive
+  { id:'mt_sailoil',    task:'Gear oil',                 intHrs:150,  intDays:null, intLabel:'Every 150h' },
+  { id:'mt_sdseals',    task:'Lip seals',                intHrs:1000, intDays:null, intLabel:'Every 1000h' },
+  { id:'mt_sdshaft',    task:'Propeller shaft',          intHrs:1000, intDays:null, intLabel:'Every 1000h' },
+  // Genset (independent intervals, gs_ prefix)
+  { id:'gs_oil',        task:'Genset oil',               intHrs:150,  intDays:null, intLabel:'Every 150h' },
+  { id:'gs_oilfilter',  task:'Genset oil filter',        intHrs:150,  intDays:null, intLabel:'Every 150h' },
+  { id:'gs_coolant',    task:'Genset coolant',           intHrs:null, intDays:365,  intLabel:'Every 12 months' },
+  { id:'gs_ffuel',      task:'Genset fuel filters',      intHrs:250,  intDays:null, intLabel:'Every 250h' },
+  { id:'gs_impeller',   task:'Genset raw water impeller',intHrs:250,  intDays:null, intLabel:'Every 250h' },
+  { id:'gs_belts_rep',  task:'Genset engine belt',       intHrs:1000, intDays:null, intLabel:'Every 1000h' },
+  { id:'gs_rwbelt_rep', task:'Genset raw water belt',    intHrs:1000, intDays:null, intLabel:'Every 1000h' },
+  { id:'gs_hex',        task:'Genset heat exchanger',    intHrs:1000, intDays:null, intLabel:'Every 1000h' },
+  { id:'gs_mixelbow',   task:'Genset mixing elbow',      intHrs:1000, intDays:null, intLabel:'Every 1000h' },
 ];
 
-const INTERVAL_CONFIG = [
-  { section:'Engine', rows:[
-    { label:'Engine oil',         checkId:null,            replaceId:'mt_oil',         unit:'h' },
-    { label:'Engine oil filter',  checkId:null,            replaceId:'mt_oilfilter',   unit:'h' },
-    { label:'Engine belt',        checkId:'mt_belts_ins',  replaceId:'mt_belts_rep',   unit:'h' },
-    { label:'Water mixing elbow', checkId:'mt_mixelbow',   replaceId:null,             unit:'h' },
-    { label:'Heat exchanger',     checkId:null,            replaceId:'mt_hex',         unit:'h' },
-    { label:'Engine coolant',     checkId:null,            replaceId:'mt_coolant',     unit:'m' },
-  ]},
-  { section:'Raw Water Pump', rows:[
-    { label:'Impeller',  checkId:'mt_impeller',   replaceId:'mt_impeller_rep', unit:'h' },
-    { label:'Belt',      checkId:'mt_rwbelt_ins', replaceId:'mt_rwbelt_rep',   unit:'h' },
-  ]},
-  { section:'Sail Drive', rows:[
-    { label:'Sail drive oil', checkId:null,          replaceId:'mt_sailoil',  unit:'h' },
-    { label:'Lip seals',      checkId:null,          replaceId:'mt_sdseals',  unit:'h' },
-    { label:'Shaft',          checkId:'mt_sdshaft',  replaceId:null,          unit:'h' },
-  ]},
+const MAINT_CATEGORIES = [
+  { id:'engine',    label:'Engine',     tasks:['mt_oil','mt_oilfilter','mt_coolant','mt_ffuel','mt_impeller','mt_belts_rep','mt_rwbelt_rep','mt_hex','mt_mixelbow'] },
+  { id:'saildrive', label:'Sail Drive', tasks:['mt_sailoil','mt_sdseals','mt_sdshaft'] },
+  { id:'genset',    label:'Genset',     tasks:['gs_oil','gs_oilfilter','gs_coolant','gs_ffuel','gs_impeller','gs_belts_rep','gs_rwbelt_rep','gs_hex','gs_mixelbow'] },
 ];
+
+const INTERVAL_CONFIG = MAINT_CATEGORIES;
+
+function getActiveCategories() {
+  if (!data.maintenance) return ['engine','saildrive'];
+  if (!data.maintenance.activeCategories) {
+    data.maintenance.activeCategories = ['engine','saildrive'];
+  }
+  return data.maintenance.activeCategories;
+}
 
 function maintTaskKeywords(taskId) {
   return {
@@ -2020,7 +2023,10 @@ function renderMaintenance() {
   </div>`;
   // ── Coming up ──
   const colorRank = {red:2, orange:1, green:0};
-  const taskRows = MAINT_TASKS.flatMap(task => {
+  const activeCatTasks = new Set(
+    MAINT_CATEGORIES.filter(c => getActiveCategories().includes(c.id)).flatMap(c => c.tasks)
+  );
+  const taskRows = MAINT_TASKS.filter(t => activeCatTasks.has(t.id)).flatMap(task => {
     const rawStatuses = eids.map(eid => { const s = calcMaintStatus(task, eid); return s ? {eid, ...s} : null; });
     const statuses = rawStatuses.filter(Boolean);
     if (!statuses.length) return [];
@@ -2127,77 +2133,92 @@ function renderMaintenance() {
       </div>
       ${logRows}
     </div>`;
+  const activeCats      = getActiveCategories();
+  const activeCatLabels = MAINT_CATEGORIES.filter(c => activeCats.includes(c.id)).map(c => c.label).join(', ');
   const intervalsCardHtml = `
   <div onclick="showIntervalsModal()" style="background:#E6F1FB;border-radius:12px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;border:0.5px solid #B5D4F4;cursor:pointer">
     <div>
       <div style="font-size:12px;font-weight:600;color:#0C447C">Service intervals</div>
-      <div style="font-size:11px;color:#185FA5;margin-top:1px">${MAINT_TASKS.filter(t => t.intHrs || t.intDays).length} tasks · ${(data.maintenance?.customIntervalTasks||[]).length} custom</div>
+      <div style="font-size:11px;color:#185FA5;margin-top:1px">${esc(activeCatLabels)}${(data.maintenance?.customIntervalTasks||[]).length ? ' · ' + (data.maintenance.customIntervalTasks.length) + ' custom' : ''}</div>
     </div>
     <button onclick="event.stopPropagation();showIntervalsModal()" style="font-size:12px;background:#185FA5;color:#fff;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:var(--font);font-weight:600">Edit ›</button>
   </div>`;
   return hoursHtml + renderMaintGauges() + comingUpHtml + intervalsCardHtml + logHtml;
 }
 
-function showIntervalsModal() {
+function showIntervalsModal(editingCat) {
   const intervals   = data.maintenance?.intervals || {};
+  const activeCats  = getActiveCategories();
   const customTasks = data.maintenance?.customIntervalTasks || [];
+  const inpStyle    = 'width:58px;text-align:center;border:0.5px solid var(--sep);border-radius:8px;padding:5px 4px;font-family:var(--font);font-size:13px;background:var(--bg);color:var(--label);-moz-appearance:textfield;appearance:textfield';
 
-  const inpStyle = 'width:58px;text-align:center;border:0.5px solid var(--sep);border-radius:8px;padding:5px 4px;font-family:var(--font);font-size:13px;background:var(--bg);color:var(--label);-moz-appearance:textfield;appearance:textfield';
-
-  function getVal(taskId, unit) {
+  function getVal(taskId) {
     const cust = intervals[taskId];
     const task = MAINT_TASKS.find(t => t.id === taskId);
-    if (cust) return unit === 'm' ? Math.round((cust.days || 365) / 30.5) : (cust.hrs || '');
+    if (cust) return cust.days ? Math.round(cust.days / 30.5) : (cust.hrs || '');
     if (!task) return '';
-    return unit === 'm' ? (task.intDays ? Math.round(task.intDays / 30.5) : '') : (task.intHrs || '');
+    return task.intDays ? Math.round(task.intDays / 30.5) : (task.intHrs || '');
   }
 
-  const SIMPLE_CONFIG = [
-    { section: 'Lubricating system', rows: [
-      { id: 'mt_oil',      label: 'Engine oil',      unit: 'h' },
-      { id: 'mt_sailoil',  label: 'Sail drive oil',  unit: 'h' },
-      { id: 'mt_ffuel',    label: 'Fuel filters',    unit: 'h' },
-      { id: 'mt_impeller', label: 'Impeller',        unit: 'h' },
-    ]},
-    { section: 'Engine', rows: [
-      { id: 'mt_valve',    label: 'Valve clearance', unit: 'h', sub: 'Check & adjust' },
-      { id: 'mt_hex',      label: 'Heat exchanger',  unit: 'h' },
-      { id: 'mt_coolant',  label: 'Engine coolant',  unit: 'm' },
-      { id: 'mt_belts_rep',label: 'Belts',           unit: 'h' },
-      { id: 'mt_rawpump',  label: 'Raw water pump',  unit: 'h' },
-      { id: 'mt_sdseals',  label: 'Sail drive lip seals', unit: 'h' },
-    ]},
-  ];
+  function unitFor(taskId) {
+    const cust = intervals[taskId];
+    const task = MAINT_TASKS.find(t => t.id === taskId);
+    return (cust?.days || task?.intDays) ? 'mo' : 'h';
+  }
 
-  const sectionsHtml = SIMPLE_CONFIG.map(sec => `
-    <div style="font-size:10px;font-weight:800;color:var(--label3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">${esc(sec.section)}</div>
-    <div class="card" style="margin-bottom:14px">
-      ${sec.rows.map(row => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:0.5px solid var(--sep)">
-          <div>
-            <div style="font-size:13px;font-weight:500;color:var(--label)">${esc(row.label)}</div>
-            ${row.sub ? `<div style="font-size:10px;color:var(--label3);margin-top:1px">${esc(row.sub)}</div>` : ''}
+  const activeSections = MAINT_CATEGORIES.filter(c => activeCats.includes(c.id)).map(cat => {
+    const isEditing = editingCat === cat.id;
+    const taskRows = cat.tasks.map(tid => {
+      const task = MAINT_TASKS.find(t => t.id === tid);
+      if (!task) return '';
+      const unit = unitFor(tid);
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:0.5px solid var(--sep)">
+        <div style="font-size:13px;font-weight:500;color:var(--label)">${esc(task.task)}</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="number" min="1" id="int_${tid}" value="${getVal(tid)}" placeholder="—" style="${inpStyle}">
+          <span style="font-size:12px;color:var(--label3);width:18px">${unit}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    const header = isEditing
+      ? `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:0.5px solid var(--sep);background:var(--surface2)">
+          <div style="font-size:12px;font-weight:700;color:var(--label)">${esc(cat.label)}</div>
+          <div style="display:flex;gap:8px">
+            <button onclick="deleteMaintCategory('${cat.id}')" style="font-size:12px;color:#E24B4A;background:none;border:1px solid #E24B4A;border-radius:8px;padding:3px 10px;cursor:pointer;font-family:var(--font);font-weight:600">Delete</button>
+            <button onclick="showIntervalsModal()" style="font-size:12px;background:none;border:0.5px solid var(--sep);border-radius:8px;padding:3px 10px;cursor:pointer;font-family:var(--font);color:var(--label2)">Done</button>
           </div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <input type="number" min="1" id="int_${row.id}" value="${getVal(row.id, row.unit)}" placeholder="—" style="${inpStyle}">
-            <span style="font-size:12px;color:var(--label3);width:16px">${row.unit}</span>
-          </div>
-        </div>`).join('').replace(/border-bottom[^;]+;([^<]*<\/div>\s*$)/, '$1')}
-    </div>`).join('');
+        </div>`
+      : `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:0.5px solid var(--sep);background:var(--surface2)">
+          <div style="font-size:12px;font-weight:700;color:var(--label)">${esc(cat.label)}</div>
+          <button onclick="showIntervalsModal('${cat.id}')" style="font-size:12px;background:none;border:0.5px solid var(--sep);border-radius:8px;padding:3px 10px;cursor:pointer;font-family:var(--font);color:var(--label2)">Edit</button>
+        </div>`;
+
+    return `<div style="font-size:10px;font-weight:800;color:var(--label3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">${esc(cat.label)}</div>
+      <div class="card" style="margin-bottom:16px">${header}${taskRows}</div>`;
+  }).join('');
+
+  const inactiveCats = MAINT_CATEGORIES.filter(c => !activeCats.includes(c.id));
+  const addButtons = inactiveCats.length ? `
+    <div style="font-size:10px;font-weight:800;color:var(--label3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Add category</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+      ${inactiveCats.map(c => `<button onclick="addMaintCategory('${c.id}')" style="font-size:13px;background:var(--surface);border:0.5px solid var(--sep);border-radius:10px;padding:8px 16px;cursor:pointer;font-family:var(--font);color:var(--label2);font-weight:500">+ ${esc(c.label)}</button>`).join('')}
+    </div>` : '';
 
   const customHtml = customTasks.map(cit => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:0.5px solid var(--sep)">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:0.5px solid var(--sep)">
       <div style="font-size:13px;font-weight:500;color:var(--label)">${esc(cit.name)}</div>
       <div style="display:flex;align-items:center;gap:6px">
         <input type="number" min="1" id="cit_${esc(cit.id)}" value="${cit.replaceHrs||''}" placeholder="—" style="${inpStyle}">
-        <span style="font-size:12px;color:var(--label3);width:16px">h</span>
+        <span style="font-size:12px;color:var(--label3);width:18px">h</span>
         <button onclick="deleteCustomIntervalTask('${esc(cit.id)}')" style="background:none;border:none;color:#E24B4A;font-size:15px;cursor:pointer;padding:0 0 0 2px;line-height:1" title="Remove">✕</button>
       </div>
     </div>`).join('');
 
   const html = `
     <div style="max-height:65vh;overflow-y:auto;padding-right:2px;margin-bottom:12px">
-      ${sectionsHtml}
+      ${activeSections}
+      ${addButtons}
       <div style="font-size:10px;font-weight:800;color:var(--label3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Custom tasks</div>
       <div class="card" style="margin-bottom:4px">
         ${customHtml}
@@ -2219,33 +2240,39 @@ function showIntervalsModal() {
   showModal('Service intervals', html);
 }
 
+function addMaintCategory(catId) {
+  if (!data.maintenance) data.maintenance = {};
+  const active = getActiveCategories();
+  if (!active.includes(catId)) {
+    active.push(catId);
+    data.maintenance.activeCategories = active;
+    save();
+  }
+  showIntervalsModal();
+}
+
+function deleteMaintCategory(catId) {
+  if (!data.maintenance) return;
+  const active = getActiveCategories();
+  data.maintenance.activeCategories = active.filter(id => id !== catId);
+  save();
+  showIntervalsModal();
+}
+
 function saveIntervals() {
   if (!data.maintenance) data.maintenance = {};
   if (!data.maintenance.intervals) data.maintenance.intervals = {};
   const ints = data.maintenance.intervals;
 
-  const SIMPLE_CONFIG = [
-    { section: 'Lubricating system', rows: [
-      { id: 'mt_oil', unit: 'h' }, { id: 'mt_sailoil', unit: 'h' },
-      { id: 'mt_ffuel', unit: 'h' }, { id: 'mt_impeller', unit: 'h' },
-    ]},
-    { section: 'Engine', rows: [
-      { id: 'mt_valve', unit: 'h' }, { id: 'mt_hex', unit: 'h' },
-      { id: 'mt_coolant', unit: 'm' }, { id: 'mt_belts_rep', unit: 'h' },
-      { id: 'mt_rawpump', unit: 'h' }, { id: 'mt_sdseals', unit: 'h' },
-    ]},
-  ];
-
-  SIMPLE_CONFIG.forEach(sec => {
-    sec.rows.forEach(row => {
-      const el  = document.getElementById('int_' + row.id);
-      const val = el ? parseInt(el.value) : NaN;
-      if (val > 0) {
-        ints[row.id] = row.unit === 'm' ? { days: Math.round(val * 30.5) } : { hrs: val };
-      } else {
-        delete ints[row.id];
-      }
-    });
+  MAINT_TASKS.forEach(task => {
+    const el  = document.getElementById('int_' + task.id);
+    if (!el) return;
+    const val = parseInt(el.value);
+    if (val > 0) {
+      ints[task.id] = task.intDays ? { days: Math.round(val * 30.5) } : { hrs: val };
+    } else {
+      delete ints[task.id];
+    }
   });
 
   (data.maintenance.customIntervalTasks || []).forEach(cit => {
