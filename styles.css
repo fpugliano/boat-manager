@@ -42,7 +42,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--label);min-height:
 .tab-bar{background:var(--surface);border-bottom:1px solid var(--sep);
   overflow-x:auto;display:flex;gap:6px;padding:8px 12px;scrollbar-width:none}
 .tab-bar::-webkit-scrollbar{display:none}
-.tab-btn{flex-shrink:0;background:var(--surface2);border:1.5px solid var(--sep);border-radius:8px;
+.tab-btn{flex-shrink:0;background:var(--surface2);border:0.5px solid var(--sep);border-radius:8px;
   font-family:var(--font);font-size:12px;font-weight:600;color:var(--label2);
   padding:7px 10px;cursor:pointer;white-space:nowrap;transition:all .15s}
 .tab-btn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
@@ -89,7 +89,7 @@ select.fi{-webkit-appearance:none}
   font-size:15px;font-weight:600;cursor:pointer;transition:opacity .15s}
 .btn:active{opacity:.75}
 .btn-p{background:var(--blue);color:#fff}
-.btn-s{background:var(--surface2);color:var(--blue);border:1.5px solid var(--sep)}
+.btn-s{background:var(--surface2);color:var(--blue);border:0.5px solid var(--sep)}
 .btn-d{background:rgba(255,59,48,.1);color:var(--red)}
 .btn-sm{padding:6px 12px;font-size:13px;border-radius:8px}
 .btn-xs{padding:4px 10px;font-size:12px;border-radius:7px}
@@ -126,7 +126,7 @@ select.fi{-webkit-appearance:none}
 .hours-edit{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:12px}
 .h-btn{width:38px;height:38px;border-radius:50%;border:none;background:var(--surface2);
   font-size:20px;font-weight:700;color:var(--label);cursor:pointer}
-.h-input{width:80px;border:1.5px solid var(--sep);border-radius:10px;padding:8px;
+.h-input{width:80px;border:0.5px solid var(--sep);border-radius:10px;padding:8px;
   font-family:var(--font);font-size:17px;text-align:center;background:var(--surface);
   color:var(--label);outline:none}
 .maint-row{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;
@@ -142,7 +142,7 @@ select.fi{-webkit-appearance:none}
 
 /* ── Spare parts ── */
 .parts-top{display:flex;gap:8px;margin-bottom:10px}
-.search-box{flex:1;border:1.5px solid var(--sep);border-radius:10px;padding:9px 14px;
+.search-box{flex:1;border:0.5px solid var(--sep);border-radius:10px;padding:9px 14px;
   font-family:var(--font);font-size:14px;background:var(--surface);color:var(--label);
   outline:none}
 .search-box:focus{border-color:var(--blue)}
@@ -171,7 +171,7 @@ select.fi{-webkit-appearance:none}
 .sys-body.open{display:block}
 
 /* ── Winterization ── */
-.wcard{background:var(--surface);border:1.5px solid var(--sep);border-radius:14px;margin-bottom:12px;overflow:hidden}
+.wcard{background:var(--surface);border:0.5px solid var(--sep);border-radius:14px;margin-bottom:12px;overflow:hidden}
 .whdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;user-select:none;-webkit-user-select:none}
 .wrow{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--sep)}
 .wrow:last-child{border-bottom:none}
@@ -208,7 +208,7 @@ select.fi{-webkit-appearance:none}
 .setup-sub{font-size:15px;color:var(--label3);margin-bottom:28px}
 .setup-lbl{display:block;font-size:12px;font-weight:600;color:var(--label2);
   margin-bottom:8px;text-transform:uppercase;letter-spacing:.3px}
-.setup-inp{width:100%;border:1.5px solid var(--sep);border-radius:12px;padding:13px 16px;
+.setup-inp{width:100%;border:0.5px solid var(--sep);border-radius:12px;padding:13px 16px;
   font-family:var(--font);font-size:17px;background:var(--surface);color:var(--label);
   outline:none;margin-bottom:18px}
 .setup-inp:focus{border-color:var(--blue)}
@@ -230,7 +230,7 @@ select.fi{-webkit-appearance:none}
   max-height:88vh;overflow-y:auto;padding:18px 18px 50px}
 .modal-handle{width:36px;height:4px;border-radius:2px;background:var(--sep);margin:0 auto 14px}
 .modal-title{font-size:19px;font-weight:700;color:var(--label);margin-bottom:16px}
-.mi{width:100%;border:1.5px solid var(--sep);border-radius:10px;padding:11px 14px;
+.mi{width:100%;border:0.5px solid var(--sep);border-radius:10px;padding:11px 14px;
   font-family:var(--font);font-size:15px;background:var(--surface);color:var(--label);
   outline:none;margin-bottom:12px}
 .mi:focus{border-color:var(--blue)}
@@ -304,7 +304,7 @@ input[type=file]{display:none}
 
 /* ── PIN boxes ── */
 .pin-boxes{display:flex;gap:12px;justify-content:center;margin:12px 0 6px}
-.pin-box{width:54px;height:62px;border:1.5px solid var(--sep);border-radius:12px;
+.pin-box{width:54px;height:62px;border:0.5px solid var(--sep);border-radius:12px;
   font-size:28px;text-align:center;background:var(--surface);color:var(--label);
   font-family:var(--font);outline:none;-webkit-appearance:none;appearance:none}
 .pin-box:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,122,255,.15)}
