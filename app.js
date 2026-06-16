@@ -4019,8 +4019,8 @@ function renderProvisionsList() {
   const items = prov.items || [];
   const visible = sub === 'all' ? items : items.filter(it => it.category === sub);
 
-  // Shopping list — items below min, across all categories
-  const needed = items.filter(it => it.minQty > 0 && it.qty < it.minQty)
+  // Shopping list — all unchecked items (bought=false/undefined means "needs buying")
+  const needed = items.filter(it => !it.bought)
     .sort((a,b) => PROV_CAT_ORDER.indexOf(a.category) - PROV_CAT_ORDER.indexOf(b.category));
   const shoppingCard = needed.length ? `
     <div style="background:rgba(251,146,60,.12);border:0.5px solid #fb923c;border-radius:14px;padding:10px 14px;margin-bottom:12px">
@@ -4030,9 +4030,8 @@ function renderProvisionsList() {
       </div>
       ${needed.map(it=>`
         <div style="display:flex;align-items:center;gap:8px;padding:4px 0">
-          <input type="checkbox" onchange="provMarkBought('${it.id}',this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:#fb923c">
+          <input type="checkbox" onchange="provToggleBought(${items.indexOf(it)},this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:#fb923c">
           <span style="flex:1;font-size:13px">${esc(it.name)}</span>
-          <span style="font-size:12px;color:#fb923c;font-weight:600">need ${it.minQty - it.qty} more</span>
         </div>`).join('')}
     </div>` : '';
 
@@ -4045,27 +4044,14 @@ function renderProvisionsList() {
   const catCards = PROV_CAT_ORDER.filter(c => byCat[c]).map(c => {
     const rows = byCat[c].map(it => {
       const origIdx = items.indexOf(it);
-      const low = it.minQty > 0 && it.qty < it.minQty;
-      const badge = it.minQty > 0
-        ? (low ? `<span style="background:rgba(239,68,68,.12);color:#ef4444;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:600">Low</span>`
-                : `<span style="background:rgba(34,197,94,.12);color:#22c55e;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:600">OK</span>`)
-        : '';
-      const qtyColor = low ? '#ef4444' : '#22c55e';
-      const unitLabel = it.unit ? ` ${esc(it.unit)}` : '';
       const dimmed = it.bought ? 'opacity:0.4;' : '';
       return `<div data-prov-id="${it.id}" draggable="true" ondragstart="provDragStart(event,'${it.id}')" ondragover="provDragOver(event,'${it.id}')" ondragleave="provDragLeave(event)" ondrop="provDrop(event,'${it.id}')" ondragend="provDragEnd()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-top:1px solid var(--sep);${dimmed}">
         <span class="prov-grip" ontouchstart="provTouchStart(event,'${it.id}')">⠿</span>
         <input type="checkbox" ${it.bought?'checked':''} onchange="provToggleBought(${origIdx},this.checked)" style="width:17px;height:17px;flex-shrink:0;cursor:pointer;accent-color:var(--blue)">
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:600;${it.bought?'color:var(--label3);':'color:var(--label);'}">${esc(it.name)}</div>
-          <div style="font-size:11px;color:var(--label3)">${it.location?esc(it.location)+' · ':''}min ${it.minQty}${unitLabel}</div>
+          ${it.location?`<div style="font-size:11px;color:var(--label3)">${esc(it.location)}</div>`:''}
         </div>
-        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-          <button onclick="provAdj(${origIdx},-1)" style="background:var(--surface2);border:0.5px solid var(--sep);border-radius:8px;width:26px;height:26px;font-size:16px;line-height:1;cursor:pointer;color:var(--label);font-family:var(--font)">−</button>
-          <span style="font-size:15px;font-weight:700;color:${qtyColor};min-width:22px;text-align:center">${it.qty}</span>
-          <button onclick="provAdj(${origIdx},1)" style="background:var(--surface2);border:0.5px solid var(--sep);border-radius:8px;width:26px;height:26px;font-size:16px;line-height:1;cursor:pointer;color:var(--label);font-family:var(--font)">+</button>
-        </div>
-        ${badge}
         <button onclick="provEdit(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:14px;color:var(--label3);line-height:1;flex-shrink:0">✏️</button>
       </div>`;
     }).join('');
@@ -4233,12 +4219,6 @@ function setProvSub(s) {
   document.getElementById('mainContent').innerHTML = renderProvisions();
 }
 
-function provAdj(idx, delta) {
-  const prov = getProvisionsData();
-  if (!prov.items[idx]) return;
-  prov.items[idx].qty = Math.max(0, (prov.items[idx].qty || 0) + delta);
-  save(); document.getElementById('mainContent').innerHTML = renderProvisions();
-}
 function provToggleBought(idx, checked) {
   const prov = getProvisionsData();
   if (!prov.items[idx]) return;
@@ -4249,13 +4229,6 @@ function provUncheckAll() {
   const prov = getProvisionsData();
   prov.items.forEach(it => { it.bought = false; });
   save(); document.getElementById('mainContent').innerHTML = renderProvisions();
-}
-
-function provMarkBought(id, checked) {
-  if (!checked) return;
-  const prov = getProvisionsData();
-  const it = prov.items.find(x => x.id === id);
-  if (it) { it.qty = it.minQty; save(); document.getElementById('mainContent').innerHTML = renderProvisions(); }
 }
 
 function provDragStart(e, id) {
@@ -4353,8 +4326,6 @@ function provItemModal(item, idx, lockedCat) {
     <div class="mi-label">Category</div>
     ${catField}
     <div class="mi-label">Location on boat</div><input class="mi" id="pv-loc" value="${esc(e.location||'')}">
-    <div class="mi-label">Current quantity</div><input class="mi" id="pv-qty" type="number" min="0" value="${e.qty||0}">
-    <div class="mi-label">Minimum quantity</div><input class="mi" id="pv-min" type="number" min="0" value="${e.minQty||0}">
     <div class="mi-label">Unit (optional)</div><input class="mi" id="pv-unit" placeholder="bottles, cans, rolls…" value="${esc(e.unit||'')}">
     <div class="modal-btns">
       ${isEdit?`<button onclick="if(confirm('Delete this item?')){hideModal();provDelete(${idx})}" style="background:#FCEBEB;border:0.5px solid #F09595;color:#A32D2D;border-radius:8px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">Delete</button>`:''}
@@ -4376,13 +4347,11 @@ function provSave(idx) {
   if (!name) { showToast('Enter a name', true); return; }
   const category = document.getElementById('pv-cat')?.value || 'misc';
   const location = document.getElementById('pv-loc')?.value.trim() || '';
-  const qty     = Math.max(0, parseInt(document.getElementById('pv-qty')?.value) || 0);
-  const minQty  = Math.max(0, parseInt(document.getElementById('pv-min')?.value) || 0);
   const unit    = document.getElementById('pv-unit')?.value.trim() || '';
   if (idx != null && idx !== 'null') {
-    prov.items[idx] = {...prov.items[idx], name, category, location, qty, minQty, unit};
+    prov.items[idx] = {...prov.items[idx], name, category, location, unit};
   } else {
-    prov.items.push({id:uid(), name, category, location, qty, minQty, unit});
+    prov.items.push({id:uid(), name, category, location, unit});
   }
   if (prov.exampleDismissed === false) prov.exampleDismissed = true;
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderProvisions();
