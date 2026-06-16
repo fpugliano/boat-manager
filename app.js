@@ -123,7 +123,7 @@ let ui = {
   tab:'documents', docSub:'vessel', maintEngine:'port',
   photoSub:'vesselDoc', crewOpen:null, sysOpen:null, sysTab:'All',
   partsSearch:'', partsFilter:'All', alertsOpen:false, maintShowAll:false, maintTaskFilter:'All',
-  provisionsSub:'all', tlDetailId:null
+  provisionsSub:'all', provisionsView:'list', tlDetailId:null
 };
 let _photoCtx = null; // {section, index} for upload
 
@@ -3875,6 +3875,22 @@ function getProvisionsData() {
 }
 
 function renderProvisions() {
+  return (ui.provisionsView || 'list') === 'insights'
+    ? renderProvisionsInsights()
+    : renderProvisionsList();
+}
+
+function _provViewToggle() {
+  const v = ui.provisionsView || 'list';
+  return `<div style="display:flex;background:var(--surface2);border-radius:8px;padding:2px;gap:2px;margin-bottom:8px">
+    <button onclick="ui.provisionsView='list';document.getElementById('mainContent').innerHTML=renderProvisions()"
+      style="flex:1;border:none;border-radius:6px;padding:5px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .15s;${v==='list'?'background:var(--surface);color:var(--blue);box-shadow:0 1px 2px rgba(0,0,0,.08)':'background:transparent;color:var(--label3)'}">List</button>
+    <button onclick="ui.provisionsView='insights';document.getElementById('mainContent').innerHTML=renderProvisions()"
+      style="flex:1;border:none;border-radius:6px;padding:5px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .15s;${v==='insights'?'background:var(--surface);color:var(--blue);box-shadow:0 1px 2px rgba(0,0,0,.08)':'background:transparent;color:var(--label3)'}">Insights</button>
+  </div>`;
+}
+
+function renderProvisionsList() {
   const prov = getProvisionsData();
   const email = localStorage.getItem(EMAIL_KEY);
   const isOwner = email === OWNER_EMAIL;
@@ -3953,6 +3969,7 @@ function renderProvisions() {
     : '';
 
   return `<div style="padding:12px">
+    ${_provViewToggle()}
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px">
       <button onclick="provUncheckAll()" style="background:var(--surface2);color:var(--label);border:0.5px solid var(--sep);border-radius:8px;padding:5px 14px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">Uncheck All</button>
       <button onclick="provAddModal()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:5px 14px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">+ Add item</button>
@@ -3961,6 +3978,128 @@ function renderProvisions() {
     <div class="subtab-bar" style="margin-bottom:10px">${subtabs}</div>
     ${shoppingCard}
     ${catCards}${emptyMsg}
+  </div>`;
+}
+
+function renderProvisionsInsights() {
+  const prov = getProvisionsData();
+  const items = prov.items || [];
+  const now = new Date();
+  const thisYM = now.getFullYear() * 100 + (now.getMonth() + 1);
+  const lastDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastYM = lastDate.getFullYear() * 100 + (lastDate.getMonth() + 1);
+  const fmt = n => `€${Number(n).toFixed(2)}`;
+
+  const hasData = items.some(it => (it.priceHistory || []).some(h => h.price != null));
+
+  if (!hasData) {
+    return `<div style="padding:12px">
+      ${_provViewToggle()}
+      <div style="padding:40px 16px;text-align:center">
+        <div style="font-size:40px;margin-bottom:12px">📊</div>
+        <div style="font-size:15px;font-weight:600;color:var(--label);margin-bottom:8px">No spend data yet</div>
+        <div style="font-size:13px;color:var(--label3);line-height:1.6;max-width:260px;margin:0 auto">Insights build up automatically from AI-imported receipts — no manual entry needed.</div>
+      </div>
+    </div>`;
+  }
+
+  // Monthly spend
+  let thisMonthSpend = 0, lastMonthSpend = 0;
+  items.forEach(it => {
+    (it.priceHistory || []).forEach(h => {
+      if (h.price == null || !h.date) return;
+      try {
+        const d = new Date(h.date);
+        const ym = d.getFullYear() * 100 + (d.getMonth() + 1);
+        if (ym === thisYM) thisMonthSpend += Number(h.price) || 0;
+        if (ym === lastYM) lastMonthSpend += Number(h.price) || 0;
+      } catch(e) {}
+    });
+  });
+  const spendDiff = thisMonthSpend - lastMonthSpend;
+  const spendArrow = spendDiff > 0 ? '↑' : spendDiff < 0 ? '↓' : '→';
+  const spendColor = spendDiff > 0 ? 'var(--red)' : spendDiff < 0 ? 'var(--green)' : 'var(--label3)';
+  const spendCard = (thisMonthSpend > 0 || lastMonthSpend > 0) ? `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-hd">Monthly spend</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;padding:12px 14px;gap:8px">
+        <div style="text-align:center">
+          <div style="font-size:20px;font-weight:700;color:var(--blue)">${fmt(thisMonthSpend)}</div>
+          <div style="font-size:11px;color:var(--label3);margin-top:2px">This month</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:20px;font-weight:700;color:var(--label2)">${fmt(lastMonthSpend)}</div>
+          <div style="font-size:11px;color:var(--label3);margin-top:2px">Last month</div>
+        </div>
+      </div>
+      ${spendDiff !== 0 ? `<div style="padding:0 14px 12px;font-size:12px;color:${spendColor};font-weight:600">${spendArrow} ${fmt(Math.abs(spendDiff))} vs last month</div>` : ''}
+    </div>` : '';
+
+  // Store price comparison — items with history from 2+ different stores
+  const byName = {};
+  items.forEach(it => {
+    (it.priceHistory || []).forEach(h => {
+      if (!h.store || h.price == null) return;
+      const key = (it.name || '').toLowerCase().trim();
+      if (!key) return;
+      if (!byName[key]) byName[key] = { name: it.name, byStore: {} };
+      if (!byName[key].byStore[h.store]) byName[key].byStore[h.store] = [];
+      byName[key].byStore[h.store].push(Number(h.price));
+    });
+  });
+  const comparisons = Object.values(byName).filter(x => Object.keys(x.byStore).length >= 2);
+  const storeCard = comparisons.length ? `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-hd">Store price comparison</div>
+      ${comparisons.map(item => {
+        const storeLatest = Object.entries(item.byStore).map(([store, prices]) => ({ store, price: prices[prices.length - 1] }));
+        storeLatest.sort((a,b) => a.price - b.price);
+        const cheapest = storeLatest[0];
+        const priciest = storeLatest[storeLatest.length - 1];
+        const pctDiff = priciest.price > 0 ? Math.round((priciest.price - cheapest.price) / priciest.price * 100) : 0;
+        return `<div style="padding:10px 14px;border-bottom:1px solid var(--sep)">
+          <div style="font-size:13px;font-weight:600;color:var(--label);margin-bottom:6px">${esc(item.name)}</div>
+          ${storeLatest.map(({store, price}) => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">
+              <span style="font-size:12px;color:var(--label2)">${esc(store)}</span>
+              <span style="font-size:12px;font-weight:700;color:${store===cheapest.store?'var(--green)':'var(--label)'}">${fmt(price)}${store===cheapest.store?' ✓':''}</span>
+            </div>`).join('')}
+          ${pctDiff > 0 ? `<div style="font-size:11px;color:var(--green);margin-top:4px">${pctDiff}% cheaper at ${esc(cheapest.store)}</div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
+  // Buying frequency — items purchased 2+ times
+  const allEntries = {};
+  items.forEach(it => {
+    const history = (it.priceHistory || []).filter(h => h.date);
+    if (history.length < 2) return;
+    const key = (it.name || '').toLowerCase().trim();
+    if (!key) return;
+    if (!allEntries[key]) allEntries[key] = { name: it.name, dates: [] };
+    history.forEach(h => allEntries[key].dates.push(h.date));
+  });
+  const freqItems = Object.values(allEntries).filter(x => x.dates.length >= 2).map(x => {
+    x.dates.sort();
+    const first = new Date(x.dates[0]);
+    const last  = new Date(x.dates[x.dates.length - 1]);
+    const days  = Math.round((last - first) / 86400000);
+    const avgDays = Math.round(days / (x.dates.length - 1));
+    return { name: x.name, avgDays, count: x.dates.length };
+  }).filter(x => x.avgDays > 0);
+  const freqCard = freqItems.length ? `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-hd">Buying frequency</div>
+      ${freqItems.map(it => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--sep)">
+          <span style="font-size:13px;color:var(--label)">${esc(it.name)}</span>
+          <span style="font-size:12px;color:var(--label3);font-weight:500">every ~${it.avgDays}d</span>
+        </div>`).join('')}
+    </div>` : '';
+
+  return `<div style="padding:12px">
+    ${_provViewToggle()}
+    ${spendCard}${storeCard}${freqCard}
   </div>`;
 }
 
@@ -8981,18 +9120,80 @@ function timeAgo(isoStr) {
 
 // ── AI Import Assistant ──────────────────────────────────────
 let _aiImportText = '', _aiImportParsed = null, _aiImportInProgress = false, _aiImportPhotoData = null;
+let _aiSectionDest = null, _aiItemState = null;
 
 function showAiImportModal() {
   _aiImportText = '';
   _aiImportParsed = null;
   _aiImportInProgress = false;
   _aiImportPhotoData = null;
+  _aiSectionDest = null;
+  _aiItemState = null;
   showModal('AI Import Assistant', _aiStep1Html());
 }
 
 function showAiImportTextMode() {
   showAiImportModal();
   setTimeout(() => aiShowTextInput(), 0);
+}
+
+function _normProvCat(cat) {
+  if (PROV_CAT_ORDER.includes(cat)) return cat;
+  if (cat === 'cleaning') return 'toiletries';
+  return 'misc';
+}
+function _aiRefreshStep3() {
+  const body = document.getElementById('modalBody');
+  if (body && _aiImportParsed) {
+    const inner = document.querySelector('.modal-inner');
+    if (inner) inner.innerHTML = `<div class="modal-title">AI Import Assistant</div>` + _aiStep3Html(_aiImportParsed);
+    else body.innerHTML = _aiStep3Html(_aiImportParsed);
+  }
+}
+function aiRedirectSection(section, dest) {
+  if (!_aiSectionDest || !_aiItemState) return;
+  _aiSectionDest[section] = dest;
+  const defaultCat = dest === 'provisions' ? 'misc' : PART_CATEGORIES[0];
+  (_aiItemState[section] || []).forEach(it => { it.category = defaultCat; });
+  _aiRefreshStep3();
+}
+function aiToggleItem(section, idx) {
+  if (_aiItemState?.[section]) _aiItemState[section][idx].include = !_aiItemState[section][idx].include;
+  const btn = document.getElementById('ai-import-btn');
+  if (btn) { const n = _aiCountIncluded(_aiImportParsed); btn.textContent = `Import ${n} ${n===1?'entry':'entries'}`; }
+  const row = document.getElementById(`ai-row-${section}-${idx}`);
+  if (row) row.style.opacity = _aiItemState[section][idx].include ? '1' : '0.4';
+  const cb = document.getElementById(`ai-cb-${section}-${idx}`);
+  if (cb) cb.checked = _aiItemState[section][idx].include;
+  const hd = document.getElementById(`ai-hd-${section}`);
+  if (hd) { const st = _aiItemState[section]; hd.textContent = `${st.filter(s=>s.include).length}/${st.length} selected`; }
+}
+function aiSetItemCat(section, idx, val) {
+  if (_aiItemState?.[section]) _aiItemState[section][idx].category = val;
+}
+function _aiCountIncluded(parsed) {
+  if (!parsed) return 0;
+  let n = 0;
+  if (_aiItemState?.provisions) n += _aiItemState.provisions.filter(it => it.include).length;
+  else if (Array.isArray(parsed.provisions)) n += parsed.provisions.length;
+  if (_aiItemState?.spareParts) n += _aiItemState.spareParts.filter(it => it.include).length;
+  else if (Array.isArray(parsed.spareParts)) n += parsed.spareParts.length;
+  if (Array.isArray(parsed.maintenance) && parsed.maintenance.length) n += parsed.maintenance.length;
+  const tl = parsed.documents?.transitLog;
+  if (tl && Object.values(tl).some(v => v !== '' && v != null)) n += 1;
+  const cu = parsed.documents?.customs;
+  if (cu && Object.values(cu).some(v => v !== '' && v != null && !(Array.isArray(v) && !v.length))) n += 1;
+  const ins = parsed.documents?.insurance;
+  if (ins && Object.values(ins).some(v => v !== '' && v != null)) n += 1;
+  if (Array.isArray(parsed.safety?.flares) && parsed.safety.flares.length) n += parsed.safety.flares.length;
+  if (Array.isArray(parsed.safety?.lifeRafts) && parsed.safety.lifeRafts.length) n += parsed.safety.lifeRafts.length;
+  if (Array.isArray(parsed.systems) && parsed.systems.length) n += parsed.systems.length;
+  if (parsed.watermaker) n += 1;
+  if (parsed.lpg?.history?.length) n += parsed.lpg.history.length;
+  if (parsed.shipyard?.current?.name || parsed.shipyard?.history?.length || parsed.shipyard?.quotes?.length) n += 1;
+  if (parsed.upgrades?.seasons?.length) n += parsed.upgrades.seasons.reduce((a, s) => a + (s.items?.length || 0), 0);
+  if (parsed.documents?.vessel && Object.values(parsed.documents.vessel).some(v => v)) n += 1;
+  return n;
 }
 
 function _aiStep1Html() {
@@ -9121,10 +9322,20 @@ async function aiImportConvert() {
 }
 
 function _aiStep3Html(parsed) {
+  // Init item state once; preserved across re-renders triggered by aiToggleItem / aiRedirectSection
+  if (!_aiSectionDest) _aiSectionDest = { provisions: 'provisions', spareParts: 'spareParts' };
+  if (!_aiItemState) _aiItemState = {
+    provisions: (parsed.provisions || []).map(e => ({ include: true, category: _normProvCat(e.category) })),
+    spareParts: (parsed.spareParts  || []).map(e => ({
+      include: true,
+      category: PART_CATEGORIES.includes(e.category) ? e.category : PART_CATEGORIES[0],
+    })),
+  };
+
   const sections = [];
-  let total = 0;
+  const selSty = 'font-size:11px;border:0.5px solid var(--sep);border-radius:6px;padding:2px 6px;background:var(--surface2);color:var(--label2);font-family:var(--font);cursor:pointer;max-width:130px';
+
   if (Array.isArray(parsed.maintenance) && parsed.maintenance.length) {
-    total += parsed.maintenance.length;
     const rows = parsed.maintenance.slice(0, 5).map(e =>
       `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(e.date||'?')} · ${esc(String(e.hours||'?'))}h · ${esc(e.task||'?')}</div>`).join('');
     sections.push(`<div style="margin-bottom:12px">
@@ -9132,29 +9343,68 @@ function _aiStep3Html(parsed) {
       ${rows}${parsed.maintenance.length > 5 ? `<div style="font-size:11px;color:var(--label3)">…and ${parsed.maintenance.length - 5} more</div>` : ''}
     </div>`);
   }
+
   if (Array.isArray(parsed.provisions) && parsed.provisions.length) {
-    total += parsed.provisions.length;
-    const rows = parsed.provisions.slice(0, 4).map(e =>
-      `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(e.name||'?')} × ${esc(String(e.qty||1))} ${esc(e.unit||'')}</div>`).join('');
+    const states = _aiItemState.provisions;
+    const dest   = _aiSectionDest.provisions;
+    const inclN  = states.filter(s => s.include).length;
+    const destSel = `<select onchange="aiRedirectSection('provisions',this.value)" style="${selSty}">
+      <option value="provisions" ${dest==='provisions'?'selected':''}>→ Provisions</option>
+      <option value="spareParts" ${dest==='spareParts'?'selected':''}>→ Spare Parts</option>
+    </select>`;
+    const rows = parsed.provisions.map((e, idx) => {
+      const st = states[idx];
+      const catOpts = dest === 'provisions'
+        ? PROV_CAT_ORDER.map(c => `<option value="${c}" ${st.category===c?'selected':''}>${PROV_CAT_LABELS[c]}</option>`).join('')
+        : PART_CATEGORIES.map(c => `<option value="${c}" ${st.category===c?'selected':''}>${esc(c)}</option>`).join('');
+      const priceStr = e.price != null ? ` · €${e.price}` : '';
+      return `<div id="ai-row-provisions-${idx}" style="display:flex;align-items:center;gap:6px;padding:3px 0;${!st.include?'opacity:0.4;':''}">
+        <input id="ai-cb-provisions-${idx}" type="checkbox" ${st.include?'checked':''} onchange="aiToggleItem('provisions',${idx})" style="width:15px;height:15px;cursor:pointer;accent-color:var(--blue);flex-shrink:0">
+        <span style="flex:1;font-size:11px;color:var(--label2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.name||'?')}">${esc(e.name||'?')}${e.qty&&e.qty!==1?` ×${e.qty}`:''}${priceStr}</span>
+        <select onchange="aiSetItemCat('provisions',${idx},this.value)" style="${selSty}">${catOpts}</select>
+      </div>`;
+    }).join('');
     sections.push(`<div style="margin-bottom:12px">
-      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🛒 Provisions — ${parsed.provisions.length} items <span style="font-weight:400;color:var(--label3)">→ Provisions tab</span></div>
-      ${rows}${parsed.provisions.length > 4 ? `<div style="font-size:11px;color:var(--label3)">…and ${parsed.provisions.length - 4} more</div>` : ''}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+        <div style="font-size:12px;font-weight:700;color:var(--label)">🛒 Provisions <span id="ai-hd-provisions" style="font-weight:400;color:var(--label3)">${inclN}/${parsed.provisions.length} selected</span></div>
+        ${destSel}
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:6px 8px">${rows}</div>
     </div>`);
   }
+
   if (Array.isArray(parsed.spareParts) && parsed.spareParts.length) {
-    total += parsed.spareParts.length;
-    const rows = parsed.spareParts.slice(0, 4).map(e =>
-      `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(e.name||'?')} × ${esc(String(e.qty||1))}</div>`).join('');
+    const states = _aiItemState.spareParts;
+    const dest   = _aiSectionDest.spareParts;
+    const inclN  = states.filter(s => s.include).length;
+    const destSel = `<select onchange="aiRedirectSection('spareParts',this.value)" style="${selSty}">
+      <option value="spareParts" ${dest==='spareParts'?'selected':''}>→ Spare Parts</option>
+      <option value="provisions" ${dest==='provisions'?'selected':''}>→ Provisions</option>
+    </select>`;
+    const rows = parsed.spareParts.map((e, idx) => {
+      const st = states[idx];
+      const catOpts = dest === 'spareParts'
+        ? PART_CATEGORIES.map(c => `<option value="${c}" ${st.category===c?'selected':''}>${esc(c)}</option>`).join('')
+        : PROV_CAT_ORDER.map(c => `<option value="${c}" ${st.category===c?'selected':''}>${PROV_CAT_LABELS[c]}</option>`).join('');
+      return `<div id="ai-row-spareParts-${idx}" style="display:flex;align-items:center;gap:6px;padding:3px 0;${!st.include?'opacity:0.4;':''}">
+        <input id="ai-cb-spareParts-${idx}" type="checkbox" ${st.include?'checked':''} onchange="aiToggleItem('spareParts',${idx})" style="width:15px;height:15px;cursor:pointer;accent-color:var(--blue);flex-shrink:0">
+        <span style="flex:1;font-size:11px;color:var(--label2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.name||'?')}">${esc(e.name||'?')} ×${esc(String(e.qty||1))}</span>
+        <select onchange="aiSetItemCat('spareParts',${idx},this.value)" style="${selSty}">${catOpts}</select>
+      </div>`;
+    }).join('');
     sections.push(`<div style="margin-bottom:12px">
-      <div style="font-size:12px;font-weight:700;color:var(--label);margin-bottom:4px">🔩 Spare Parts — ${parsed.spareParts.length} items <span style="font-weight:400;color:var(--label3)">→ Spare Parts tab</span></div>
-      ${rows}${parsed.spareParts.length > 4 ? `<div style="font-size:11px;color:var(--label3)">…and ${parsed.spareParts.length - 4} more</div>` : ''}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+        <div style="font-size:12px;font-weight:700;color:var(--label)">🔩 Spare Parts <span id="ai-hd-spareParts" style="font-weight:400;color:var(--label3)">${inclN}/${parsed.spareParts.length} selected</span></div>
+        ${destSel}
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:6px 8px">${rows}</div>
     </div>`);
   }
+
   function docFieldVal(v) { return Array.isArray(v) ? v.join(', ') : String(v); }
   const tlData = parsed.documents?.transitLog;
   const tlFields = tlData ? Object.entries(tlData).filter(([,v]) => v !== '' && v !== null && v !== undefined) : [];
   if (tlFields.length) {
-    total += 1;
     const TL_DOC_KEYS = {docNumber:'Doc #',issueDate:'Issue Date',validFrom:'Valid From',validUntil:'Valid Until',customsAuthority:'Customs Authority',validityType:'Validity Type',prevDocsCount:'Prev Docs',otherNotes:'Notes',provisions:'Provisions'};
     const TL_VSL_KEYS = {vesselName:'Vessel Name',flag:'Flag',portOfRegistry:'Port of Registry',registrationNumber:'Reg #',callSign:'Call Sign',vesselType:'Type',grossTonnage:'GT',engine:'Engine',lengthLOA:'LOA',yearBuilt:'Year Built',yearFirstReg:'Year First Reg',ownerName:'Owner',holderName:'Holder',address:'Address',telephone:'Tel',email:'Email',afmTin:'AFM/TIN',passportId:'ID/Passport'};
     const docRows = tlFields.filter(([k]) => TL_DOC_KEYS[k]).map(([k,v]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(TL_DOC_KEYS[k])}: ${esc(docFieldVal(v))}</div>`).join('');
@@ -9168,7 +9418,6 @@ function _aiStep3Html(parsed) {
   const cusData = parsed.documents?.customs;
   const cusFields = cusData ? Object.entries(cusData).filter(([,v]) => v !== '' && v !== null && v !== undefined && !(Array.isArray(v) && !v.length)) : [];
   if (cusFields.length) {
-    total += 1;
     const CUS_LABELS = {applicationNumber:'App #',applicationDate:'App Date',entryDate:'Entry Date',year:'Year',monthsCovered:'Months',amountPaid:'Amount Paid',paymentCode:'Payment Code',adminFeeCode:'Admin Fee Code',status:'Status',validUntil:'Valid Until',holderName:'Holder',afmTin:'AFM/TIN',customsOffice:'Customs Office',clearanceNumber:'Clearance #',email:'Email',paymentRef:'Payment Ref',passportNumber:'Passport #',phone:'Phone',address:'Address'};
     const preview = cusFields.map(([k,v]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(CUS_LABELS[k]||k)}: ${esc(docFieldVal(v))}</div>`).join('');
     sections.push(`<div style="margin-bottom:12px">
@@ -9179,7 +9428,6 @@ function _aiStep3Html(parsed) {
   const insData = parsed.documents?.insurance;
   const insFields = insData ? Object.entries(insData).filter(([,v]) => v !== '' && v !== null && v !== undefined) : [];
   if (insFields.length) {
-    total += 1;
     const INS_LABELS = {insurer:'Insurer',certNumber:'Cert #',issueDate:'Issue Date',expiryDate:'Expiry Date',premium:'Premium',personalInjury:'Personal Injury/Death',materialDamage:'Material Damage',pollution:'Pollution',totalSumInsured:'Total Sum Insured',thirdPartyLiability:'Third Party Liability',deductibles:'Deductibles',navigationLimits:'Navigation Limits',specialNotes:'Special Notes'};
     const preview = insFields.map(([k,v]) => `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(INS_LABELS[k]||k)}: ${esc(docFieldVal(v))}</div>`).join('');
     sections.push(`<div style="margin-bottom:12px">
@@ -9189,7 +9437,6 @@ function _aiStep3Html(parsed) {
   }
   const safetyFlares = parsed.safety?.flares;
   if (Array.isArray(safetyFlares) && safetyFlares.length) {
-    total += safetyFlares.length;
     const rows = safetyFlares.slice(0,5).map(f =>
       `<div style="font-size:11px;color:var(--label2);padding:2px 0">✓ ${esc(f.type||'?')} × ${esc(String(f.qty||1))}${f.expiry?' · '+esc(f.expiry):''}</div>`).join('');
     sections.push(`<div style="margin-bottom:12px">
@@ -9197,12 +9444,14 @@ function _aiStep3Html(parsed) {
       ${rows}${safetyFlares.length>5?`<div style="font-size:11px;color:var(--label3)">…and ${safetyFlares.length-5} more</div>`:''}
     </div>`);
   }
+
   const warningsHtml = Array.isArray(parsed._warnings) && parsed._warnings.length
     ? `<div style="margin-bottom:10px;padding:8px 12px;background:rgba(245,158,11,.08);border:0.5px solid #F59E0B;border-radius:8px">
         <div style="font-size:11px;font-weight:700;color:#D97706;margin-bottom:3px">⚠️ Uncertain readings — please verify:</div>
         ${parsed._warnings.map(w=>`<div style="font-size:11px;color:#D97706;padding:1px 0">· ${esc(String(w))}</div>`).join('')}
       </div>`
     : '';
+
   if (!sections.length) return `
     <div style="text-align:center;padding:24px 0">
       <div style="font-size:28px;margin-bottom:10px">🤔</div>
@@ -9210,11 +9459,13 @@ function _aiStep3Html(parsed) {
       <div style="font-size:12px;color:var(--label3);margin-top:6px">Try pasting column headers with your data, or rephrase your description.</div>
     </div>
     <div class="modal-btns"><button class="btn btn-p" onclick="showAiImportModal()">← Try again</button></div>`;
+
+  const total = _aiCountIncluded(parsed);
   return `
     <div style="max-height:300px;overflow-y:auto;margin-bottom:4px">${warningsHtml}${sections.join('')}</div>
     <div class="modal-btns">
-      <button class="btn btn-s" onclick="showAiImportModal()">← Edit</button>
-      <button class="btn btn-p" onclick="aiImportApply(this)">Import ${total} ${total===1?'entry':'entries'}</button>
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button id="ai-import-btn" class="btn btn-p" onclick="aiImportApply(this)">Import ${total} ${total===1?'entry':'entries'}</button>
     </div>`;
 }
 
@@ -9223,6 +9474,8 @@ async function aiImportApply(btn) {
   _aiImportInProgress = true;
   if (btn) { btn.disabled = true; btn.textContent = 'Importing…'; }
   const p = _aiImportParsed;
+  const recStore = p._receiptStore || null;
+  const recDate  = p._receiptDate  || null;
   try {
     if (Array.isArray(p.maintenance) && p.maintenance.length) {
       if (!data.maintenance) data.maintenance = { engines:{}, sched:{}, log:[] };
@@ -9233,22 +9486,71 @@ async function aiImportApply(btn) {
         notes: e.notes||'', engines: ['port','starboard'],
       }));
     }
+
+    if (!data.provisions) data.provisions = {items:[]};
+    if (!data.provisions.items) data.provisions.items = [];
+    if (!data.spareParts) data.spareParts = [];
+
+    // Provisions — honour per-item include/category and section-level destination redirect
+    const provCounts = { provisions: 0, toSpareParts: 0 };
     if (Array.isArray(p.provisions) && p.provisions.length) {
-      if (!data.provisions) data.provisions = {items:[]};
-      if (!data.provisions.items) data.provisions.items = [];
-      p.provisions.forEach(e => data.provisions.items.push({
-        id: uid(), name: e.name||'', qty: Number(e.qty)||0,
-        minQty:0, unit: e.unit||'', category: e.category||'misc', location:'',
-      }));
+      const states = _aiItemState?.provisions;
+      const dest   = _aiSectionDest?.provisions || 'provisions';
+      p.provisions.forEach((e, idx) => {
+        if (states && !states[idx]?.include) return;
+        const cat = states?.[idx]?.category || _normProvCat(e.category);
+        const ph  = (e.price != null || e.store || recStore)
+          ? [{ date: e.date||recDate||'', store: e.store||recStore||'', price: e.price!=null ? Number(e.price) : null, qty: Number(e.qty)||1, unit: e.unit||'' }]
+          : [];
+        if (dest === 'provisions') {
+          data.provisions.items.push({
+            id: uid(), name: e.name||'', qty: Number(e.qty)||0,
+            minQty: 0, unit: e.unit||'', category: cat, location: '',
+            lastPrice: e.price!=null ? Number(e.price) : null,
+            lastStore: e.store||recStore||null,
+            lastPurchaseDate: e.date||recDate||null,
+            priceHistory: ph,
+            originalText: e.originalText||null,
+          });
+          provCounts.provisions++;
+        } else {
+          data.spareParts.push({
+            id: uid(), desc: e.name||'', pn:'', category: cat,
+            qty: Number(e.qty)||1, minQuantity:0,
+            unitPrice: e.price!=null ? Number(e.price) : 0,
+            location: e.store||recStore||'', notes:'', storeUrl:'',
+          });
+          provCounts.toSpareParts++;
+        }
+      });
     }
+
+    // Spare Parts — honour per-item include/category and section-level destination redirect
+    const spCounts = { spareParts: 0, toProvisions: 0 };
     if (Array.isArray(p.spareParts) && p.spareParts.length) {
-      if (!data.spareParts) data.spareParts = [];
-      p.spareParts.forEach(e => data.spareParts.push({
-        id: uid(), desc: e.name||'', pn:'', category:'General',
-        qty: Number(e.qty)||1, minQuantity:0, unitPrice:0,
-        location: e.location||'', notes: e.notes||'', storeUrl:'',
-      }));
+      const states = _aiItemState?.spareParts;
+      const dest   = _aiSectionDest?.spareParts || 'spareParts';
+      p.spareParts.forEach((e, idx) => {
+        if (states && !states[idx]?.include) return;
+        const cat = states?.[idx]?.category || (PART_CATEGORIES.includes(e.category) ? e.category : PART_CATEGORIES[0]);
+        if (dest === 'spareParts') {
+          data.spareParts.push({
+            id: uid(), desc: e.name||'', pn:'', category: cat,
+            qty: Number(e.qty)||1, minQuantity:0, unitPrice:0,
+            location: e.location||'', notes: e.notes||'', storeUrl:'',
+          });
+          spCounts.spareParts++;
+        } else {
+          data.provisions.items.push({
+            id: uid(), name: e.name||'', qty: Number(e.qty)||0,
+            minQty: 0, unit: e.unit||'', category: cat, location: '',
+            priceHistory: [], originalText: e.originalText||null,
+          });
+          spCounts.toProvisions++;
+        }
+      });
     }
+
     const tlImport = p.documents?.transitLog;
     if (tlImport && typeof tlImport === 'object') {
       const wd = getTLData(), log = wd.logs[wd.currentLog];
@@ -9307,7 +9609,6 @@ async function aiImportApply(btn) {
         id:uid(), type:f.type||'', qty:Number(f.qty)||1, expiry:f.expiry||'', notes:f.notes||''
       }));
     }
-    // Life Rafts
     if (Array.isArray(p.safety?.lifeRafts) && p.safety.lifeRafts.length) {
       if (!data.safety) data.safety = { flares: [], lifeRafts: [] };
       if (!data.safety.lifeRafts) data.safety.lifeRafts = [];
@@ -9318,8 +9619,6 @@ async function aiImportApply(btn) {
         revisions: Array.isArray(r.revisions) ? r.revisions : []
       }));
     }
-
-    // Systems
     if (Array.isArray(p.systems) && p.systems.length) {
       if (!data.systems) data.systems = [];
       p.systems.forEach(s => data.systems.push({
@@ -9329,8 +9628,6 @@ async function aiImportApply(btn) {
         lastService: '', warrantyExpiry: s.warrantyExpiry || '', manualUrl: '', photos: []
       }));
     }
-
-    // Watermaker
     if (p.watermaker && typeof p.watermaker === 'object') {
       if (!data.watermaker) data.watermaker = { currentReading: 0, lastChangeReading: 0, targetHours: 60, charcoalChangedDate: null, inventory: { micron20: 0, micron5: 0, charcoal: 0 } };
       const wm = p.watermaker;
@@ -9350,8 +9647,6 @@ async function aiImportApply(btn) {
         }));
       }
     }
-
-    // LPG
     if (Array.isArray(p.lpg?.history) && p.lpg.history.length) {
       if (!data.lpg) data.lpg = { bottles: [], history: [] };
       if (!data.lpg.history) data.lpg.history = [];
@@ -9361,8 +9656,6 @@ async function aiImportApply(btn) {
         pricePerKg: Number(h.pricePerKg) || 0, notes: h.notes || ''
       }));
     }
-
-    // Shipyard
     if (p.shipyard && typeof p.shipyard === 'object') {
       if (!data.shipyard) data.shipyard = { current: {}, quotes: [], history: [] };
       if (p.shipyard.current) {
@@ -9372,8 +9665,6 @@ async function aiImportApply(btn) {
       if (Array.isArray(p.shipyard.history)) p.shipyard.history.forEach(h => data.shipyard.history.push({ ...h, id: uid() }));
       if (Array.isArray(p.shipyard.quotes))  p.shipyard.quotes.forEach(q  => data.shipyard.quotes.push({ ...q,  id: uid() }));
     }
-
-    // Upgrades
     if (Array.isArray(p.upgrades?.seasons) && p.upgrades.seasons.length) {
       if (!data.upgrades) data.upgrades = { seasons: [] };
       if (!data.upgrades.seasons) data.upgrades.seasons = [];
@@ -9384,8 +9675,6 @@ async function aiImportApply(btn) {
           : []
       }));
     }
-
-    // Vessel document
     if (p.documents?.vessel && typeof p.documents.vessel === 'object') {
       if (!data.documents) data.documents = {};
       if (!data.documents.vessel) data.documents.vessel = {};
@@ -9399,22 +9688,26 @@ async function aiImportApply(btn) {
     await save(); await pushToCloud();
     renderApp();
     _aiImportParsed = null;
+    _aiSectionDest  = null;
+    _aiItemState    = null;
 
-    // Build success summary
+    // Build accurate success summary using actual destination counts
     const lines = [];
-    if (p.maintenance?.length)  lines.push(`${p.maintenance.length} maintenance ${p.maintenance.length===1?'entry':'entries'} → Engine Maintenance`);
-    if (p.provisions?.length)   lines.push(`${p.provisions.length} provision ${p.provisions.length===1?'item':'items'} → Provisions`);
-    if (p.spareParts?.length)   lines.push(`${p.spareParts.length} spare ${p.spareParts.length===1?'part':'parts'} → Spare Parts`);
+    if (p.maintenance?.length)    lines.push(`${p.maintenance.length} maintenance ${p.maintenance.length===1?'entry':'entries'} → Engine Maintenance`);
+    if (provCounts.provisions)    lines.push(`${provCounts.provisions} provision ${provCounts.provisions===1?'item':'items'} → Provisions`);
+    if (provCounts.toSpareParts)  lines.push(`${provCounts.toSpareParts} provision ${provCounts.toSpareParts===1?'item':'items'} redirected → Spare Parts`);
+    if (spCounts.spareParts)      lines.push(`${spCounts.spareParts} spare ${spCounts.spareParts===1?'part':'parts'} → Spare Parts`);
+    if (spCounts.toProvisions)    lines.push(`${spCounts.toProvisions} part${spCounts.toProvisions===1?'':'s'} redirected → Provisions`);
     if (tlImport  && Object.values(tlImport).some(v=>v))  lines.push('Transit Log updated → Boat Docs');
     if (cusImport && Object.values(cusImport).some(v=>v)) lines.push('eTEPAY updated → Boat Docs');
     if (insImport && Object.values(insImport).some(v=>v)) lines.push('Insurance updated → Boat Docs');
-    if (p.safety?.flares?.length) lines.push(`${p.safety.flares.length} ${p.safety.flares.length===1?'flare':'flares'} added → Safety`);
-    if (p.safety?.lifeRafts?.length)     lines.push(`${p.safety.lifeRafts.length} life raft${p.safety.lifeRafts.length!==1?'s':''} → Safety`);
-    if (p.systems?.length)               lines.push(`${p.systems.length} system${p.systems.length!==1?'s':''} → Systems`);
-    if (p.watermaker)                    lines.push('Watermaker updated → Water Maker');
-    if (p.lpg?.history?.length)          lines.push(`${p.lpg.history.length} LPG refill${p.lpg.history.length!==1?'s':''} → LPG`);
-    if (p.shipyard?.current?.name)       lines.push(`Shipyard: ${p.shipyard.current.name} → Shipyard`);
-    if (p.upgrades?.seasons?.length)     lines.push(`${p.upgrades.seasons.reduce((n,s)=>n+(s.items?.length||0),0)} repair items → Upgrades`);
+    if (p.safety?.flares?.length)    lines.push(`${p.safety.flares.length} ${p.safety.flares.length===1?'flare':'flares'} added → Safety`);
+    if (p.safety?.lifeRafts?.length) lines.push(`${p.safety.lifeRafts.length} life raft${p.safety.lifeRafts.length!==1?'s':''} → Safety`);
+    if (p.systems?.length)           lines.push(`${p.systems.length} system${p.systems.length!==1?'s':''} → Systems`);
+    if (p.watermaker)                lines.push('Watermaker updated → Water Maker');
+    if (p.lpg?.history?.length)      lines.push(`${p.lpg.history.length} LPG refill${p.lpg.history.length!==1?'s':''} → LPG`);
+    if (p.shipyard?.current?.name)   lines.push(`Shipyard: ${p.shipyard.current.name} → Shipyard`);
+    if (p.upgrades?.seasons?.length) lines.push(`${p.upgrades.seasons.reduce((n,s)=>n+(s.items?.length||0),0)} repair items → Upgrades`);
     if (p.documents?.vessel?.vesselName) lines.push('Vessel document updated → Boat Docs');
 
     const modalBody = document.getElementById('modalBody');
@@ -9430,9 +9723,10 @@ async function aiImportApply(btn) {
         <button class="btn btn-p" onclick="hideModal()">Done</button>
       </div>`;
   } catch(e) {
-    _aiImportInProgress = false;
     if (btn) { btn.disabled = false; btn.textContent = 'Import'; }
     showToast('Import failed: ' + e.message, true);
+  } finally {
+    _aiImportInProgress = false;
   }
 }
 
