@@ -3936,13 +3936,16 @@ function renderProvisionsHistory() {
     const hasTotal = items.some(it => it.lastPrice != null);
     return `<div style="padding:12px">
       ${_provViewToggle()}
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-        <button onclick="ui.provHistGroup=null;document.getElementById('mainContent').innerHTML=renderProvisions()"
-          style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--label2);line-height:1;padding:0">←</button>
-        <div>
-          <div style="font-size:15px;font-weight:700;color:var(--label)">${esc(gStore || 'Unknown store')}</div>
-          <div style="font-size:12px;color:var(--label3)">${esc(fmtDate(gDate))} · ${items.length} item${items.length!==1?'s':''}${hasTotal?' · '+fmt(total):''}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <button onclick="ui.provHistGroup=null;document.getElementById('mainContent').innerHTML=renderProvisions()"
+            style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--label2);line-height:1;padding:0">←</button>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:var(--label)">${esc(gStore || 'Unknown store')}</div>
+            <div style="font-size:12px;color:var(--label3)">${esc(fmtDate(gDate))} · ${items.length} item${items.length!==1?'s':''}${hasTotal?' · '+fmt(total):''}</div>
+          </div>
         </div>
+        <button onclick="if(confirm('Delete this receipt? This removes all ${items.length} item${items.length!==1?'s':''} from your price history.'))provHistDeleteGroup()" style="background:#FCEBEB;border:0.5px solid #F09595;color:#A32D2D;border-radius:8px;padding:5px 12px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;flex-shrink:0">🗑</button>
       </div>
       <div class="card">
         ${items.map(it => `
@@ -4044,12 +4047,11 @@ function renderProvisionsList() {
   const catCards = PROV_CAT_ORDER.filter(c => byCat[c]).map(c => {
     const rows = byCat[c].map(it => {
       const origIdx = items.indexOf(it);
-      const dimmed = it.bought ? 'opacity:0.4;' : '';
-      return `<div data-prov-id="${it.id}" draggable="true" ondragstart="provDragStart(event,'${it.id}')" ondragover="provDragOver(event,'${it.id}')" ondragleave="provDragLeave(event)" ondrop="provDrop(event,'${it.id}')" ondragend="provDragEnd()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-top:1px solid var(--sep);${dimmed}">
+      return `<div data-prov-id="${it.id}" draggable="true" ondragstart="provDragStart(event,'${it.id}')" ondragover="provDragOver(event,'${it.id}')" ondragleave="provDragLeave(event)" ondrop="provDrop(event,'${it.id}')" ondragend="provDragEnd()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-top:1px solid var(--sep)">
         <span class="prov-grip" ontouchstart="provTouchStart(event,'${it.id}')">⠿</span>
         <input type="checkbox" ${it.bought?'checked':''} onchange="provToggleBought(${origIdx},this.checked)" style="width:17px;height:17px;flex-shrink:0;cursor:pointer;accent-color:var(--blue)">
         <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:600;${it.bought?'color:var(--label3);':'color:var(--label);'}">${esc(it.name)}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--label)">${esc(it.name)}</div>
           ${it.location?`<div style="font-size:11px;color:var(--label3)">${esc(it.location)}</div>`:''}
         </div>
         <button onclick="provEdit(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:14px;color:var(--label3);line-height:1;flex-shrink:0">✏️</button>
@@ -4067,8 +4069,7 @@ function renderProvisionsList() {
 
   return `<div style="padding:12px">
     ${_provViewToggle()}
-    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px">
-      <button onclick="provUncheckAll()" style="background:var(--surface2);color:var(--label);border:0.5px solid var(--sep);border-radius:8px;padding:5px 14px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">Uncheck All</button>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
       <button onclick="provAddModal()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:5px 14px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">+ Add item</button>
     </div>
     ${exampleBanner}
@@ -4225,10 +4226,18 @@ function provToggleBought(idx, checked) {
   prov.items[idx].bought = checked;
   save(); document.getElementById('mainContent').innerHTML = renderProvisions();
 }
-function provUncheckAll() {
-  const prov = getProvisionsData();
-  prov.items.forEach(it => { it.bought = false; });
-  save(); document.getElementById('mainContent').innerHTML = renderProvisions();
+function provHistDeleteGroup() {
+  const key = ui.provHistGroup;
+  if (!key) return;
+  getProvisionsData();
+  const [gDate, ...gStoreParts] = key.split('_');
+  const gStore = gStoreParts.join('_');
+  data.provisions.history = (data.provisions.history || []).filter(it =>
+    !((it.lastPurchaseDate || '') === gDate && (it.lastStore || '') === gStore)
+  );
+  ui.provHistGroup = null;
+  save();
+  document.getElementById('mainContent').innerHTML = renderProvisions();
 }
 
 function provDragStart(e, id) {
