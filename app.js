@@ -4376,16 +4376,37 @@ function prefillProvisionsData() {
   const email = localStorage.getItem(EMAIL_KEY);
   if (email === OWNER_EMAIL) return false;
   const prov = data.provisions;
-  if (prov && prov.items?.length > 0) return false;
-  if (!data.provisions) data.provisions = {};
-  data.provisions = {exampleDismissed:false, items:[
-    {id:'pv_ex1', name:'Pasta (Example)',            category:'food',       location:'Galley locker', qty:2,  minQty:6, unit:'packs'},
-    {id:'pv_ex2', name:'Canned tomatoes (Example)',  category:'food',       location:'Galley locker', qty:8,  minQty:4, unit:'cans'},
-    {id:'pv_ex3', name:'Olive oil (Example)',        category:'food',       location:'Galley',        qty:1,  minQty:3, unit:'bottles'},
-    {id:'pv_ex4', name:'Sunscreen SPF50 (Example)', category:'toiletries', location:'Nav station',   qty:1,  minQty:3, unit:'bottles'},
-    {id:'pv_ex5', name:'Toilet paper (Example)',     category:'toiletries', location:'Aft cabin',     qty:2,  minQty:8, unit:'rolls'},
-    {id:'pv_ex6', name:'Dish soap (Example)',        category:'toiletries', location:'Galley',        qty:0,  minQty:2, unit:'bottles'},
-  ]};
+  if (prov && (prov.items?.length > 0 || prov.history?.length > 0)) return false;
+  // Dates always land in the correct calendar month regardless of when the user registers
+  const d1 = (() => { const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); d.setDate(12); return d.toISOString().slice(0,10); })();
+  const d2 = (() => { const d=new Date(); d.setDate(5); return d.toISOString().slice(0,10); })();
+  const s1 = 'Alpha Supermarket (Example)', s2 = 'Beta Market (Example)';
+  const ph = (date, price, store) => [{date, price, store}];
+  data.provisions = {
+    exampleDismissed: false,
+    items: [
+      {id:'pv_ex1', name:'Pasta (Example)',            category:'food',       location:'Galley locker', unit:'packs'},
+      {id:'pv_ex2', name:'Canned tomatoes (Example)',  category:'food',       location:'Galley locker', unit:'cans'},
+      {id:'pv_ex3', name:'Olive oil (Example)',        category:'food',       location:'Galley',        unit:'bottles'},
+      {id:'pv_ex4', name:'Sunscreen SPF50 (Example)', category:'toiletries', location:'Nav station',   unit:'bottles'},
+      {id:'pv_ex5', name:'Toilet paper (Example)',     category:'toiletries', location:'Aft cabin',     unit:'rolls'},
+      {id:'pv_ex6', name:'Dish soap (Example)',        category:'toiletries', location:'Galley',        unit:'bottles'},
+    ],
+    history: [
+      // Receipt 1 — last month at s1
+      {id:'pv_h_ex1',  name:'Pasta (Example)',            qty:2, unit:'packs',   category:'food',       lastPrice:2.50,  lastStore:s1, lastPurchaseDate:d1, priceHistory:ph(d1,2.50, s1),  importedAt:d1},
+      {id:'pv_h_ex2',  name:'Canned tomatoes (Example)', qty:4, unit:'cans',    category:'food',       lastPrice:1.20,  lastStore:s1, lastPurchaseDate:d1, priceHistory:ph(d1,1.20, s1),  importedAt:d1},
+      {id:'pv_h_ex3',  name:'Olive oil (Example)',        qty:1, unit:'bottles', category:'food',       lastPrice:8.90,  lastStore:s1, lastPurchaseDate:d1, priceHistory:ph(d1,8.90, s1),  importedAt:d1},
+      {id:'pv_h_ex4',  name:'Toilet paper (Example)',    qty:1, unit:'packs',   category:'toiletries', lastPrice:5.40,  lastStore:s1, lastPurchaseDate:d1, priceHistory:ph(d1,5.40, s1),  importedAt:d1},
+      {id:'pv_h_ex5',  name:'Dish soap (Example)',        qty:1, unit:'bottles', category:'toiletries', lastPrice:2.10,  lastStore:s1, lastPurchaseDate:d1, priceHistory:ph(d1,2.10, s1),  importedAt:d1},
+      // Receipt 2 — this month at s2; 3 items overlap with Receipt 1 → store comparison + buying frequency in Insights
+      {id:'pv_h_ex6',  name:'Pasta (Example)',            qty:2, unit:'packs',   category:'food',       lastPrice:2.80,  lastStore:s2, lastPurchaseDate:d2, priceHistory:ph(d2,2.80, s2),  importedAt:d2},
+      {id:'pv_h_ex7',  name:'Olive oil (Example)',        qty:1, unit:'bottles', category:'food',       lastPrice:8.20,  lastStore:s2, lastPurchaseDate:d2, priceHistory:ph(d2,8.20, s2),  importedAt:d2},
+      {id:'pv_h_ex8',  name:'Sunscreen SPF50 (Example)', qty:2, unit:'bottles', category:'toiletries', lastPrice:12.50, lastStore:s2, lastPurchaseDate:d2, priceHistory:ph(d2,12.50,s2),  importedAt:d2},
+      {id:'pv_h_ex9',  name:'Dish soap (Example)',        qty:1, unit:'bottles', category:'toiletries', lastPrice:1.90,  lastStore:s2, lastPurchaseDate:d2, priceHistory:ph(d2,1.90, s2),  importedAt:d2},
+      {id:'pv_h_ex10', name:'Coffee (Example)',            qty:1, unit:'packs',   category:'drinks',     lastPrice:4.50,  lastStore:s2, lastPurchaseDate:d2, priceHistory:ph(d2,4.50, s2),  importedAt:d2},
+    ]
+  };
   return true;
 }
 
