@@ -123,7 +123,7 @@ let ui = {
   tab:'documents', docSub:'vessel', maintEngine:'port',
   photoSub:'vesselDoc', crewOpen:null, sysOpen:null, sysTab:'All',
   partsSearch:'', partsFilter:'All', alertsOpen:false, maintShowAll:false, maintTaskFilter:'All',
-  provisionsSub:'all', provisionsView:'list', tlDetailId:null
+  provisionsSub:'all', provisionsView:'list', provHistGroup:null, tlDetailId:null
 };
 let _photoCtx = null; // {section, index} for upload
 
@@ -3875,18 +3875,129 @@ function getProvisionsData() {
 }
 
 function renderProvisions() {
-  return (ui.provisionsView || 'list') === 'insights'
-    ? renderProvisionsInsights()
-    : renderProvisionsList();
+  const v = ui.provisionsView || 'list';
+  if (v === 'insights') return renderProvisionsInsights();
+  if (v === 'history')  return renderProvisionsHistory();
+  return renderProvisionsList();
 }
 
 function _provViewToggle() {
   const v = ui.provisionsView || 'list';
+  const btn = (label, val) => {
+    const active = v === val;
+    return `<button onclick="ui.provisionsView='${val}';ui.provHistGroup=null;document.getElementById('mainContent').innerHTML=renderProvisions()"
+      style="flex:1;border:none;border-radius:6px;padding:5px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .15s;${active?'background:var(--surface);color:var(--blue);box-shadow:0 1px 2px rgba(0,0,0,.08)':'background:transparent;color:var(--label3)'}">${label}</button>`;
+  };
   return `<div style="display:flex;background:var(--surface2);border-radius:8px;padding:2px;gap:2px;margin-bottom:8px">
-    <button onclick="ui.provisionsView='list';document.getElementById('mainContent').innerHTML=renderProvisions()"
-      style="flex:1;border:none;border-radius:6px;padding:5px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .15s;${v==='list'?'background:var(--surface);color:var(--blue);box-shadow:0 1px 2px rgba(0,0,0,.08)':'background:transparent;color:var(--label3)'}">List</button>
-    <button onclick="ui.provisionsView='insights';document.getElementById('mainContent').innerHTML=renderProvisions()"
-      style="flex:1;border:none;border-radius:6px;padding:5px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .15s;${v==='insights'?'background:var(--surface);color:var(--blue);box-shadow:0 1px 2px rgba(0,0,0,.08)':'background:transparent;color:var(--label3)'}">Insights</button>
+    ${btn('List','list')}${btn('History','history')}${btn('Insights','insights')}
+  </div>`;
+}
+
+// ── Provisions name normalization for Insights matching ───────────────────────
+// Strips size/count tokens so "Tuna Rio Mare 2x160g" and "Rio Mare Tuna" can match.
+function _normProvName(n) {
+  return (n || '').toLowerCase()
+    .replace(/\d+(?:[.,]\d+)?(?:\s*x\s*\d+(?:[.,]\d+)?)?\s*(?:g|gr|kg|ml|l|cl|pcs?|pieces?|pc|rolls?|ply|ct|pack|τεμ)\b/gi, '')
+    .replace(/\b\d+[-–]\w+\b/g, '') // "3-ply", "2-pack"
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+const _PROV_SW = new Set(['in','of','the','a','an','and','or','for','with','to','from','by','de','la','le']);
+function _provTokenSet(n) {
+  return new Set(_normProvName(n).split(' ').filter(w => w.length >= 2 && !_PROV_SW.has(w)));
+}
+// True if shorter token set is a subset of the larger (handles word-order + extra descriptors).
+// Requires shorter set to have ≥ 2 tokens to avoid spurious single-word matches.
+function _provNamesMatch(a, b) {
+  const ta = _provTokenSet(a), tb = _provTokenSet(b);
+  if (!ta.size || !tb.size) return _normProvName(a) === _normProvName(b);
+  const [smaller, larger] = ta.size <= tb.size ? [ta, tb] : [tb, ta];
+  if (smaller.size < 2) return _normProvName(a) === _normProvName(b);
+  return [...smaller].every(t => larger.has(t));
+}
+
+function renderProvisionsHistory() {
+  getProvisionsData(); // ensure data.provisions exists
+  const history = (data.provisions?.history || []);
+  const fmtDate = d => {
+    try { const dt = new Date(d); return dt.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
+    catch(e) { return d || '—'; }
+  };
+  const fmt = n => n != null ? `€${Number(n).toFixed(2)}` : '';
+
+  // Drill-down: show a single receipt group's items
+  if (ui.provHistGroup) {
+    const [gDate, ...gStoreParts] = ui.provHistGroup.split('_');
+    const gStore = gStoreParts.join('_');
+    const items = history.filter(it =>
+      (it.lastPurchaseDate || '') === gDate && (it.lastStore || '') === gStore
+    );
+    const total = items.reduce((s, it) => s + (it.lastPrice != null ? Number(it.lastPrice) : 0), 0);
+    const hasTotal = items.some(it => it.lastPrice != null);
+    return `<div style="padding:12px">
+      ${_provViewToggle()}
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <button onclick="ui.provHistGroup=null;document.getElementById('mainContent').innerHTML=renderProvisions()"
+          style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--label2);line-height:1;padding:0">←</button>
+        <div>
+          <div style="font-size:15px;font-weight:700;color:var(--label)">${esc(gStore || 'Unknown store')}</div>
+          <div style="font-size:12px;color:var(--label3)">${esc(fmtDate(gDate))} · ${items.length} item${items.length!==1?'s':''}${hasTotal?' · '+fmt(total):''}</div>
+        </div>
+      </div>
+      <div class="card">
+        ${items.map(it => `
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 14px;border-bottom:1px solid var(--sep)">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;color:var(--label);font-weight:500">${esc(it.name||'?')}</div>
+              ${it.qty && it.qty !== 1 ? `<div style="font-size:11px;color:var(--label3)">×${it.qty}${it.unit?' '+esc(it.unit):''}</div>` : ''}
+            </div>
+            <div style="font-size:13px;font-weight:600;color:var(--blue);flex-shrink:0;margin-left:10px">${it.lastPrice!=null?fmt(it.lastPrice):''}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Empty state
+  if (!history.length) return `<div style="padding:12px">
+    ${_provViewToggle()}
+    <div style="padding:40px 16px;text-align:center">
+      <div style="font-size:40px;margin-bottom:12px">🧾</div>
+      <div style="font-size:15px;font-weight:600;color:var(--label);margin-bottom:8px">No receipt history yet</div>
+      <div style="font-size:13px;color:var(--label3);line-height:1.6;max-width:260px;margin:0 auto">Import a supermarket receipt with AI Import to see it here.</div>
+    </div>
+  </div>`;
+
+  // Build receipt groups: key = "date_store"
+  const groupMap = {};
+  history.forEach(it => {
+    const key = `${it.lastPurchaseDate || ''}_${it.lastStore || ''}`;
+    if (!groupMap[key]) groupMap[key] = { date: it.lastPurchaseDate||'', store: it.lastStore||'', items: [] };
+    groupMap[key].items.push(it);
+  });
+  // Sort groups reverse-chronological
+  const groups = Object.entries(groupMap)
+    .sort(([,a],[,b]) => (b.date||'').localeCompare(a.date||''))
+    .map(([key, g]) => ({ key, ...g }));
+
+  const cards = groups.map(g => {
+    const total = g.items.reduce((s, it) => s + (it.lastPrice != null ? Number(it.lastPrice) : 0), 0);
+    const hasTotal = g.items.some(it => it.lastPrice != null);
+    return `<div onclick="ui.provHistGroup='${esc(g.key)}';document.getElementById('mainContent').innerHTML=renderProvisions()"
+      class="card" style="margin-bottom:10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:14px">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:var(--label)">${esc(g.store || 'Unknown store')}</div>
+        <div style="font-size:12px;color:var(--label3);margin-top:2px">${esc(fmtDate(g.date))} · ${g.items.length} item${g.items.length!==1?'s':''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;margin-left:12px">
+        ${hasTotal?`<div style="font-size:16px;font-weight:700;color:var(--blue)">${fmt(total)}</div>`:''}
+        <div style="font-size:18px;color:var(--label3)">›</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div style="padding:12px">
+    ${_provViewToggle()}
+    ${cards}
   </div>`;
 }
 
@@ -4019,6 +4130,12 @@ function renderProvisionsInsights() {
   const spendDiff = thisMonthSpend - lastMonthSpend;
   const spendArrow = spendDiff > 0 ? '↑' : spendDiff < 0 ? '↓' : '→';
   const spendColor = spendDiff > 0 ? 'var(--red)' : spendDiff < 0 ? 'var(--green)' : 'var(--label3)';
+  // Fix: when lastMonthSpend is 0 there's no real baseline — don't show a misleading arrow
+  const vsLastMonthHtml = lastMonthSpend === 0
+    ? `<div style="padding:0 14px 12px;font-size:12px;color:var(--label3)">No data for last month</div>`
+    : spendDiff !== 0
+      ? `<div style="padding:0 14px 12px;font-size:12px;color:${spendColor};font-weight:600">${spendArrow} ${fmt(Math.abs(spendDiff))} vs last month</div>`
+      : '';
   const spendCard = (thisMonthSpend > 0 || lastMonthSpend > 0) ? `
     <div class="card" style="margin-bottom:12px">
       <div class="card-hd">Monthly spend</div>
@@ -4032,22 +4149,27 @@ function renderProvisionsInsights() {
           <div style="font-size:11px;color:var(--label3);margin-top:2px">Last month</div>
         </div>
       </div>
-      ${spendDiff !== 0 ? `<div style="padding:0 14px 12px;font-size:12px;color:${spendColor};font-weight:600">${spendArrow} ${fmt(Math.abs(spendDiff))} vs last month</div>` : ''}
+      ${vsLastMonthHtml}
     </div>` : '';
 
-  // Store price comparison — items with history from 2+ different stores
-  const byName = {};
+  // Store price comparison — smart name matching handles word-order and size-suffix variance
+  // Uses _provNamesMatch() (bidirectional token-subset) instead of exact lowercase key.
+  const nameGroups = []; // [{displayName, tokens, byStore:{store:[price,...]}}]
   items.forEach(it => {
     (it.priceHistory || []).forEach(h => {
       if (!h.store || h.price == null) return;
-      const key = (it.name || '').toLowerCase().trim();
-      if (!key) return;
-      if (!byName[key]) byName[key] = { name: it.name, byStore: {} };
-      if (!byName[key].byStore[h.store]) byName[key].byStore[h.store] = [];
-      byName[key].byStore[h.store].push(Number(h.price));
+      const name = (it.name || '').trim();
+      if (!name) return;
+      let group = nameGroups.find(g => _provNamesMatch(name, g.displayName));
+      if (!group) {
+        group = { displayName: name, byStore: {} };
+        nameGroups.push(group);
+      }
+      if (!group.byStore[h.store]) group.byStore[h.store] = [];
+      group.byStore[h.store].push(Number(h.price));
     });
   });
-  const comparisons = Object.values(byName).filter(x => Object.keys(x.byStore).length >= 2);
+  const comparisons = nameGroups.filter(x => Object.keys(x.byStore).length >= 2);
   const storeCard = comparisons.length ? `
     <div class="card" style="margin-bottom:12px">
       <div class="card-hd">Store price comparison</div>
@@ -4058,7 +4180,7 @@ function renderProvisionsInsights() {
         const priciest = storeLatest[storeLatest.length - 1];
         const pctDiff = priciest.price > 0 ? Math.round((priciest.price - cheapest.price) / priciest.price * 100) : 0;
         return `<div style="padding:10px 14px;border-bottom:1px solid var(--sep)">
-          <div style="font-size:13px;font-weight:600;color:var(--label);margin-bottom:6px">${esc(item.name)}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--label);margin-bottom:6px">${esc(item.displayName)}</div>
           ${storeLatest.map(({store, price}) => `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">
               <span style="font-size:12px;color:var(--label2)">${esc(store)}</span>
@@ -4069,16 +4191,19 @@ function renderProvisionsInsights() {
       }).join('')}
     </div>` : '';
 
-  // Buying frequency — items purchased 2+ times
-  const allEntries = {};
+  // Buying frequency — smart name matching so "Tuna Rio Mare" and "Rio Mare Tuna" count as one item
+  const freqGroups = []; // [{displayName, dates:[]}]
   items.forEach(it => {
-    const history = (it.priceHistory || []).filter(h => h.date);
-    if (history.length < 2) return;
-    const key = (it.name || '').toLowerCase().trim();
-    if (!key) return;
-    if (!allEntries[key]) allEntries[key] = { name: it.name, dates: [] };
-    history.forEach(h => allEntries[key].dates.push(h.date));
+    const hist = (it.priceHistory || []).filter(h => h.date);
+    if (!hist.length) return;
+    const name = (it.name || '').trim();
+    if (!name) return;
+    let group = freqGroups.find(g => _provNamesMatch(name, g.displayName));
+    if (!group) { group = { displayName: name, dates: [] }; freqGroups.push(group); }
+    hist.forEach(h => group.dates.push(h.date));
   });
+  const allEntries = {}; // kept for compatibility with code below
+  freqGroups.forEach(g => { if (g.dates.length >= 2) allEntries[g.displayName] = { name: g.displayName, dates: g.dates }; });
   const freqItems = Object.values(allEntries).filter(x => x.dates.length >= 2).map(x => {
     x.dates.sort();
     const first = new Date(x.dates[0]);
