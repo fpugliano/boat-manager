@@ -9254,6 +9254,31 @@ function aiImportPhotoSelected(input) {
   reader.readAsDataURL(file);
 }
 
+// Cosmetic progress bar for AI import — stages advance on a fixed timer, not real backend state.
+// The AI call is a single request/response with no streaming; the bar is purely heuristic.
+function _aiProgressHtml(pct, caption) {
+  return `
+    <div class="modal-title">AI Import Assistant</div>
+    <div style="padding:44px 24px 36px">
+      <div style="font-size:13px;font-weight:600;color:var(--label);text-align:center;margin-bottom:16px" id="ai-prog-caption">${esc(caption)}</div>
+      <div style="background:var(--surface2);border-radius:99px;height:5px;overflow:hidden">
+        <div id="ai-prog-bar" style="height:5px;border-radius:99px;background:var(--blue);width:${pct}%;transition:width .5s ease"></div>
+      </div>
+    </div>`;
+}
+// Schedule deferred stage updates; returns a cancel function to clear all pending timers.
+function _aiProgressAdvance(stages) {
+  const timers = stages.map(({ delay, pct, caption }) =>
+    setTimeout(() => {
+      const bar = document.getElementById('ai-prog-bar');
+      const cap = document.getElementById('ai-prog-caption');
+      if (bar) bar.style.width = pct + '%';
+      if (cap) cap.textContent = caption;
+    }, delay)
+  );
+  return () => timers.forEach(clearTimeout);
+}
+
 async function aiImportConvertPhoto(btn) {
   if (!_aiImportPhotoData) { showToast('No photo selected', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Reading…'; }
@@ -9261,13 +9286,14 @@ async function aiImportConvertPhoto(btn) {
   const mediaType = parts[0].match(/data:([^;]+)/)?.[1] || 'image/jpeg';
   const imageData = parts[1] || '';
   const body = document.getElementById('modalBody');
-  if (body) body.innerHTML = `
-    <div class="modal-title">AI Import Assistant</div>
-    <div style="text-align:center;padding:36px 16px">
-      <div style="font-size:36px;margin-bottom:14px">⏳</div>
-      <div style="font-size:14px;font-weight:600;color:var(--label)">Reading your photo…</div>
-      <div style="font-size:12px;color:var(--label3);margin-top:6px">Claude is analysing the image</div>
-    </div>`;
+  // Photo path: 4 stages — Uploading / Reading photo / Identifying / Preparing
+  // Timings tuned for a typical 5–12 s response; bar caps at 88% until fetch resolves.
+  if (body) body.innerHTML = _aiProgressHtml(4, 'Uploading…');
+  const cancelProgress = _aiProgressAdvance([
+    { delay:  700, pct: 28, caption: 'Reading your photo…' },
+    { delay: 2500, pct: 58, caption: 'Identifying items and prices…' },
+    { delay: 5000, pct: 88, caption: 'Preparing preview…' },
+  ]);
   try {
     const email = localStorage.getItem(EMAIL_KEY);
     const hash  = email ? await emailToKey(email) : '';
@@ -9280,9 +9306,14 @@ async function aiImportConvertPhoto(btn) {
     const { result } = await r.json();
     let parsed;
     try { parsed = JSON.parse(result); } catch(e) { throw new Error('Claude returned unparseable JSON — try another photo'); }
+    cancelProgress();
+    const bar = document.getElementById('ai-prog-bar');
+    if (bar) { bar.style.transition = 'width .2s ease'; bar.style.width = '100%'; }
+    await new Promise(res => setTimeout(res, 180));
     _aiImportParsed = parsed;
     if (body) body.innerHTML = `<div class="modal-title">AI Import Assistant</div>` + _aiStep3Html(parsed);
   } catch(e) {
+    cancelProgress();
     if (body) body.innerHTML = `<div class="modal-title">AI Import Assistant</div>` + _aiStep1Html();
     showToast('Photo import failed: ' + e.message, true);
   }
@@ -9294,13 +9325,13 @@ async function aiImportConvert() {
   if (!text) { showToast('Paste some data first', true); return; }
   _aiImportText = text;
   const body = document.getElementById('modalBody');
-  if (body) body.innerHTML = `
-    <div class="modal-title">AI Import Assistant</div>
-    <div style="text-align:center;padding:36px 16px">
-      <div style="font-size:36px;margin-bottom:14px">⏳</div>
-      <div style="font-size:14px;font-weight:600;color:var(--label)">Analysing your data…</div>
-      <div style="font-size:12px;color:var(--label3);margin-top:6px">Claude is processing your input</div>
-    </div>`;
+  // Text path: 3 stages — Reading text / Identifying / Preparing (no Upload stage)
+  // Timings tuned for a typical 3–8 s response; bar caps at 88% until fetch resolves.
+  if (body) body.innerHTML = _aiProgressHtml(4, 'Reading your text…');
+  const cancelProgress = _aiProgressAdvance([
+    { delay: 1500, pct: 58, caption: 'Identifying items and prices…' },
+    { delay: 4000, pct: 88, caption: 'Preparing preview…' },
+  ]);
   try {
     const email = localStorage.getItem(EMAIL_KEY);
     const hash  = email ? await emailToKey(email) : '';
@@ -9313,9 +9344,14 @@ async function aiImportConvert() {
     const { result } = await r.json();
     let parsed;
     try { parsed = JSON.parse(result); } catch(e) { throw new Error('Claude returned unparseable JSON — try rephrasing your input'); }
+    cancelProgress();
+    const bar = document.getElementById('ai-prog-bar');
+    if (bar) { bar.style.transition = 'width .2s ease'; bar.style.width = '100%'; }
+    await new Promise(res => setTimeout(res, 180));
     _aiImportParsed = parsed;
     if (body) body.innerHTML = `<div class="modal-title">AI Import Assistant</div>` + _aiStep3Html(parsed);
   } catch(e) {
+    cancelProgress();
     if (body) body.innerHTML = `<div class="modal-title">AI Import Assistant</div>` + _aiStep1Html();
     showToast('AI import failed: ' + e.message, true);
   }
