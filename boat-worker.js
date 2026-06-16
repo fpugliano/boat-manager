@@ -40,12 +40,15 @@ maintenance: array of {date: "YYYY-MM-DD", hours: number, task: string, notes: s
   Canonical task names (use closest match): Engine oil, Oil filter, Gear oil, Impeller, Fuel filters, Coolant, Engine belt, Water pump, Heat exchanger, Saildrive, Saildrive lip seals, Saildrive shaft, Valve clearance, Raw water strainer
   → Engine Maintenance tab. NEVER map engine hours or service records to Systems or Spare Parts.
 
-provisions: array of {name: string, qty: number, unit: string, category: string}
-  category must be one of: food, drinks, cleaning, toiletries, galley, paper, other
+provisions: array of {name: string, qty: number, unit: string, category: string, price: number|null, originalText: string|null}
+  category must be one of: food, drinks, toiletries, misc
+  price: unit price as a number (e.g. 2.49), or null if not visible. Do not guess.
+  originalText: the raw receipt line as printed, verbatim, before any cleaning or translation. Null if not from a receipt.
   → Provisions tab. Food, drink, cleaning products, toiletries, galley items, paper goods.
   NEVER map LPG/gas refills here. NEVER map flares or safety equipment here.
 
-spareParts: array of {name: string, qty: number, location: string, notes: string}
+spareParts: array of {name: string, qty: number, location: string, notes: string, originalText: string|null}
+  originalText: the raw receipt line as printed, verbatim, before any cleaning or translation. Null if not from a receipt.
   → Spare Parts tab. Replacement parts, consumables, filters, anodes, impellers kept as spares.
   NEVER map installed/permanent equipment here (that is Systems). NEVER map life rafts, flares, or safety gear here.
 
@@ -88,6 +91,21 @@ safety: object optionally containing:
   flares: array of {type: string, qty: number, expiry: string, notes: string}
     type examples: "Parachute rocket", "Hand flare", "Smoke signal", "Collision flare", "Orange smoke"
   lifeRafts: array of {brand: string, model: string, persons: number, expiry: string, serialNumber: string, notes: string, revisions: array of {date: string, notes: string}}
+
+Top-level receipt fields (include when the input is a receipt/invoice):
+  _receiptStore: string — name of the store or supplier (e.g. "Lidl Lefkada", "AB Vasilopoulos"). Null if unknown.
+  _receiptDate: string — date of the receipt in YYYY-MM-DD. Null if not found.
+  These fields are used as fallbacks when individual items don't carry their own store/date.
+
+═══ GREEK SUPERMARKET RECEIPTS ═══
+
+Greek thermal receipt printers truncate long product names mid-word due to column-width limits (~24–28 chars). Rules:
+- Do NOT treat a truncated word as a complete word. "ΧΩΡΙΑΤΙΚ" is a truncation of "ΧΩΡΙΑΤΙΚΗ" (village-style) — not a product name on its own.
+- Do NOT fold the receipt's raw line number, barcode fragment, or weight string into the product name.
+- Common truncations to recognise: ΝΩΠΑ = fresh (νωπά), ΧΩΡΙΑΤΙΚ = village-style (χωριάτικη), ΓΛΟΥΤ = likely Χωρίς Γλουτένη (gluten-free), ΚΑΤΕΨ = frozen (κατεψυγμένα), ΒΙΟΛ = organic/bio, ΠΑΣΤΕΡΙΩ = pasteurised.
+- Weight-priced items print "X.XXX kg × €Y.YY/kg = €Z.ZZ" — extract the total line price as price, unit as "kg", qty as the weight.
+- If a product name remains ambiguous after de-truncation, include it in _warnings.
+- Store the raw printed line verbatim in originalText regardless of how mangled it looks.
 
 ═══ CONFIDENCE RULES ═══
 
