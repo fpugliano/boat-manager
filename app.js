@@ -3983,7 +3983,7 @@ function renderProvisionsList() {
 
 function renderProvisionsInsights() {
   const prov = getProvisionsData();
-  const items = prov.items || [];
+  const items = prov.history || [];  // read from AI-import history, not the manual list
   const now = new Date();
   const thisYM = now.getFullYear() * 100 + (now.getMonth() + 1);
   const lastDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -8269,6 +8269,33 @@ function migrateData() {
       }
     }
   } catch(e) { console.warn('migrateSchengenSecondPerson', e); }
+  // Move AI-imported provision items out of visible list → history-only — owner only, runs once
+  try {
+    if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL && !data._provHistMigrated) {
+      if (!data.provisions) data.provisions = { items: [] };
+      if (!data.provisions.items) data.provisions.items = [];
+      if (!data.provisions.history) data.provisions.history = [];
+      const toMove = [];
+      const toKeep = [];
+      (data.provisions.items || []).forEach(it => {
+        // AI-imported items have at least one priceHistory entry, or lastStore/lastPrice set
+        const isAiImported = (Array.isArray(it.priceHistory) && it.priceHistory.length > 0)
+          || it.lastStore != null || it.lastPrice != null;
+        if (isAiImported) toMove.push(it);
+        else toKeep.push(it);
+      });
+      if (toMove.length) {
+        toMove.forEach(it => {
+          if (!data.provisions.history.some(h => h.id === it.id)) {
+            data.provisions.history.push(it);
+          }
+        });
+        data.provisions.items = toKeep;
+      }
+      data._provHistMigrated = true;
+      dirty = true;
+    }
+  } catch(e) { console.warn('migrateProvHistory', e); }
   if (dirty) save();
 }
 
@@ -9539,14 +9566,17 @@ async function aiImportApply(btn) {
           ? [{ date: e.date||recDate||'', store: e.store||recStore||'', price: e.price!=null ? Number(e.price) : null, qty: Number(e.qty)||1, unit: e.unit||'' }]
           : [];
         if (dest === 'provisions') {
-          data.provisions.items.push({
+          // AI-imported receipt items go to history-only storage, not the manual planning list
+          if (!data.provisions.history) data.provisions.history = [];
+          data.provisions.history.push({
             id: uid(), name: e.name||'', qty: Number(e.qty)||0,
-            minQty: 0, unit: e.unit||'', category: cat, location: '',
+            unit: e.unit||'', category: cat,
             lastPrice: e.price!=null ? Number(e.price) : null,
             lastStore: e.store||recStore||null,
             lastPurchaseDate: e.date||recDate||null,
             priceHistory: ph,
             originalText: e.originalText||null,
+            importedAt: new Date().toISOString().slice(0,10),
           });
           provCounts.provisions++;
         } else {
@@ -9730,7 +9760,7 @@ async function aiImportApply(btn) {
     // Build accurate success summary using actual destination counts
     const lines = [];
     if (p.maintenance?.length)    lines.push(`${p.maintenance.length} maintenance ${p.maintenance.length===1?'entry':'entries'} → Engine Maintenance`);
-    if (provCounts.provisions)    lines.push(`${provCounts.provisions} provision ${provCounts.provisions===1?'item':'items'} → Provisions`);
+    if (provCounts.provisions)    lines.push(`${provCounts.provisions} provision ${provCounts.provisions===1?'item':'items'} → Provisions (Insights)`);
     if (provCounts.toSpareParts)  lines.push(`${provCounts.toSpareParts} provision ${provCounts.toSpareParts===1?'item':'items'} redirected → Spare Parts`);
     if (spCounts.spareParts)      lines.push(`${spCounts.spareParts} spare ${spCounts.spareParts===1?'part':'parts'} → Spare Parts`);
     if (spCounts.toProvisions)    lines.push(`${spCounts.toProvisions} part${spCounts.toProvisions===1?'':'s'} redirected → Provisions`);
