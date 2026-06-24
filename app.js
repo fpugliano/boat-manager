@@ -5709,9 +5709,10 @@ function renderSystemsOverview() {
   const open = ui.sysOverviewOpen;
   const toggle = "ui.sysOverviewOpen=!ui.sysOverviewOpen;document.getElementById('mainContent').innerHTML=renderSystems()";
 
-  // Computed totals
-  const total   = systems.reduce((s, x) => s + (x.purchasePriceUsd > 0 ? x.purchasePriceUsd : 0), 0);
-  const priced  = systems.filter(x => x.purchasePriceUsd > 0).length;
+  // Planned/uninstalled items excluded from all totals
+  const planned  = x => (x.notes||'').toUpperCase().includes('NOT YET INSTALLED');
+  const total    = systems.reduce((s, x) => s + (!planned(x) && x.purchasePriceUsd > 0 ? x.purchasePriceUsd : 0), 0);
+  const priced   = systems.filter(x => !planned(x) && x.purchasePriceUsd > 0).length;
   const unpriced = systems.length - priced;
 
   const fmtK = n => { n = Math.round(n); return n >= 10000 ? '$' + (n/1000).toFixed(1).replace(/\.0$/,'') + 'k' : '$' + n.toLocaleString(); };
@@ -5752,15 +5753,19 @@ function renderSystemsOverview() {
       </div>
     </div>`;
 
-  // Section 2: investment bar chart grouped by cat field
-  const catMap = {};
-  systems.forEach(x => {
-    if (x.purchasePriceUsd > 0) {
-      const c = x.cat || x.category || 'Other';
-      catMap[c] = (catMap[c] || 0) + x.purchasePriceUsd;
-    }
-  });
-  const cats = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+  // Section 2: investment bar chart — five named categories, planned items excluded
+  const isLFP     = x => x.make==='Victron Energy' && /lifepo4/i.test(x.model||'');
+  const chartDefs = [
+    { label:'LiFePO4 Batteries', match: x => isLFP(x)                                              },
+    { label:'Victron',           match: x => x.make==='Victron Energy' && !isLFP(x) && !planned(x) },
+    { label:'Flex Solar',        match: x => x.make==='SUNBEAMsystem'                               },
+    { label:'Rigid Solar',       match: x => x.make==='SunPower'                                    },
+    { label:'Raymarine',         match: x => x.make==='Raymarine'                                   },
+  ];
+  const cats = chartDefs
+    .map(d => [d.label, systems.filter(x => !planned(x) && x.purchasePriceUsd>0 && d.match(x)).reduce((t,x)=>t+x.purchasePriceUsd,0)])
+    .filter(([,amt]) => amt > 0)
+    .sort((a,b) => b[1]-a[1]);
   const maxAmt = cats.length ? cats[0][1] : 1;
   const bars = cats.map(([c, amt]) => {
     const pct = Math.round(amt / maxAmt * 100);
@@ -9067,7 +9072,10 @@ const OROBORO_B1150_SYSTEMS = [
     "serialNumber": "1520540611100063",
     "location": "Cabin roof — flush mounted",
     "installDate": "2024-2025",
-    "notes": "Paired with Panel 2 in parallel → MPPT 75/15 HQ21320J2KCQ. Replaced original 100W (SBM-T100JB Oct 2018). SunPower Maxeon 22.5%+ efficiency. Walkable ETFE. Warranty registered.",
+    "notes": "Paired with Panel 2 in parallel → MPPT 75/15 HQ21320J2KCQ. Replaced original 100W (SBM-T100JB Oct 2018). SunPower Maxeon 22.5%+ efficiency. Walkable ETFE. Warranty registered. Replaced under warranty 2024-2025. Original: SBM-T100JB Tough 100W (PowerSol PWS06660).",
+    "purchasePriceUsd": 441,
+    "purchasePriceOriginal": "R8,126 ZAR (original SBM-T100JB, PowerSol PWS06660)",
+    "invoiceRef": "PowerSol PWS06660",
     "photos": [],
     "lastService": "",
     "warrantyExpiry": ""
@@ -9080,7 +9088,10 @@ const OROBORO_B1150_SYSTEMS = [
     "serialNumber": "1520540611100067",
     "location": "Cabin roof — flush mounted",
     "installDate": "2024-2025",
-    "notes": "Paired with Panel 1 in parallel → MPPT 75/15 HQ21320J2KCQ. Warranty registered.",
+    "notes": "Paired with Panel 1 in parallel → MPPT 75/15 HQ21320J2KCQ. Warranty registered. Replaced under warranty 2024-2025. Original: SBM-T100JB Tough 100W (PowerSol PWS06660).",
+    "purchasePriceUsd": 441,
+    "purchasePriceOriginal": "R8,126 ZAR (original SBM-T100JB, PowerSol PWS06660)",
+    "invoiceRef": "PowerSol PWS06660",
     "photos": [],
     "lastService": "",
     "warrantyExpiry": ""
@@ -9093,7 +9104,10 @@ const OROBORO_B1150_SYSTEMS = [
     "serialNumber": "1520540611100044",
     "location": "Cabin roof — flush mounted",
     "installDate": "2024-2025",
-    "notes": "Paired with Panel 4 in parallel → MPPT 75/15 HQ21120G2CF. Warranty registered.",
+    "notes": "Paired with Panel 4 in parallel → MPPT 75/15 HQ21120G2CF. Warranty registered. Replaced under warranty 2024-2025. Original: SBM-T100JB Tough 100W (PowerSol PWS06660).",
+    "purchasePriceUsd": 441,
+    "purchasePriceOriginal": "R8,126 ZAR (original SBM-T100JB, PowerSol PWS06660)",
+    "invoiceRef": "PowerSol PWS06660",
     "photos": [],
     "lastService": "",
     "warrantyExpiry": ""
@@ -9106,7 +9120,10 @@ const OROBORO_B1150_SYSTEMS = [
     "serialNumber": "1520540611100043",
     "location": "Cabin roof — flush mounted",
     "installDate": "2024-2025",
-    "notes": "Paired with Panel 3 in parallel → MPPT 75/15 HQ21120G2CF. Warranty registered.",
+    "notes": "Paired with Panel 3 in parallel → MPPT 75/15 HQ21120G2CF. Warranty registered. Replaced under warranty 2024-2025. Original: SBM-T100JB Tough 100W (PowerSol PWS06660).",
+    "purchasePriceUsd": 441,
+    "purchasePriceOriginal": "R8,126 ZAR (original SBM-T100JB, PowerSol PWS06660)",
+    "invoiceRef": "PowerSol PWS06660",
     "photos": [],
     "lastService": "",
     "warrantyExpiry": ""
@@ -9732,18 +9749,17 @@ function migrateData() {
     }
   } catch(e) { console.warn('seedPowerSpec', e); }
   // One-time systems import for owner — replaces existing systems with authoritative B1150 spreadsheet data
-  // v3: same data as v2 — fixes a race condition where v1/v2 migrations fired save() after a concurrent
-  // prefill or pushToCloud() call overwrote localStorage, so the migrated data never actually landed.
-  // Fix: migrateData() now runs BEFORE any save()/pushToCloud() in the init sequence (see attemptUnlock/attemptLogin).
+  // v4: adds purchasePriceUsd/invoiceRef to 4 Sunbeam flex panels + invoice notes
   try {
-    if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL && !data._systemsImportedV3) {
+    if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL && !data._systemsImportedV4) {
       data.systems = OROBORO_B1150_SYSTEMS.map(s => Object.assign({id: uid()}, s));
       data._systemsImportedV1 = true;
       data._systemsImportedV2 = true;
       data._systemsImportedV3 = true;
+      data._systemsImportedV4 = true;
       dirty = true;
     }
-  } catch(e) { console.warn('systemsImportV3', e); }
+  } catch(e) { console.warn('systemsImportV4', e); }
   if (dirty) save();
 }
 
