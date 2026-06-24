@@ -8448,15 +8448,18 @@ function migrateData() {
     }
   } catch(e) { console.warn('migrateProvHistory', e); }
   // One-time systems import for owner — replaces existing systems with authoritative B1150 spreadsheet data
+  // v1: initial import (may have been saved before migration completed due to concurrent save() calls)
+  // v2: force re-import with confirmed camelCase purchase field names (purchasePriceUsd, invoiceRef, partCode)
   try {
-    if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL && !data._systemsImportedV1) {
+    if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL && !data._systemsImportedV2) {
       if (typeof OROBORO_B1150_SYSTEMS !== 'undefined') {
         data.systems = OROBORO_B1150_SYSTEMS.map(s => Object.assign({id: uid()}, s));
         data._systemsImportedV1 = true;
+        data._systemsImportedV2 = true;
         dirty = true;
       }
     }
-  } catch(e) { console.warn('systemsImportV1', e); }
+  } catch(e) { console.warn('systemsImportV2', e); }
   if (dirty) save();
 }
 
