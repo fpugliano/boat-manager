@@ -121,7 +121,7 @@ const YANMAR_SCHED = [
 let data = {};
 let ui = {
   tab:'documents', docSub:'vessel', maintEngine:'port',
-  photoSub:'vesselDoc', crewOpen:null, sysOpen:null, sysTab:'All',
+  photoSub:'vesselDoc', crewOpen:null, sysOpen:null, sysTab:'All', sysOverviewOpen:false,
   partsSearch:'', partsFilter:'All', alertsOpen:false, maintShowAll:false, maintTaskFilter:'All',
   provisionsSub:'all', provisionsView:'list', provHistGroup:null, tlDetailId:null
 };
@@ -5701,6 +5701,210 @@ function _sysDoReorder(fromId, toId) {
   save(); document.getElementById('mainContent').innerHTML = renderSystems();
 }
 
+function renderSystemsOverview() {
+  const systems = data.systems || [];
+  const ps = data.meta?.powerSpec;
+  if (!systems.length && !ps) return '';
+
+  const open = ui.sysOverviewOpen;
+  const toggle = "ui.sysOverviewOpen=!ui.sysOverviewOpen;document.getElementById('mainContent').innerHTML=renderSystems()";
+
+  // Computed totals
+  const total   = systems.reduce((s, x) => s + (x.purchasePriceUsd > 0 ? x.purchasePriceUsd : 0), 0);
+  const priced  = systems.filter(x => x.purchasePriceUsd > 0).length;
+  const unpriced = systems.length - priced;
+
+  const fmtK = n => { n = Math.round(n); return n >= 10000 ? '$' + (n/1000).toFixed(1).replace(/\.0$/,'') + 'k' : '$' + n.toLocaleString(); };
+
+  // Collapsed one-liner
+  let summary = `${systems.length} systems`;
+  if (total > 0) summary += ` · ${fmtK(total)} invested`;
+  if (ps?.houseBankAh) summary += ` · ${Number(ps.houseBankAh).toLocaleString()}Ah LFP`;
+  if (ps?.solarW)      summary += ` · ${Number(ps.solarW).toLocaleString()}W solar`;
+
+  const hdr = `
+    <div onclick="${toggle}" style="display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;user-select:none;-webkit-user-select:none">
+      <span style="font-size:16px;flex-shrink:0">📊</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600">Systems Overview</div>
+        ${!open ? `<div style="font-size:12px;color:var(--label3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px">${esc(summary)}</div>` : ''}
+      </div>
+      <span style="color:var(--label3);font-size:13px;flex-shrink:0">${open ? '▲' : '▼'}</span>
+    </div>`;
+
+  if (!open) return `<div style="background:var(--surface);border-radius:var(--radius);margin-bottom:10px">${hdr}</div>`;
+
+  // Section 1: headline tiles
+  const sec1 = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:14px 16px">
+      <div style="text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--blue);line-height:1.1">${systems.length}</div>
+        <div style="font-size:11px;color:var(--label3);margin-top:3px">total systems</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--blue);line-height:1.1">${fmtK(total)}</div>
+        <div style="font-size:11px;color:var(--label3);margin-top:3px">invested</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--blue);line-height:1.1">${priced}</div>
+        <div style="font-size:11px;color:var(--label3);margin-top:3px">priced</div>
+        <div style="font-size:11px;color:var(--label3)">${unpriced} from build</div>
+      </div>
+    </div>`;
+
+  // Section 2: investment bar chart grouped by cat field
+  const catMap = {};
+  systems.forEach(x => {
+    if (x.purchasePriceUsd > 0) {
+      const c = x.cat || x.category || 'Other';
+      catMap[c] = (catMap[c] || 0) + x.purchasePriceUsd;
+    }
+  });
+  const cats = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+  const maxAmt = cats.length ? cats[0][1] : 1;
+  const bars = cats.map(([c, amt]) => {
+    const pct = Math.round(amt / maxAmt * 100);
+    return `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+        <div style="font-size:12px;color:var(--label2);width:128px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c)}</div>
+        <div style="flex:1;background:var(--sep);border-radius:3px;height:5px">
+          <div style="width:${pct}%;background:var(--blue);border-radius:3px;height:5px;min-width:3px"></div>
+        </div>
+        <div style="font-size:12px;color:var(--label2);text-align:right;white-space:nowrap;min-width:52px">${fmtK(amt)}</div>
+      </div>`;
+  }).join('');
+  const sec2 = cats.length ? `
+    <div style="border-top:1px solid var(--sep);padding:14px 16px 7px">
+      <div style="font-size:11px;font-weight:600;color:var(--label3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Investment by category</div>
+      ${bars}
+    </div>` : '';
+
+  // Section 3: vessel quick-reference — power spec + engines
+  const sec3_ps = ps ? `
+    <div${cats.length ? '' : ''}>
+      <div style="display:flex;align-items:center;margin-bottom:8px">
+        <div style="font-size:11px;font-weight:600;color:var(--label3);text-transform:uppercase;letter-spacing:.5px;flex:1">Power Spec</div>
+        <button onclick="event.stopPropagation();editPowerSpec()" style="background:none;border:none;padding:0;cursor:pointer;font-size:12px;color:var(--blue);font-weight:500">✏️ Edit</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin-bottom:2px">
+        <div>
+          <div style="font-size:11px;color:var(--label3)">House Bank</div>
+          <div style="font-size:15px;font-weight:600">${Number(ps.houseBankAh||0).toLocaleString()}Ah</div>
+          <div style="font-size:12px;color:var(--label3)">${esc(ps.houseBankDesc||'')}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--label3)">Solar</div>
+          <div style="font-size:15px;font-weight:600">${Number(ps.solarW||0).toLocaleString()}W</div>
+          <div style="font-size:12px;color:var(--label3)">${esc(ps.solarDesc||'')}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--label3)">Inverter</div>
+          <div style="font-size:15px;font-weight:600">${Number(ps.inverterVA||0).toLocaleString()}VA</div>
+          <div style="font-size:12px;color:var(--label3)">${esc(ps.inverterDesc||'')}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--label3)">Alternator(s)</div>
+          <div style="font-size:15px;font-weight:600">${Number(ps.alternatorA||0).toLocaleString()}A</div>
+          <div style="font-size:12px;color:var(--label3)">${esc(ps.alternatorDesc||'')}</div>
+        </div>
+      </div>
+    </div>` : '';
+
+  const yanmars = systems
+    .filter(x => x.make === 'Yanmar')
+    .sort((a, b) => {
+      const aP = (a.location || '').toLowerCase().includes('port') ? 0 : 1;
+      const bP = (b.location || '').toLowerCase().includes('port') ? 0 : 1;
+      return aP - bP;
+    });
+  const engLines = yanmars.map(x => {
+    const side = (x.location || '').toLowerCase().includes('port') ? 'Port' : 'Stbd';
+    return `<div style="font-size:13px;color:var(--label2);margin-bottom:3px">${esc(x.make)} ${esc(x.model)} · <span style="color:var(--label3)">${side}</span> · <span style="font-family:monospace;font-size:12px">${esc(x.serialNumber||'—')}</span></div>`;
+  }).join('');
+  const sec3_eng = yanmars.length ? `
+    <div${sec3_ps ? ' style="border-top:1px solid var(--sep);padding-top:12px;margin-top:12px"' : ''}>
+      <div style="font-size:11px;font-weight:600;color:var(--label3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Engines</div>
+      ${engLines}
+    </div>` : '';
+
+  const sec3 = (sec3_ps || sec3_eng) ? `
+    <div style="border-top:1px solid var(--sep);padding:14px 16px">
+      ${sec3_ps}
+      ${sec3_eng}
+    </div>` : '';
+
+  return `
+    <div style="background:var(--surface);border-radius:var(--radius);margin-bottom:10px">
+      ${hdr}
+      <div style="border-top:1px solid var(--sep)">
+        ${sec1}
+        ${sec2}
+        ${sec3}
+      </div>
+    </div>`;
+}
+
+function editPowerSpec() {
+  const ps = data.meta?.powerSpec || {};
+  showModal('Edit Power Spec', `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">
+      <div>
+        <div class="mi-label">House Bank (Ah)</div>
+        <input class="mi" type="number" id="ps-hbah" value="${esc(String(ps.houseBankAh||''))}">
+      </div>
+      <div>
+        <div class="mi-label">House Bank desc</div>
+        <input class="mi" id="ps-hbdesc" value="${esc(ps.houseBankDesc||'')}">
+      </div>
+      <div style="margin-top:10px">
+        <div class="mi-label">Solar (W)</div>
+        <input class="mi" type="number" id="ps-sw" value="${esc(String(ps.solarW||''))}">
+      </div>
+      <div style="margin-top:10px">
+        <div class="mi-label">Solar desc</div>
+        <input class="mi" id="ps-sdesc" value="${esc(ps.solarDesc||'')}">
+      </div>
+      <div style="margin-top:10px">
+        <div class="mi-label">Inverter (VA)</div>
+        <input class="mi" type="number" id="ps-iva" value="${esc(String(ps.inverterVA||''))}">
+      </div>
+      <div style="margin-top:10px">
+        <div class="mi-label">Inverter desc</div>
+        <input class="mi" id="ps-idesc" value="${esc(ps.inverterDesc||'')}">
+      </div>
+      <div style="margin-top:10px">
+        <div class="mi-label">Alternator (A)</div>
+        <input class="mi" type="number" id="ps-alta" value="${esc(String(ps.alternatorA||''))}">
+      </div>
+      <div style="margin-top:10px">
+        <div class="mi-label">Alternator desc</div>
+        <input class="mi" id="ps-adesc" value="${esc(ps.alternatorDesc||'')}">
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="savePowerSpec()">Save</button>
+    </div>`);
+}
+
+function savePowerSpec() {
+  if (!data.meta) data.meta = {};
+  data.meta.powerSpec = {
+    houseBankAh:    Number(document.getElementById('ps-hbah').value)  || 0,
+    houseBankDesc:  document.getElementById('ps-hbdesc').value.trim(),
+    solarW:         Number(document.getElementById('ps-sw').value)    || 0,
+    solarDesc:      document.getElementById('ps-sdesc').value.trim(),
+    inverterVA:     Number(document.getElementById('ps-iva').value)   || 0,
+    inverterDesc:   document.getElementById('ps-idesc').value.trim(),
+    alternatorA:    Number(document.getElementById('ps-alta').value)  || 0,
+    alternatorDesc: document.getElementById('ps-adesc').value.trim(),
+  };
+  save();
+  pushToCloud();
+  hideModal();
+  document.getElementById('mainContent').innerHTML = renderSystems();
+}
+
 function renderSystems() {
   const systems = data.systems || [];
   if (!ui.sysTab) ui.sysTab = 'All';
@@ -5726,6 +5930,7 @@ function renderSystems() {
       `).join('') + noCat.map(s=>renderSystemCard(s)).join('');
 
   return `
+    ${renderSystemsOverview()}
     <div class="subtab-bar" style="margin-bottom:10px">${pills}</div>
     <div class="btn-row">
       <button class="btn btn-p btn-sm" onclick="showAddSystem()">+ Add System</button>
@@ -9509,6 +9714,23 @@ function migrateData() {
       dirty = true;
     }
   } catch(e) { console.warn('migrateProvHistory', e); }
+  // Seed power spec for owner account — update manually if power system changes
+  try {
+    if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL && !data.meta?.powerSpec) {
+      if (!data.meta) data.meta = {};
+      data.meta.powerSpec = {
+        houseBankAh:    800,   // 4× Victron LFP 200Ah
+        houseBankDesc:  '4 × LFP 200Ah',
+        solarW:         1425,  // 981W rigid (stern arch) + 444W flex (cabin roof)
+        solarDesc:      '981W rigid + 444W flex',
+        inverterVA:     3000,
+        inverterDesc:   'MultiPlus 12/3000/120',
+        alternatorA:    120,   // 4× Orion-Tr Smart 30A DC-DC chargers
+        alternatorDesc: '4 × Orion-Tr Smart 30A',
+      };
+      dirty = true;
+    }
+  } catch(e) { console.warn('seedPowerSpec', e); }
   // One-time systems import for owner — replaces existing systems with authoritative B1150 spreadsheet data
   // v3: same data as v2 — fixes a race condition where v1/v2 migrations fired save() after a concurrent
   // prefill or pushToCloud() call overwrote localStorage, so the migrated data never actually landed.
