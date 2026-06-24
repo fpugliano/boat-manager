@@ -4650,9 +4650,11 @@ function prefillNewUserSampleData() {
   const hasRealSystems = data.systems?.some(s => !s.id?.startsWith('ex_'));
   if (!hasRealSystems) {
     data.systems = [
-      {id:uid(), cat:'Solar',      category:'Solar',      make:'Example', model:'Solar Panels 400W', serialNumber:'', location:'Coachroof',  notes:'Example — update with your own details', installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', photos:[]},
-      {id:uid(), cat:'Watermaker', category:'Watermaker', make:'Example', model:'Watermaker 12V',    serialNumber:'', location:'Engine bay', notes:'Example — update with your own details', installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', photos:[]},
-      {id:uid(), cat:'Navigation', category:'Navigation', make:'Example', model:'Autopilot',         serialNumber:'', location:'Helm',       notes:'Example — update with your own details', installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', photos:[]},
+      {id:uid(), cat:'House Bank',             category:'House Bank',             make:'Victron Energy',  model:'LiFePO4 Smart 12.8V/200Ah (Example)',  serialNumber:'', location:'Hull battery locker', notes:'Example — update with your own details', installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', photos:[]},
+      {id:uid(), cat:'Chartplotter & Displays',category:'Chartplotter & Displays',make:'Raymarine',       model:'Axiom 12 MFD (Example)',               serialNumber:'', location:'Helm station',       notes:'Example — update with your own details', installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', photos:[]},
+      {id:uid(), cat:'Main Engines',           category:'Main Engines',           make:'Yanmar',          model:'3YM30 30HP Diesel (Example)',           serialNumber:'', location:'Engine room',        notes:'Example — update with your own details', installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', photos:[]},
+      {id:uid(), cat:'Charge Controllers',     category:'Charge Controllers',     make:'Victron Energy',  model:'SmartSolar MPPT 100/30 (Example)',      serialNumber:'', location:'Below deck',         notes:'Example — update with your own details', installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', photos:[]},
+      {id:uid(), cat:'Sensors & Network',      category:'Sensors & Network',      make:'Standard Horizon',model:'GX2200 Matrix VHF (Example)',           serialNumber:'', location:'Helm station',       notes:'Example — update with your own details', installDate:'', lastService:'', warrantyExpiry:'', manualUrl:'', photos:[]},
     ];
     dirty = true;
   }
@@ -5625,12 +5627,12 @@ function prefillUpgradesData() {
 
 const SYS_GROUPS = [
   {id:'All',      label:'All'},
-  {id:'Victron',  label:'⚡ Victron',        cats:['Battery Storage','Distribution','Charge Controllers','Protection & Management','Inverter / Charger','Monitoring']},
-  {id:'Engines',  label:'🔧 Engines',        cats:['Engines','Propulsion','Sail Drive']},
-  {id:'Sails',    label:'⛵ Sails & Rigging', cats:['Main sail','Genoa','Standing rigging','Sails','Rigging','Halyards']},
-  {id:'Water',    label:'💧 Water & Fuel',    cats:['Watermaker','Fresh Water','Diesel','Water']},
-  {id:'Solar',    label:'☀️ Solar',           cats:['Solar','Flexible solar']},
-  {id:'Raymarine',label:'📡 Raymarine',       cats:['Raymarine','Navigation','Electronics']},
+  {id:'Victron',  label:'⚡ Victron',        cats:['Battery Storage','Distribution','Charge Controllers','Protection & Management','Inverter / Charger','Monitoring','House Bank','Distribution & Protection','Alternator Charging','Future Projects']},
+  {id:'Engines',  label:'🔧 Engines',        cats:['Engines','Propulsion','Sail Drive','Main Engines','Start Batteries','Fuel System']},
+  {id:'Sails',    label:'⛵ Sails & Rigging', cats:['Main sail','Genoa','Standing rigging','Sails','Rigging','Halyards','Deck Equipment']},
+  {id:'Water',    label:'💧 Water & Fuel',    cats:['Watermaker','Fresh Water','Diesel','Water','Bilge','Sanitation','Fuel Transfer']},
+  {id:'Solar',    label:'☀️ Solar',           cats:['Solar','Flexible solar','Rigid Panels — Stern Arch','Flexible Panels — Cabin Roof','Charge Controllers']},
+  {id:'Raymarine',label:'📡 Raymarine',       cats:['Raymarine','Navigation','Electronics','Chartplotter & Displays','Radar','AIS & GPS','Autopilot','Sensors & Network']},
   {id:'Other',    label:'➕ Other'},
 ];
 const SYS_ALL_CATS = SYS_GROUPS.filter(g=>g.cats).flatMap(g=>g.cats);
@@ -5734,6 +5736,8 @@ function renderSystems() {
 function renderSystemCard(s) {
   const open = ui.sysOpen === s.id;
   const wExp = expiryBadge(s.warrantyExpiry, 90);
+  const idx = data.systems.indexOf(s);
+  const hasPurchase = s.purchasePriceUsd || s.purchasePriceOriginal || s.supplier || s.invoiceRef || s.partCode;
   return `
     <div class="sys-card" data-sys-id="${s.id}" draggable="true" ondragstart="sysDragStart(event,'${s.id}')" ondragover="sysDragOver(event,'${s.id}')" ondragleave="sysDragLeave(event)" ondrop="sysDrop(event,'${s.id}')" ondragend="sysDragEnd()">
       <div class="sys-hdr" onclick="ui.sysOpen=ui.sysOpen==='${s.id}'?null:'${s.id}';document.getElementById('mainContent').innerHTML=renderSystems()">
@@ -5749,18 +5753,26 @@ function renderSystemCard(s) {
         </div>
       </div>
       <div class="sys-body ${open?'open':''}">
-        ${fr('Make','systems.'+data.systems.indexOf(s)+'.make',s.make)}
-        ${fr('Model','systems.'+data.systems.indexOf(s)+'.model',s.model)}
-        ${fr('Serial No.','systems.'+data.systems.indexOf(s)+'.serialNumber',s.serialNumber)}
-        ${fr('Location','systems.'+data.systems.indexOf(s)+'.location',s.location)}
-        ${fr('Install Date','systems.'+data.systems.indexOf(s)+'.installDate',s.installDate,'date')}
-        ${fr('Last Service','systems.'+data.systems.indexOf(s)+'.lastService',s.lastService,'date')}
-        ${frExpiry('systems.'+data.systems.indexOf(s)+'.warrantyExpiry',s.warrantyExpiry,wExp,'Warranty Expiry')}
-        ${fr('Manual URL','systems.'+data.systems.indexOf(s)+'.manualUrl',s.manualUrl)}
+        ${fr('Make','systems.'+idx+'.make',s.make)}
+        ${fr('Model','systems.'+idx+'.model',s.model)}
+        ${fr('Serial No.','systems.'+idx+'.serialNumber',s.serialNumber)}
+        ${fr('Location','systems.'+idx+'.location',s.location)}
+        ${fr('Install Date','systems.'+idx+'.installDate',s.installDate,'date')}
+        ${fr('Last Service','systems.'+idx+'.lastService',s.lastService,'date')}
+        ${frExpiry('systems.'+idx+'.warrantyExpiry',s.warrantyExpiry,wExp,'Warranty Expiry')}
+        ${fr('Manual URL','systems.'+idx+'.manualUrl',s.manualUrl)}
         <div class="fr" style="align-items:flex-start;padding-top:12px">
           <div class="fl">Notes</div>
-          <textarea class="fi-area" onblur="saveField('systems.${data.systems.indexOf(s)}.notes',this.value)">${esc(s.notes||'')}</textarea>
+          <textarea class="fi-area" onblur="saveField('systems.${idx}.notes',this.value)">${esc(s.notes||'')}</textarea>
         </div>
+        ${hasPurchase ? `
+        <div style="border-top:1px solid var(--border);margin:14px 0 8px"></div>
+        <div style="font-size:11px;font-weight:600;color:var(--label3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Purchase</div>
+        ${s.purchasePriceUsd ? `<div class="fr"><div class="fl">Price</div><div>$${Number(s.purchasePriceUsd).toLocaleString()}${s.purchasePriceOriginal?`<div style="font-size:12px;color:var(--label3)">${esc(s.purchasePriceOriginal)} at purchase</div>`:''}</div></div>` : ''}
+        ${fr('Supplier','systems.'+idx+'.supplier',s.supplier)}
+        ${fr('Invoice Ref','systems.'+idx+'.invoiceRef',s.invoiceRef)}
+        <div class="fr"><div class="fl">Part Code</div><input class="fi" type="text" value="${esc(s.partCode||'')}" onblur="saveField('systems.${idx}.partCode',this.value)" placeholder="—" style="font-family:monospace;font-size:13px"></div>
+        ` : ''}
         ${s.manualUrl?`<div class="btn-row"><a href="${esc(s.manualUrl)}" target="_blank"><button class="btn btn-s btn-xs">📄 Manual</button></a></div>`:''}
       </div>
     </div>`;
@@ -5835,6 +5847,15 @@ function editSystem(id) {
     <div class="mi-label">Warranty Expiry</div><input class="mi" id="es-war" type="date" value="${esc(s.warrantyExpiry||'')}">
     <div class="mi-label">Manual URL</div><input class="mi" id="es-url" value="${esc(s.manualUrl||'')}">
     <div class="mi-label">Notes</div><input class="mi" id="es-nt" value="${esc(s.notes||'')}">
+    <div style="border-top:1px solid var(--border);margin:16px 0 8px"></div>
+    <div class="mi-label" style="color:var(--label3)">Purchase (optional)</div>
+    <div style="display:flex;gap:8px">
+      <div style="flex:1"><div class="mi-label">Price USD</div><input class="mi" id="es-pusd" type="number" step="1" placeholder="e.g. 1934" value="${esc(s.purchasePriceUsd!=null?String(s.purchasePriceUsd):'')}" style="width:100%"></div>
+      <div style="flex:1"><div class="mi-label">Original price</div><input class="mi" id="es-porg" placeholder="e.g. €1,712 EUR" value="${esc(s.purchasePriceOriginal||'')}" style="width:100%"></div>
+    </div>
+    <div class="mi-label">Supplier</div><input class="mi" id="es-sup" value="${esc(s.supplier||'')}">
+    <div class="mi-label">Invoice Ref</div><input class="mi" id="es-inv" value="${esc(s.invoiceRef||'')}">
+    <div class="mi-label">Part Code</div><input class="mi" id="es-pcode" value="${esc(s.partCode||'')}" style="font-family:monospace">
     <div class="modal-btns">
       <button onclick="if(confirm('Remove this system?')){hideModal();removeSystem('${id}')}" style="background:#FCEBEB;border:0.5px solid #F09595;color:#A32D2D;border-radius:8px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">Delete</button>
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
@@ -5857,6 +5878,12 @@ function saveEditSystem(id) {
   s.warrantyExpiry= document.getElementById('es-war').value;
   s.manualUrl     = document.getElementById('es-url').value;
   s.notes         = document.getElementById('es-nt').value;
+  const pusd = document.getElementById('es-pusd')?.value;
+  s.purchasePriceUsd      = pusd !== '' && pusd != null ? Number(pusd) : null;
+  s.purchasePriceOriginal = document.getElementById('es-porg')?.value || '';
+  s.supplier              = document.getElementById('es-sup')?.value  || '';
+  s.invoiceRef            = document.getElementById('es-inv')?.value  || '';
+  s.partCode              = document.getElementById('es-pcode')?.value || '';
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderSystems();
 }
 
@@ -8420,6 +8447,16 @@ function migrateData() {
       dirty = true;
     }
   } catch(e) { console.warn('migrateProvHistory', e); }
+  // One-time systems import for owner — replaces existing systems with authoritative B1150 spreadsheet data
+  try {
+    if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL && !data._systemsImportedV1) {
+      if (typeof OROBORO_B1150_SYSTEMS !== 'undefined') {
+        data.systems = OROBORO_B1150_SYSTEMS.map(s => Object.assign({id: uid()}, s));
+        data._systemsImportedV1 = true;
+        dirty = true;
+      }
+    }
+  } catch(e) { console.warn('systemsImportV1', e); }
   if (dirty) save();
 }
 
@@ -9813,9 +9850,14 @@ async function aiImportApply(btn) {
       if (!data.systems) data.systems = [];
       p.systems.forEach(s => data.systems.push({
         id: uid(), cat: s.cat || 'Electronics', category: s.cat || 'Electronics',
-        make: s.make || '', model: s.model || '', serialNumber: s.serialNumber || '',
-        location: s.location || '', notes: s.notes || '', installDate: s.installDate || '',
-        lastService: '', warrantyExpiry: s.warrantyExpiry || '', manualUrl: '', photos: []
+        make: s.make || '', model: s.model || '', serialNumber: s.serialNumber || s.serial_no || '',
+        location: s.location || '', notes: s.notes || '', installDate: s.installDate || s.install_date || '',
+        lastService: '', warrantyExpiry: s.warrantyExpiry || '', manualUrl: s.manualUrl || s.manual_url || '', photos: [],
+        purchasePriceUsd:      s.purchasePriceUsd || (s.purchase_price_usd ? Number(s.purchase_price_usd) : null),
+        purchasePriceOriginal: s.purchasePriceOriginal || s.purchase_price_original || '',
+        invoiceRef:            s.invoiceRef || s.invoice || '',
+        supplier:              s.supplier || '',
+        partCode:              s.partCode || s.part_code || '',
       }));
     }
     if (p.watermaker && typeof p.watermaker === 'object') {
