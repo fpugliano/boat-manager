@@ -5636,6 +5636,12 @@ const SYS_GROUPS = [
   {id:'Other',    label:'➕ Other'},
 ];
 const SYS_ALL_CATS = SYS_GROUPS.filter(g=>g.cats).flatMap(g=>g.cats);
+const SYS_CAT_ICON = {};
+SYS_GROUPS.forEach(g => {
+  if (!g.cats) return;
+  const emoji = g.label.split(' ')[0]; // "☀️ Solar" → "☀️", handles multi-codepoint emoji correctly
+  g.cats.forEach(c => SYS_CAT_ICON[c] = emoji);
+});
 
 function sysDragStart(e, id) {
   if (e.target.closest('button,input,select,textarea,a')) { e.preventDefault(); return; }
@@ -5948,11 +5954,12 @@ function renderSystemCard(s) {
   const wExp = expiryBadge(s.warrantyExpiry, 90);
   const idx = data.systems.indexOf(s);
   const hasPurchase = s.purchasePriceUsd || s.purchasePriceOriginal || s.supplier || s.invoiceRef || s.partCode;
+  const icon = SYS_CAT_ICON[s.cat] || '➕';
   return `
     <div class="sys-card" data-sys-id="${s.id}" draggable="true" ondragstart="sysDragStart(event,'${s.id}')" ondragover="sysDragOver(event,'${s.id}')" ondragleave="sysDragLeave(event)" ondrop="sysDrop(event,'${s.id}')" ondragend="sysDragEnd()">
       <div class="sys-hdr" onclick="ui.sysOpen=ui.sysOpen==='${s.id}'?null:'${s.id}';document.getElementById('mainContent').innerHTML=renderSystems()">
         <span class="prov-grip" ontouchstart="sysTouchStart(event,'${s.id}')" style="margin-right:4px">⠿</span>
-        <div class="sys-icon">⚡</div>
+        <div class="sys-icon">${icon}</div>
         <div style="flex:1">
           <div style="font-size:15px;font-weight:600">${esc(s.make?s.make+' ':'')}${esc(s.model)}</div>
           <div style="font-size:12px;color:var(--label3)">${esc(s.notes||'')} ${s.location?'· '+esc(s.location):''}</div>
