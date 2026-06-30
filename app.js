@@ -9443,10 +9443,16 @@ const OROBORO_B1150_SYSTEMS = [
     "cat": "Air Conditioning",
     "category": "Air Conditioning",
     "make": "Cruisair (Dometic)",
-    "model": "~16,000 BTU self-contained (exact model TBC)",
+    "model": "STQ12CK-410A",
+    "serialNumber": "33498976",
     "location": "Starboard hull",
-    "installDate": "2018-08",
-    "notes": "Seawater-cooled. Both units running simultaneously at anchor draws ~230-260A from 12V bank via MultiPlus. 1,425W solar partially offsets this in good sun.",
+    "installDate": "2018",
+    "notes": "Cruisair (Dometic) STQ12CK-410A, 12,000 BTU, 220-240V/50Hz 1-phase, R410A refrigerant (11.5oz/326g). Features: Stowaway Turbo, Q-Logic Control, High Velocity Blower. Factory test passed 08/28/2013 (manufacture date, not install date — installed on Oroboro 2018). Both units running simultaneously at anchor draws ~230-260A from 12V bank via MultiPlus. 1,425W solar partially offsets this in good sun.",
+    "purchasePriceUsd": 0,
+    "purchasePriceOriginal": "",
+    "supplier": "",
+    "invoiceRef": "",
+    "partCode": "",
     "photos": [],
     "lastService": "",
     "warrantyExpiry": ""
@@ -9531,24 +9537,6 @@ const OROBORO_B1150_SYSTEMS = [
     "location": "Saloon / helm",
     "installDate": "2018-08",
     "notes": "Multiple speakers throughout. Helm Remote + FWD Remote. Connected to Axiom 12 via SeaTalkng.",
-    "photos": [],
-    "lastService": "",
-    "warrantyExpiry": ""
-  },
-  {
-    "cat": "Other",
-    "category": "Other",
-    "make": "Cruisair (Dometic)",
-    "model": "STQ12CK-410A",
-    "serialNumber": "33498976",
-    "location": "Starboard hull",
-    "installDate": "2018",
-    "notes": "Cruisair (Dometic) STQ12CK-410A, 12,000 BTU, 220-240V/50Hz 1-phase, R410A refrigerant (11.5oz/326g). Features: Stowaway Turbo, Q-Logic Control, High Velocity Blower. Factory test passed 08/28/2013 (manufacture date, not install date — installed on Oroboro 2018).",
-    "purchasePriceUsd": 0,
-    "purchasePriceOriginal": "",
-    "supplier": "",
-    "invoiceRef": "",
-    "partCode": "",
     "photos": [],
     "lastService": "",
     "warrantyExpiry": ""
@@ -9771,18 +9759,19 @@ function migrateData() {
     }
   } catch(e) { console.warn('seedPowerSpec', e); }
   // One-time systems import for owner — replaces existing systems with authoritative B1150 spreadsheet data
-  // v5: adds Cruisair AC unit (77th item)
+  // v6: replace starboard AC placeholder with real nameplate data (STQ12CK-410A, s/n 33498976)
   try {
-    if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL && !data._systemsImportedV5) {
+    if (localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL && !data._systemsImportedV6) {
       data.systems = OROBORO_B1150_SYSTEMS.map(s => Object.assign({id: uid()}, s));
       data._systemsImportedV1 = true;
       data._systemsImportedV2 = true;
       data._systemsImportedV3 = true;
       data._systemsImportedV4 = true;
       data._systemsImportedV5 = true;
+      data._systemsImportedV6 = true;
       dirty = true;
     }
-  } catch(e) { console.warn('systemsImportV5', e); }
+  } catch(e) { console.warn('systemsImportV6', e); }
   if (dirty) save();
 }
 
