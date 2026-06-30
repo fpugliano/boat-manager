@@ -3312,9 +3312,6 @@ function renderWatermaker() {
             if (i === 0) { lastedMap[r.reading] = null; return; } // oldest: no prior
             lastedMap[r.reading] = (r.reading||0) - (arr[i-1].reading||0);
           });
-          // Most recent: lasted = currentReading - its reading
-          const mostRecent = byReading[byReading.length-1];
-          if (mostRecent) lastedMap[mostRecent.reading] = Math.max(0, (wm.currentReading||0) - (mostRecent.reading||0));
           // Display sorted date-descending, use original indices for edit/delete
           const display = clean.slice().sort((a,b) => b.date.localeCompare(a.date));
           return display.map(r => {
