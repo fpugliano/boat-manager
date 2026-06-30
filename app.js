@@ -3297,11 +3297,11 @@ function renderWatermaker() {
         <button onclick="wmAddMicronHistoryEntry()" style="background:none;border:none;font-size:12px;font-weight:600;color:var(--blue);font-family:var(--font);cursor:pointer;padding:0">+ Add entry</button>
       </div>
       ${(()=>{
-          // Deduplicate by reading and date, exclude currentReading as a history row
+          // Deduplicate by reading+date only
           const seen = new Set();
           const clean = (wm.micronHistory||[]).filter(r => {
             const key = `${r.reading}|${r.date}`;
-            if (seen.has(key) || r.reading === (wm.currentReading||0)) return false;
+            if (seen.has(key)) return false;
             seen.add(key); return true;
           });
           if (clean.length === 0) return `<div style="padding:4px 14px 10px;font-size:13px;color:var(--label3)">No changes recorded yet</div>`;
