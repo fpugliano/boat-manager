@@ -216,6 +216,7 @@ async function getOrCreateSalt() {
 }
 
 async function deriveKey(password, salt) {
+  if (!window.crypto || !window.crypto.subtle) { showCryptoUnsupported(); throw new Error('crypto.subtle unavailable'); }
   const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(password),
     { name:'PBKDF2' }, false, ['deriveKey']);
   return crypto.subtle.deriveKey(
@@ -11562,7 +11563,31 @@ function renderSettings() {
 //  INIT
 // ═══════════════════════════════════════════════════════════
 
+function showCryptoUnsupported() {
+  const ov = document.getElementById('setupOv');
+  ov.innerHTML = `
+    <div class="setup-inner" style="padding-top:calc(env(safe-area-inset-top) + 40px);text-align:center">
+      <div style="font-size:48px;margin-bottom:16px">🔐</div>
+      <div class="setup-h">Browser not supported</div>
+      <div class="setup-sub" style="line-height:1.6;margin-bottom:20px">
+        Oroboro Boat Manager requires the Web Crypto API, which isn't available in this browser.<br><br>
+        If you're using <strong>DuckDuckGo browser</strong>, please open this page in
+        <strong>Safari</strong> or <strong>Chrome</strong> instead.
+      </div>
+      <a href="https://boat.sailingoroboro.com"
+        style="display:inline-block;background:var(--blue);color:#fff;border-radius:10px;
+               padding:10px 24px;font-size:14px;font-weight:600;text-decoration:none">
+        Try again in another browser
+      </a>
+    </div>`;
+  ov.classList.remove('hidden');
+}
+
 async function init() {
+  if (!window.crypto || !window.crypto.subtle) {
+    showCryptoUnsupported();
+    return;
+  }
   if (new URLSearchParams(window.location.search).has('new')) {
     window.history.replaceState({}, '', window.location.pathname);
     startNewSetup('');
