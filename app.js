@@ -3751,6 +3751,9 @@ function lpgSaveFill(idx) {
     lpg.history[idx] = {...lpg.history[idx], date, location, bottles, kg, pricePerKg, notes};
   } else {
     lpg.history.unshift({id:uid(), date, location, bottles, kg, pricePerKg, notes});
+    // Mark the filled bottles as full in the on-board inventory
+    let toMark = bottles;
+    (lpg.bottles||[]).forEach(b => { if (!b.full && toMark > 0) { b.full = true; toMark--; } });
   }
   if (lpg.exampleDismissed === false) lpg.exampleDismissed = true;
   save(); hideModal(); document.getElementById('mainContent').innerHTML = renderLpg();
