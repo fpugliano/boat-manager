@@ -6,6 +6,23 @@
 
 ---
 
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/engine-maintenance-portrait.png" width="180" alt="Engine Maintenance" />
+  <img src="screenshots/spare-parts-portrait.png" width="180" alt="Spare Parts" />
+  <img src="screenshots/water-maker-portrait.png" width="180" alt="Watermaker" />
+  <img src="screenshots/systems-portrait.png" width="180" alt="Systems" />
+</p>
+<p align="center">
+  <img src="screenshots/provisioning-portrait.png" width="180" alt="Provisions" />
+  <img src="screenshots/lpg-portrait.png" width="180" alt="LPG" />
+  <img src="screenshots/winterize-portrait.png" width="180" alt="Winterize" />
+  <img src="screenshots/settings-portrait.png" width="180" alt="Settings" />
+</p>
+
+---
+
 ## What it is
 
 Oroboro Boat Manager is a mobile-first progressive web app (PWA) for bluewater sailors. It keeps everything about your boat in one place — engine maintenance, spare parts, documents, provisions, watermaker, LPG, shipyard history, safety gear, crew, and all the Greek paperwork that can sink your season.
