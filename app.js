@@ -63,6 +63,13 @@ const EMPTY_DEFAULTS = {
   },
   watermaker:{currentReading:0, lastChangeReading:0, targetHours:60, charcoalChangedDate:null, inventory:{micron20:0, micron5:0, charcoal:0}},
   lpg:{bottles:[], history:[]},
+  diesel:{
+    tanks:[
+      {id:'tank_port',      name:'Port tank',      capacity:200, current:0, engineId:'port'},
+      {id:'tank_starboard', name:'Starboard tank',  capacity:200, current:0, engineId:'starboard'},
+    ],
+    history:[], season:{startMonth:4, endMonth:10}, exampleDismissed:false
+  },
   provisions:{items:[]},
   spareParts:[
     {id:'ex_p1', desc:'Heat Exchanger gasket', pn:'128370-13201', category:'Inboard', qty:4, minQuantity:2, unitPrice:0,  location:'', storeUrl:''},
@@ -123,7 +130,8 @@ let ui = {
   tab:'documents', docSub:'vessel', maintEngine:'port',
   photoSub:'vesselDoc', crewOpen:null, sysOpen:null, sysTab:'All', sysOverviewOpen:false,
   partsSearch:'', partsFilter:'All', alertsOpen:false, maintShowAll:false, maintTaskFilter:'All',
-  provisionsSub:'all', provisionsView:'list', provHistGroup:null, tlDetailId:null
+  provisionsSub:'all', provisionsView:'list', provHistGroup:null, tlDetailId:null,
+  dieselPeriod:'all'
 };
 let _photoCtx = null; // {section, index} for upload
 
@@ -366,7 +374,7 @@ function handleJsonImport(input) {
     try {
       const json = JSON.parse(e.target.result);
       if (typeof json !== 'object' || Array.isArray(json) || json === null) throw new Error('Expected a JSON object');
-      const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2','shipyard','systems','watermaker','lpg','provisions','schengen','winterization','upgrades','passageLog','coastalLog'];
+      const KNOWN = ['documents','crew','transitLog','spareParts','maintenance','maintenance2','shipyard','systems','watermaker','lpg','diesel','provisions','schengen','winterization','upgrades','passageLog','coastalLog'];
       if (!KNOWN.some(k => k in json)) throw new Error('No recognised fields found (expected: documents, crew, maintenance, transitLog, etc.)');
 
       // Handle maintenance separately — flat import format (engineHours, log[])
@@ -610,6 +618,7 @@ const TABS = [
   {id:'provisions', icon:'🛒', label:'Provisions'},
   {id:'watermaker', icon:'💧', label:'Water Maker'},
   {id:'lpg',        icon:'🔥', label:'LPG'},
+  {id:'diesel',     icon:'⛽', label:'Diesel'},
   {id:'maint',      icon:'🔧', label:'Engine Maintenance'},
   {id:'schengen',   icon:'🛂', label:'Schengen'},
   {id:'shipyard',   icon:'⚓', label:'Shipyard'},
@@ -671,6 +680,7 @@ function renderActiveTab() {
       case 'shipyard':    mc.innerHTML = renderShipyard(); break;
       case 'watermaker':  mc.innerHTML = renderWatermaker(); break;
       case 'lpg':         mc.innerHTML = renderLpg(); break;
+      case 'diesel':      mc.innerHTML = renderDiesel(); break;
       case 'provisions':  mc.innerHTML = renderProvisions(); break;
       case 'maint':       mc.innerHTML = renderMaintenance(); break;
       case 'upgrades':  mc.innerHTML = renderUpgrades(); break;
@@ -3843,6 +3853,393 @@ function prefillLpgData() {
       {id:'ex_lpg2', date:dAgo(180), location:'Example Port',   bottles:2, kg:11, pricePerKg:1.65, notes:'Tank refill (Example)'}
     ]};
   }
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DIESEL TAB
+// ═══════════════════════════════════════════════════════════
+
+function getDieselData() {
+  if (!data.diesel) data.diesel = {
+    tanks:[
+      {id:'tank_port',      name:'Port tank',      capacity:200, current:0, engineId:'port'},
+      {id:'tank_starboard', name:'Starboard tank',  capacity:200, current:0, engineId:'starboard'},
+    ],
+    history:[], season:{startMonth:4, endMonth:10}, exampleDismissed:false
+  };
+  if (!data.diesel.tanks)   data.diesel.tanks   = [];
+  if (!data.diesel.history) data.diesel.history  = [];
+  if (!data.diesel.season)  data.diesel.season   = {startMonth:4, endMonth:10};
+  return data.diesel;
+}
+
+// Returns the season year (integer) a refill belongs to, or null if off-season
+function dieselSeasonYear(dateStr, startMonth, endMonth) {
+  const d = parseISODate(dateStr); if (!d) return null;
+  const m = d.getMonth() + 1;
+  if (m >= startMonth && m <= endMonth) return d.getFullYear();
+  return null;
+}
+
+function dieselFilterHistory(history, period, startMonth, endMonth) {
+  if (period === 'all') return history;
+  const year = parseInt(period);
+  return history.filter(h => dieselSeasonYear(h.date, startMonth, endMonth) === year);
+}
+
+function dieselConsumptionStats(filtered, tanks) {
+  const result = {};
+  for (const eid of ['port','starboard']) {
+    const tank = tanks.find(t => t.engineId === eid);
+    const refills = tank ? filtered.filter(h => h.tankId === tank.id) : [];
+    const litres  = refills.reduce((s, h) => s + (h.litres || 0), 0);
+    const readings = refills
+      .map(h => (h.hoursByEngine || {})[eid])
+      .filter(v => typeof v === 'number' && !isNaN(v));
+    const hours = readings.length >= 2 ? Math.max(...readings) - Math.min(...readings) : null;
+    const lph   = (hours !== null && hours > 0 && litres > 0) ? litres / hours : null;
+    result[eid] = {litres, hours, lph, count:refills.length};
+  }
+  const totalLitres = filtered.reduce((s, h) => s + (h.litres || 0), 0);
+  const totalEur    = filtered.reduce((s, h) => s + ((h.litres || 0) * (h.pricePerLitre || 0)), 0);
+  return {engines:result, totalLitres, totalEur};
+}
+
+// Compute per-interval L/h values for one engine's tank refills (sorted ascending)
+function dieselIntervalLph(tankRefills, eid) {
+  const sorted = [...tankRefills].sort((a, b) => a.date.localeCompare(b.date));
+  const intervals = [];
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i-1], cur = sorted[i];
+    const litres   = cur.litres || 0;
+    const prevHrs  = (prev.hoursByEngine || {})[eid];
+    const curHrs   = (cur.hoursByEngine  || {})[eid];
+    if (typeof prevHrs === 'number' && typeof curHrs === 'number' && curHrs > prevHrs && litres > 0) {
+      intervals.push({date:cur.date, lph:litres / (curHrs - prevHrs), litres, hrs:curHrs - prevHrs});
+    }
+  }
+  return intervals;
+}
+
+// Inline SVG sparkline — no libraries, mobile-friendly
+function dieselSparkline(intervals, color) {
+  if (intervals.length < 2) return '';
+  const vals = intervals.map(i => i.lph);
+  const mn = Math.min(...vals), mx = Math.max(...vals), rng = mx - mn || 1;
+  const W = 60, H = 22, pad = 3;
+  const pts = vals.map((v, i) => {
+    const x = (pad + (i / (vals.length - 1)) * (W - pad * 2)).toFixed(1);
+    const y = (pad + (1 - (v - mn) / rng) * (H - pad * 2)).toFixed(1);
+    return x + ',' + y;
+  }).join(' ');
+  return '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" style="display:inline-block;vertical-align:middle;margin-left:6px">' +
+    '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+
+function renderDiesel() {
+  const d       = getDieselData();
+  const isOwner = localStorage.getItem(EMAIL_KEY) === OWNER_EMAIL;
+  const tanks   = d.tanks   || [];
+  const history = d.history || [];
+  const season  = d.season  || {startMonth:4, endMonth:10};
+
+  const exampleBanner = (!isOwner && d.exampleDismissed === false)
+    ? '<div style="margin:0 0 10px;padding:8px 12px;background:var(--surface2);border-radius:10px;font-size:12px;color:var(--label3);font-style:italic">These are example values — update with your own data</div>' : '';
+
+  // Semicircle gauge — total litres
+  const totalCap = tanks.reduce((s, t) => s + (t.capacity || 0), 0);
+  const totalCur = tanks.reduce((s, t) => s + Math.min(t.current || 0, t.capacity || 0), 0);
+  const pct = totalCap > 0 ? Math.min(1, totalCur / totalCap) : 0;
+  const arcColor = pct > 0.5 ? '#22C55E' : pct >= 0.25 ? '#F59E0B' : '#EF4444';
+  const dashoffset = Math.round(283 * (1 - pct));
+  const gauge = '<svg width="220" height="130" viewBox="0 0 220 130" style="display:block;margin:0 auto 4px">' +
+    '<path d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="#e5e7eb" stroke-width="16" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="0"/>' +
+    '<path d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="' + arcColor + '" stroke-width="16" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="' + dashoffset + '"/>' +
+    '<text x="110" y="84" text-anchor="middle" font-size="32" font-weight="800" fill="' + arcColor + '" font-family="var(--font)">' + Math.round(totalCur) + '</text>' +
+    '<text x="110" y="104" text-anchor="middle" font-size="11" fill="#9ca3af" font-family="var(--font)">of ' + Math.round(totalCap) + ' L</text>' +
+    '<text x="18" y="126" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="var(--font)">0</text>' +
+    '<text x="110" y="22" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="var(--font)">' + Math.round(totalCap / 2) + '</text>' +
+    '<text x="202" y="126" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="var(--font)">' + Math.round(totalCap) + '</text>' +
+    '</svg>';
+
+  // Per-tank stat tiles
+  const tankTiles = tanks.map(t => {
+    const frac = (t.capacity || 0) > 0 ? (t.current || 0) / t.capacity : 0;
+    const tc = frac > 0.5 ? '#22C55E' : frac >= 0.25 ? '#F59E0B' : '#EF4444';
+    return '<div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">' +
+      '<div style="font-size:15px;font-weight:800;color:' + tc + '">' + Math.round(t.current || 0) +
+      '<span style="font-size:10px;font-weight:400;color:var(--label3)">/' + Math.round(t.capacity || 0) + ' L</span></div>' +
+      '<div style="font-size:9px;color:var(--label3)">' + esc(t.name) + '</div></div>';
+  }).join('');
+
+  const warn = pct < 0.15 && totalCap > 0
+    ? '<div style="margin:0 0 10px;padding:10px 14px;background:rgba(255,59,48,.1);border:0.5px solid var(--red);border-radius:10px;font-size:13px;color:var(--red);font-weight:600">⚠ Low fuel — ' + Math.round(totalCur) + ' L remaining across both tanks</div>' : '';
+
+  // Period selector — collect season years from history
+  const seasonYears = [];
+  history.forEach(h => {
+    const y = dieselSeasonYear(h.date, season.startMonth, season.endMonth);
+    if (y && !seasonYears.includes(y)) seasonYears.push(y);
+  });
+  seasonYears.sort((a, b) => b - a);
+  const curPeriod = ui.dieselPeriod || 'all';
+  const periodOpts = ['<option value="all" ' + (curPeriod === 'all' ? 'selected' : '') + '>All time</option>']
+    .concat(seasonYears.map(y => '<option value="' + y + '" ' + (curPeriod === String(y) ? 'selected' : '') + '>Season ' + y + '</option>'))
+    .join('');
+
+  // Consumption stats for selected period
+  const filtered = dieselFilterHistory(history, curPeriod, season.startMonth, season.endMonth);
+  const cons = dieselConsumptionStats(filtered, tanks);
+
+  // Per-engine headline + latest interval + sparkline
+  const engCols = ['port','starboard'].map(eid => {
+    const tank = tanks.find(t => t.engineId === eid);
+    const tankRefills = tank ? history.filter(h => h.tankId === tank.id) : [];
+    const intervals = dieselIntervalLph(tankRefills, eid);
+    const latest  = intervals.length ? intervals[intervals.length - 1] : null;
+    const spark   = dieselSparkline(intervals.slice(-8), eid === 'port' ? '#3B82F6' : '#8B5CF6');
+    const color   = eid === 'port' ? '#3B82F6' : '#8B5CF6';
+    const label   = eid === 'port' ? 'Port' : 'Stbd';
+    const lphDisp = cons.engines[eid].lph !== null ? cons.engines[eid].lph.toFixed(2) : '—';
+    const hrsDisp = cons.engines[eid].hours !== null ? cons.engines[eid].hours.toFixed(1) + ' hrs' : '—';
+    return '<div style="background:var(--surface2);border-radius:10px;padding:10px;text-align:center;flex:1">' +
+      '<div style="font-size:11px;color:var(--label3);margin-bottom:4px">' + label + ' engine L/h</div>' +
+      '<div style="font-size:22px;font-weight:800;color:' + color + '">' + lphDisp + '</div>' +
+      '<div style="font-size:10px;color:var(--label3)">' + cons.engines[eid].litres.toFixed(0) + ' L · ' + hrsDisp + '</div>' +
+      (latest ? '<div style="font-size:10px;color:var(--label3);margin-top:4px">Latest ' + latest.lph.toFixed(2) + ' L/h' + spark + '</div>' : '') +
+      '</div>';
+  }).join('');
+
+  const consumptionCard = '<div class="card" style="margin-bottom:12px">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px 6px">' +
+    '<span style="font-size:14px;font-weight:700">Consumption</span>' +
+    '<select onchange="ui.dieselPeriod=this.value;document.getElementById(\'mainContent\').innerHTML=renderDiesel()" style="font-size:12px;border:0.5px solid var(--sep);border-radius:8px;padding:3px 8px;background:var(--surface2);color:var(--label);font-family:var(--font)">' + periodOpts + '</select></div>' +
+    '<div style="padding:8px 14px">' +
+    '<div style="display:flex;gap:8px;margin-bottom:10px">' + engCols + '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">' +
+    '<div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">' +
+    '<div style="font-size:16px;font-weight:800">' + cons.totalLitres.toFixed(0) + ' L</div>' +
+    '<div style="font-size:9px;color:var(--label3)">Total fuel burned</div></div>' +
+    '<div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">' +
+    '<div style="font-size:16px;font-weight:800' + (cons.totalEur > 0 ? '' : ';color:var(--label3)') + '">' + (cons.totalEur > 0 ? '€' + cons.totalEur.toFixed(2) : '—') + '</div>' +
+    '<div style="font-size:9px;color:var(--label3)">Fuel bill</div></div></div>' +
+    '<div style="font-size:10px;color:var(--label3);font-style:italic">Engine hours are captured from the maintenance tab at each refill</div>' +
+    '</div></div>';
+
+  // Price card
+  const prices = history.filter(h => (h.pricePerLitre || 0) > 0).map(h => h.pricePerLitre);
+  const priceCard = prices.length ? '<div class="card" style="margin-bottom:12px">' +
+    '<div class="card-hd">Price per litre — all time</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:12px 14px">' +
+    '<div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">' +
+    '<div style="font-size:16px;font-weight:800;color:#22C55E">€' + Math.min(...prices).toFixed(3) + '</div>' +
+    '<div style="font-size:9px;color:var(--label3)">Lowest</div></div>' +
+    '<div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">' +
+    '<div style="font-size:16px;font-weight:800">€' + (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(3) + '</div>' +
+    '<div style="font-size:9px;color:var(--label3)">Average</div></div>' +
+    '<div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">' +
+    '<div style="font-size:16px;font-weight:800;color:#EF4444">€' + Math.max(...prices).toFixed(3) + '</div>' +
+    '<div style="font-size:9px;color:var(--label3)">Highest</div></div>' +
+    '</div></div>' : '';
+
+  // Refill history rows
+  const sorted = [...history].sort((a, b) => b.date.localeCompare(a.date));
+  const pricedH = sorted.filter(h => (h.pricePerLitre || 0) > 0);
+  const minPrc  = pricedH.length >= 2 ? Math.min(...pricedH.map(h => h.pricePerLitre)) : null;
+  const maxPrc  = pricedH.length >= 2 ? Math.max(...pricedH.map(h => h.pricePerLitre)) : null;
+  const showBadges = minPrc !== null && minPrc !== maxPrc;
+  const histRows = sorted.map(h => {
+    const origIdx = history.indexOf(h);
+    const dp = parseISODate(h.date);
+    const ds = dp ? String(dp.getDate()).padStart(2,'0')+'/'+String(dp.getMonth()+1).padStart(2,'0')+'/'+String(dp.getFullYear()).slice(-2) : h.date;
+    const tank = tanks.find(t => t.id === h.tankId);
+    const tankName = tank ? tank.name : '—';
+    const priceBadge = showBadges && h.pricePerLitre
+      ? (h.pricePerLitre <= minPrc
+        ? '<span style="background:rgba(52,199,89,.15);color:var(--green);border-radius:6px;padding:1px 6px;font-size:10px;font-weight:600">Cheapest</span>'
+        : h.pricePerLitre >= maxPrc
+        ? '<span style="background:rgba(255,59,48,.12);color:var(--red);border-radius:6px;padding:1px 6px;font-size:10px;font-weight:600">Priciest</span>' : '') : '';
+    const hrs = h.hoursByEngine || {};
+    const hrsLine = (hrs.port != null || hrs.starboard != null)
+      ? '<div style="font-size:10px;color:var(--label3);margin-top:2px">Port ' + (hrs.port != null ? hrs.port + 'h' : '—') + ' · Stbd ' + (hrs.starboard != null ? hrs.starboard + 'h' : '—') + '</div>' : '';
+    return '<div style="padding:8px 14px;border-top:1px solid var(--sep);font-size:12px">' +
+      '<div style="display:flex;align-items:center;gap:8px">' +
+      '<span style="flex-shrink:0;color:var(--label3)">' + ds + '</span>' +
+      (h.location ? '<span style="color:var(--label2);flex-shrink:0">' + esc(h.location) + '</span>' : '') +
+      '<span style="color:var(--label3);flex-shrink:0">' + (h.litres || 0).toFixed(0) + ' L → ' + esc(tankName) + '</span>' +
+      (h.pricePerLitre ? '<span style="color:var(--label3);flex-shrink:0">€' + Number(h.pricePerLitre).toFixed(3) + '/L</span>' + priceBadge : '') +
+      '<span style="flex:1"></span>' +
+      '<button onclick="dieselEditHistory(' + origIdx + ')" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:14px;color:var(--label3);line-height:1;flex-shrink:0">✏️</button>' +
+      '</div>' + hrsLine + '</div>';
+  }).join('');
+
+  return '<div style="padding:12px">' +
+    '<div style="display:flex;justify-content:flex-end;margin-bottom:8px">' +
+    '<button onclick="dieselAddFill()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:5px 14px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">+ New Refill</button></div>' +
+    exampleBanner + warn +
+    '<div class="card" style="margin-bottom:12px">' +
+    '<div class="card-hd">Fuel on board</div>' +
+    '<div style="padding:12px 14px 8px">' + gauge +
+    '<div style="display:grid;grid-template-columns:' + (tanks.length > 1 ? '1fr 1fr' : '1fr') + ';gap:6px;margin-bottom:12px">' + tankTiles + '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:4px">' +
+    '<button onclick="dieselEditTanks()" style="flex:1;background:var(--surface2);border:0.5px solid var(--sep);border-radius:10px;padding:9px 8px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;color:var(--label)">Edit tanks</button>' +
+    '<button onclick="dieselSetLevel()" style="flex:1;background:var(--blue);border:none;border-radius:10px;padding:9px 8px;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;color:#fff">Set current level</button>' +
+    '</div></div></div>' +
+    consumptionCard + priceCard +
+    '<div class="card">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px 6px">' +
+    '<span style="font-size:14px;font-weight:700">Refill history</span>' +
+    '<button onclick="dieselAddFill()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:4px 12px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">+ Add entry</button></div>' +
+    (sorted.length === 0 ? '<div style="padding:8px 14px 12px;font-size:13px;color:var(--label3)">No refills recorded yet</div>' : histRows) +
+    '</div></div>';
+}
+
+function dieselFillModal(entry, idx) {
+  const d = getDieselData();
+  const tanks = d.tanks || [];
+  const today = new Date().toISOString().slice(0, 10);
+  const isEdit = entry != null;
+  const e = entry || {date:today, location:'', tankId:(tanks[0]||{}).id||'', litres:'', pricePerLitre:'', notes:'', hoursByEngine:{}};
+  const portHrs = e.hoursByEngine?.port      ?? (data.maintenance?.engines?.port?.hours      ?? '');
+  const stbdHrs = e.hoursByEngine?.starboard ?? (data.maintenance?.engines?.starboard?.hours ?? '');
+  const tankOpts = tanks.map(t => '<option value="' + esc(t.id) + '" ' + (e.tankId === t.id ? 'selected' : '') + '>' + esc(t.name) + '</option>').join('');
+  showModal(isEdit ? 'Edit Refill' : 'New Refill', `
+    <div class="mi-label">Date</div><input class="mi" id="ds-d" type="date" value="${esc(e.date)}" autofocus>
+    <div class="mi-label">Location</div><input class="mi" id="ds-loc" value="${esc(e.location||'')}">
+    <div class="mi-label">Tank</div><select class="mi" id="ds-tank">${tankOpts}</select>
+    <div class="mi-label">Litres</div><input class="mi" id="ds-lit" type="number" min="0" step="0.1" value="${e.litres||''}" oninput="dieselUpdateTotal()">
+    <div class="mi-label">Price per litre (€)</div><input class="mi" id="ds-ppl" type="number" min="0" step="0.001" value="${e.pricePerLitre||''}" oninput="dieselUpdateTotal()">
+    <div id="ds-total" style="font-size:12px;color:var(--label3);margin:6px 0 4px;text-align:right"></div>
+    <div class="mi-label">Port engine hours</div><input class="mi" id="ds-hp" type="number" min="0" value="${esc(String(portHrs))}">
+    <div class="mi-label">Starboard engine hours</div><input class="mi" id="ds-hs" type="number" min="0" value="${esc(String(stbdHrs))}">
+    <div class="mi-label">Notes (optional)</div><input class="mi" id="ds-notes" value="${esc(e.notes||'')}">
+    <div class="modal-btns">
+      ${isEdit?`<button onclick="if(confirm('Delete this refill entry?')){hideModal();dieselDeleteHistory(${idx})}" style="background:#FCEBEB;border:0.5px solid #F09595;color:#A32D2D;border-radius:8px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">Delete</button>`:''}
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="dieselSaveFill(${isEdit?idx:'null'})">${isEdit?'Save':'Add Refill'}</button>
+    </div>`);
+  dieselUpdateTotal();
+}
+function dieselUpdateTotal() {
+  const lit = parseFloat(document.getElementById('ds-lit')?.value) || 0;
+  const ppl = parseFloat(document.getElementById('ds-ppl')?.value) || 0;
+  const el  = document.getElementById('ds-total');
+  if (el) el.textContent = (lit && ppl) ? 'Total: €' + (lit * ppl).toFixed(2) : '';
+}
+function dieselSaveFill(idx) {
+  const d = getDieselData();
+  const date = document.getElementById('ds-d')?.value; if (!date) { showToast('Enter a date', true); return; }
+  const tankId        = document.getElementById('ds-tank')?.value || '';
+  const litres        = parseFloat(document.getElementById('ds-lit')?.value) || 0;
+  const pricePerLitre = parseFloat(document.getElementById('ds-ppl')?.value) || 0;
+  const location      = document.getElementById('ds-loc')?.value.trim() || '';
+  const notes         = document.getElementById('ds-notes')?.value.trim() || '';
+  const portHrs       = parseFloat(document.getElementById('ds-hp')?.value);
+  const stbdHrs       = parseFloat(document.getElementById('ds-hs')?.value);
+  const hoursByEngine = {};
+  if (!isNaN(portHrs))  hoursByEngine.port      = portHrs;
+  if (!isNaN(stbdHrs))  hoursByEngine.starboard = stbdHrs;
+  if (idx != null && idx !== 'null') {
+    d.history[idx] = {...d.history[idx], date, location, tankId, litres, pricePerLitre, notes, hoursByEngine};
+  } else {
+    d.history.unshift({id:uid(), date, location, tankId, litres, pricePerLitre, notes, hoursByEngine});
+    const tank = (d.tanks || []).find(t => t.id === tankId);
+    if (tank) tank.current = Math.min((tank.current || 0) + litres, tank.capacity || 9999);
+  }
+  if (d.exampleDismissed === false) d.exampleDismissed = true;
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderDiesel();
+}
+function dieselAddFill()      { dieselFillModal(null, null); }
+function dieselEditHistory(i) { const d = getDieselData(); dieselFillModal(d.history[i], i); }
+function dieselDeleteHistory(i) {
+  const d = getDieselData(); d.history.splice(i, 1);
+  save(); document.getElementById('mainContent').innerHTML = renderDiesel();
+}
+
+// Edit tanks modal — uses working copy like lpgEditBottles
+let _dieselTanksWip = [];
+function dieselEditTanks() {
+  const d = getDieselData();
+  _dieselTanksWip = d.tanks.map(t => ({...t}));
+  dieselRenderTanksModal();
+}
+function dieselRenderTanksModal() {
+  const rows = _dieselTanksWip.map((t, i) =>
+    '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--sep)">' +
+    '<input class="mi" value="' + esc(t.name) + '" onchange="_dieselTanksWip[' + i + '].name=this.value" style="flex:2;margin:0">' +
+    '<input class="mi" type="number" min="1" value="' + (t.capacity||0) + '" onchange="_dieselTanksWip[' + i + '].capacity=parseFloat(this.value)||0" style="flex:1;margin:0" placeholder="L">' +
+    '<select onchange="_dieselTanksWip[' + i + '].engineId=this.value" style="font-size:12px;border:0.5px solid var(--sep);border-radius:8px;padding:3px 6px;background:var(--surface2);color:var(--label);font-family:var(--font);flex:1">' +
+    '<option value="port" ' + (t.engineId==='port'?'selected':'') + '>Port</option>' +
+    '<option value="starboard" ' + (t.engineId==='starboard'?'selected':'') + '>Stbd</option></select>' +
+    '<button onclick="_dieselTanksWip.splice(' + i + ',1);dieselRenderTanksModal()" style="background:none;border:none;padding:2px 6px;cursor:pointer;font-size:14px;color:var(--label3)">✕</button></div>'
+  ).join('');
+  showModal('Edit Tanks', '<div style="font-size:11px;color:var(--label3);margin-bottom:6px">Name · Capacity (L) · Engine</div>' +
+    '<div>' + rows + '</div>' +
+    '<div style="margin-top:10px"><button onclick="_dieselTanksWip.push({id:uid(),name:\'New tank\',capacity:200,current:0,engineId:\'port\'});dieselRenderTanksModal()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer">+ Add tank</button></div>' +
+    '<div class="modal-btns"><button class="btn btn-s" onclick="hideModal()">Cancel</button><button class="btn btn-p" onclick="dieselSaveTanks()">Save</button></div>');
+}
+function dieselSaveTanks() {
+  const d = getDieselData();
+  d.tanks = _dieselTanksWip.map(t => ({...t}));
+  if (d.exampleDismissed === false) d.exampleDismissed = true;
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderDiesel();
+}
+
+// Manual level correction
+function dieselSetLevel() {
+  const d = getDieselData();
+  const tanks = d.tanks || [];
+  const fields = tanks.map((t, i) =>
+    '<div class="mi-label">' + esc(t.name) + ' — current litres</div>' +
+    '<input class="mi" id="ds-lv-' + i + '" type="number" min="0" max="' + (t.capacity||9999) + '" step="1" value="' + Math.round(t.current||0) + '">'
+  ).join('');
+  showModal('Set Current Level',
+    fields +
+    '<div style="font-size:11px;color:var(--label3);margin:6px 0">Manual correction — refills auto-add litres</div>' +
+    '<div class="modal-btns"><button class="btn btn-s" onclick="hideModal()">Cancel</button><button class="btn btn-p" onclick="dieselSaveLevel()">Save</button></div>');
+}
+function dieselSaveLevel() {
+  const d = getDieselData();
+  (d.tanks || []).forEach((t, i) => {
+    const v = parseFloat(document.getElementById('ds-lv-' + i)?.value);
+    if (!isNaN(v) && v >= 0) t.current = Math.min(v, t.capacity || 9999);
+  });
+  if (d.exampleDismissed === false) d.exampleDismissed = true;
+  save(); hideModal(); document.getElementById('mainContent').innerHTML = renderDiesel();
+}
+
+function prefillDieselData() {
+  const email    = localStorage.getItem(EMAIL_KEY);
+  const existing = data.diesel;
+  if (existing && (existing.history?.length || existing.tanks?.some(t => (t.current||0) > 0))) return false;
+  const dAgo = n => { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); };
+  if (email === OWNER_EMAIL) {
+    if (!data.diesel) {
+      data.diesel = {
+        tanks:[
+          {id:'tank_port',      name:'Port tank',      capacity:200, current:0, engineId:'port'},
+          {id:'tank_starboard', name:'Starboard tank',  capacity:200, current:0, engineId:'starboard'},
+        ],
+        history:[], season:{startMonth:4, endMonth:10}, exampleDismissed:true
+      };
+      return true;
+    }
+    return false;
+  }
+  // Non-owner: load example data
+  data.diesel = {
+    tanks:[
+      {id:'ex_tank_p', name:'Port tank',      capacity:200, current:140, engineId:'port'},
+      {id:'ex_tank_s', name:'Starboard tank',  capacity:200, current:90,  engineId:'starboard'},
+    ],
+    history:[
+      {id:'ex_ds1', date:dAgo(15),  location:'Example Marina',    tankId:'ex_tank_p', litres:60,  pricePerLitre:1.850, notes:'', hoursByEngine:{port:1700, starboard:1702}},
+      {id:'ex_ds2', date:dAgo(50),  location:'Example Fuel Dock', tankId:'ex_tank_s', litres:110, pricePerLitre:1.790, notes:'', hoursByEngine:{port:1620, starboard:1625}},
+      {id:'ex_ds3', date:dAgo(120), location:'Example Port',      tankId:'ex_tank_p', litres:80,  pricePerLitre:1.720, notes:'', hoursByEngine:{port:1540, starboard:1543}},
+    ],
+    season:{startMonth:4, endMonth:10}, exampleDismissed:false
+  };
   return true;
 }
 
@@ -9701,6 +10098,10 @@ function migrateData() {
       dirty = true;
     }
   } catch(e) { console.warn('maintLogFixV4', e); }
+  // Diesel: ensure season window defaults if structure already exists
+  try {
+    if (data.diesel && !data.diesel.season) { data.diesel.season = {startMonth:4, endMonth:10}; dirty = true; }
+  } catch(e) { console.warn('migrateDiesel', e); }
   // Backfill second example Schengen person for non-owner accounts that only have one
   try {
     if (localStorage.getItem(EMAIL_KEY) !== OWNER_EMAIL) {
@@ -9862,6 +10263,7 @@ async function createPIN() {
     try { prefillShipyardData();      } catch(e) { console.warn('prefillShipyard', e); }
     try { prefillWatermakerData();    } catch(e) { console.warn('prefillWatermaker', e); }
     try { prefillLpgData();           } catch(e) { console.warn('prefillLpg', e); }
+    try { prefillDieselData();        } catch(e) { console.warn('prefillDiesel', e); }
     try { prefillProvisionsData();    } catch(e) { console.warn('prefillProvisions', e); }
     try { prefillSafetyData();        } catch(e) { console.warn('prefillSafety', e); }
     try { prefillPassageLogData();    } catch(e) { console.warn('prefillPassageLog', e); }
@@ -9973,6 +10375,7 @@ async function attemptUnlock() {
       try { if (prefillShipyardData()) prefillDirty = true; } catch(e) { console.warn('prefillShipyard', e); }
       try { if (prefillWatermakerData()) prefillDirty = true; } catch(e) { console.warn('prefillWatermaker', e); }
       try { if (prefillLpgData()) prefillDirty = true; } catch(e) { console.warn('prefillLpg', e); }
+      try { if (prefillDieselData()) prefillDirty = true; } catch(e) { console.warn('prefillDiesel', e); }
       try { if (prefillProvisionsData()) prefillDirty = true; } catch(e) { console.warn('prefillProvisions', e); }
       try { if (prefillSafetyData()) prefillDirty = true; } catch(e) { console.warn('prefillSafety', e); }
       try { if (prefillPassageLogData()) prefillDirty = true; } catch(e) { console.warn('prefillPassageLog', e); }
@@ -10126,6 +10529,7 @@ async function attemptLogin() {
       try { if (prefillShipyardData()) prefillDirty = true; } catch(e) { console.warn('prefillShipyard', e); }
       try { if (prefillWatermakerData()) prefillDirty = true; } catch(e) { console.warn('prefillWatermaker', e); }
       try { if (prefillLpgData()) prefillDirty = true; } catch(e) { console.warn('prefillLpg', e); }
+      try { if (prefillDieselData()) prefillDirty = true; } catch(e) { console.warn('prefillDiesel', e); }
       try { if (prefillProvisionsData()) prefillDirty = true; } catch(e) { console.warn('prefillProvisions', e); }
       try { if (prefillSafetyData()) prefillDirty = true; } catch(e) { console.warn('prefillSafety', e); }
       try { if (prefillPassageLogData()) prefillDirty = true; } catch(e) { console.warn('prefillPassageLog', e); }
