@@ -502,6 +502,31 @@ function getAlerts() {
     const d = daysUntil(r.expiry);
     if (d <= 180) alerts.push({color:alertColor(d,180), days:d, text:`Life raft: ${[r.brand,r.model].filter(Boolean).join(' ')||'Life Raft'} ${d<0?`expired ${Math.abs(d)}d ago`:`expires in ${d}d`}`});
   });
+  // Watermaker filters
+  const wm = data.watermaker;
+  if (wm) {
+    const hoursUsed = Math.max(0, (wm.currentReading||0) - (wm.lastChangeReading||0));
+    const target    = wm.targetHours || 60;
+    const hoursLeft = target - hoursUsed;
+    if (wm.lastChangeReading != null || wm.currentReading) {
+      if (hoursLeft <= 0)
+        alerts.push({color:'red',    days:-1, text:`Watermaker — micron filters overdue by ${Math.abs(Math.round(hoursLeft))}h`});
+      else if (hoursLeft <= 10)
+        alerts.push({color:'amber',  days:0,  text:`Watermaker — micron filters due in ${Math.round(hoursLeft)}h`});
+    }
+    if (wm.charcoalChangedDate) {
+      const changed = parseISODate(wm.charcoalChangedDate);
+      if (changed) {
+        const now = new Date(); now.setHours(0,0,0,0);
+        const daysElapsed = Math.round((now - changed) / 86400000);
+        const daysLeft    = 182 - daysElapsed; // 6 months ≈ 182 days
+        if (daysLeft <= 0)
+          alerts.push({color:'red',   days:daysLeft, text:`Watermaker — charcoal filter overdue by ${Math.abs(daysLeft)}d`});
+        else if (daysLeft <= 14)
+          alerts.push({color:'amber', days:daysLeft, text:`Watermaker — charcoal filter due in ${daysLeft}d`});
+      }
+    }
+  }
   // Maintenance — only overdue tasks
   getEngines().forEach(eid => {
     MAINT_TASKS.forEach(task => {
