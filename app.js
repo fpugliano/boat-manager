@@ -511,7 +511,7 @@ function getAlerts() {
     if (wm.lastChangeReading != null || wm.currentReading) {
       if (hoursLeft <= 0)
         alerts.push({color:'red',    days:-1, text:`Watermaker — micron filters overdue by ${Math.abs(Math.round(hoursLeft))}h`});
-      else if (hoursLeft <= 10)
+      else if (hoursLeft <= 5)
         alerts.push({color:'amber',  days:0,  text:`Watermaker — micron filters due in ${Math.round(hoursLeft)}h`});
     }
     if (wm.charcoalChangedDate) {
