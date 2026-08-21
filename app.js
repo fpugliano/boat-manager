@@ -245,12 +245,18 @@ async function aesDecrypt(key, storedJson) {
 }
 
 // ── Encrypted save / load ──────────────────────────────────────
+let _pushTimer = null;
+function schedulePush() {
+  clearTimeout(_pushTimer);
+  _pushTimer = setTimeout(() => pushToCloud(), 10000);
+}
+
 async function save() {
   if (!cryptoKey) return;
   try {
     const enc = await aesEncrypt(cryptoKey, JSON.stringify(data));
     localStorage.setItem(ENC_KEY, enc);
-    pushToCloud();
+    schedulePush();
   } catch(e) { console.warn('Save failed', e); }
 }
 
@@ -334,7 +340,7 @@ async function doImport(fileJsonStr) {
       cryptoKey = key;
       data = decrypted;
       localStorage.setItem('bm_just_imported', Date.now());
-      await save();
+      await save(); clearTimeout(_pushTimer);
       await pushToCloud();
       migrateData();
       startActivityTracking();
@@ -437,7 +443,7 @@ function handleJsonImport(input) {
       delete rest.schengen;
       if (Object.keys(rest).length > 0) deepMerge(data, rest);
 
-      await save();
+      await save(); clearTimeout(_pushTimer);
       localStorage.setItem('bm_just_imported', Date.now());
       await pushToCloud();
       renderApp();
@@ -10292,7 +10298,7 @@ async function createPIN() {
     try { prefillProvisionsData();    } catch(e) { console.warn('prefillProvisions', e); }
     try { prefillSafetyData();        } catch(e) { console.warn('prefillSafety', e); }
     try { prefillPassageLogData();    } catch(e) { console.warn('prefillPassageLog', e); }
-    await save();
+    await save(); clearTimeout(_pushTimer);
     trackAnalytics(true);
     pushToCloud();
     startActivityTracking();
@@ -11665,7 +11671,7 @@ async function aiImportApply(btn) {
     }
 
     migrateData();
-    await save(); await pushToCloud();
+    await save(); clearTimeout(_pushTimer); await pushToCloud();
     renderApp();
     _aiImportParsed = null;
     _aiSectionDest  = null;
