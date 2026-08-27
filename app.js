@@ -245,19 +245,14 @@ async function aesDecrypt(key, storedJson) {
 }
 
 // ── Encrypted save / load ──────────────────────────────────────
-let _pushTimer = null;
-function schedulePush() {
-  clearTimeout(_pushTimer);
-  setSyncStatus('pending');
-  _pushTimer = setTimeout(() => pushToCloud(), 2000);
-}
+let _pushInFlight = false;
 
 async function save() {
   if (!cryptoKey) return;
   try {
     const enc = await aesEncrypt(cryptoKey, JSON.stringify(data));
     localStorage.setItem(ENC_KEY, enc);
-    schedulePush();
+    pushToCloud();
   } catch(e) { console.warn('Save failed', e); }
 }
 
@@ -341,7 +336,7 @@ async function doImport(fileJsonStr) {
       cryptoKey = key;
       data = decrypted;
       localStorage.setItem('bm_just_imported', Date.now());
-      await save(); clearTimeout(_pushTimer);
+      await save(); 
       await pushToCloud();
       migrateData();
       startActivityTracking();
@@ -444,7 +439,7 @@ function handleJsonImport(input) {
       delete rest.schengen;
       if (Object.keys(rest).length > 0) deepMerge(data, rest);
 
-      await save(); clearTimeout(_pushTimer);
+      await save(); 
       localStorage.setItem('bm_just_imported', Date.now());
       await pushToCloud();
       renderApp();
@@ -10391,7 +10386,7 @@ async function createPIN() {
     try { prefillProvisionsData();    } catch(e) { console.warn('prefillProvisions', e); }
     try { prefillSafetyData();        } catch(e) { console.warn('prefillSafety', e); }
     try { prefillPassageLogData();    } catch(e) { console.warn('prefillPassageLog', e); }
-    await save(); clearTimeout(_pushTimer);
+    await save(); 
     trackAnalytics(true);
     pushToCloud();
     startActivityTracking();
@@ -10530,16 +10525,13 @@ async function attemptUnlock() {
 function resetActivity() { lastActivity = Date.now(); }
 
 async function silentPull() {
-  if (!cryptoKey || _pushTimer) return; // skip if local has unsaved changes
+  if (!cryptoKey || _pushInFlight) return; // skip if a push is in flight
   const pulled = await pullFromCloud();
   if (pulled) { migrateData(); renderApp(); }
 }
 
 async function onVisibilityChange() {
-  if (document.visibilityState === 'hidden') {
-    if (_pushTimer) { clearTimeout(_pushTimer); _pushTimer = null; pushToCloud(); }
-    return;
-  }
+  if (document.visibilityState === 'hidden') return;
   if (!cryptoKey) return;
   const rawTs = localStorage.getItem(LAST_SYNC_KEY);
   if (rawTs && Date.now() - new Date(rawTs).getTime() < 60000) return;
@@ -11005,6 +10997,7 @@ async function pushToCloud() {
   const verify = localStorage.getItem(VERIFY_KEY);
   const enc    = localStorage.getItem(ENC_KEY);
   if (!email || !salt || !verify || !enc) return;
+  _pushInFlight = true;
   setSyncStatus('syncing');
   try {
     const key = await emailToKey(email);
@@ -11021,6 +11014,8 @@ async function pushToCloud() {
   } catch(e) {
     setSyncStatus('offline');
     console.warn('Cloud sync failed', e);
+  } finally {
+    _pushInFlight = false;
   }
 }
 
@@ -11768,7 +11763,7 @@ async function aiImportApply(btn) {
     }
 
     migrateData();
-    await save(); clearTimeout(_pushTimer); await pushToCloud();
+    await save();  await pushToCloud();
     renderApp();
     _aiImportParsed = null;
     _aiSectionDest  = null;
