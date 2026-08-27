@@ -4282,6 +4282,7 @@ function prefillDieselData() {
 let _provDragId = null, _provTouchState = null;
 let _partsDragId = null, _partsTouchState = null;
 let _maintLogDragId = null, _maintLogTouchState = null;
+let _upgSeasonDragId = null, _upgSeasonTouchState = null;
 let _sysDragId = null, _sysTouchState = null;
 let _winDragId = null, _winDragSid = null, _winTouchState = null;
 const PROV_CATS = [
@@ -5893,6 +5894,7 @@ function renderUpgradeSeason(s, isFirst = false) {
   const badge = complete ? `<span style="background:var(--green);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:6px">✓ Complete</span>` : '';
   const hdr = `<div onclick="ui.upgOpen['${s.id}']=!${open};upgRerender()"
     style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;user-select:none;-webkit-user-select:none">
+    <span class="prov-grip" onclick="event.stopPropagation()" ontouchstart="upgSeasonTouchStart(event,'${s.id}')" style="font-size:16px;color:var(--label3);padding:4px 2px;flex-shrink:0">⠿</span>
     <div style="width:34px;height:34px;border-radius:9px;background:rgba(0,122,255,.1);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">⚓</div>
     <div style="flex:1;min-width:0">
       <div style="font-size:15px;font-weight:700;color:var(--label)">${esc(s.name)}${badge}</div>
@@ -5902,7 +5904,7 @@ function renderUpgradeSeason(s, isFirst = false) {
       <span style="font-size:12px;color:var(--label3)">${done}/${total}</span>
       <span style="font-size:11px;color:var(--label3)">${open?'▲':'▼'}</span>
     </div>
-  </div>
+  </div>`;
   <div style="height:3px;background:var(--surface2)">
     <div style="height:3px;background:${complete?'var(--green)':'var(--orange)'};width:${pct}%;transition:width .4s"></div>
   </div>`;
@@ -5918,7 +5920,13 @@ function renderUpgradeSeason(s, isFirst = false) {
     body = `<div style="border-top:1px solid var(--sep)">${rows}${addRow}${totLine}</div>`;
   }
 
-  return `<div style="background:var(--surface);border:0.5px solid var(--sep);border-radius:14px;margin:0 12px 10px;overflow:hidden">${hdr}${body}</div>`;
+  return `<div data-upg-season-id="${s.id}" draggable="true"
+    ondragstart="upgSeasonDragStart(event,'${s.id}')"
+    ondragover="upgSeasonDragOver(event,'${s.id}')"
+    ondragleave="upgSeasonDragLeave(event)"
+    ondrop="upgSeasonDrop(event,'${s.id}')"
+    ondragend="upgSeasonDragEnd()"
+    style="background:var(--surface);border:0.5px solid var(--sep);border-radius:14px;margin:0 12px 10px;overflow:hidden">${hdr}${body}</div>`;
 }
 
 function renderUpgradeItem(s, item, idx) {
@@ -6038,6 +6046,90 @@ function saveUpgradeSeason() {
   const wd = getUpgradesData();
   wd.seasons.push({id:uid(), name, location:document.getElementById('uas-l')?.value.trim()||'', open:true, items:[]});
   save(); hideModal(); upgRerender();
+}
+
+function upgSeasonDragStart(e, id) {
+  if (e.target.closest('button,input,select')) { e.preventDefault(); return; }
+  _upgSeasonDragId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', id);
+  setTimeout(() => document.querySelector(`[data-upg-season-id="${id}"]`)?.classList.add('prov-dragging'), 0);
+}
+function upgSeasonDragOver(e, id) {
+  if (!_upgSeasonDragId || _upgSeasonDragId === id) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  e.currentTarget.classList.add('prov-drag-over');
+}
+function upgSeasonDragLeave(e) {
+  if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('prov-drag-over');
+}
+function upgSeasonDrop(e, targetId) {
+  e.preventDefault();
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  const fromId = _upgSeasonDragId; _upgSeasonDragId = null;
+  _upgSeasonDoReorder(fromId, targetId);
+}
+function upgSeasonDragEnd() {
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  _upgSeasonDragId = null;
+}
+function upgSeasonTouchStart(e, id) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const row = e.currentTarget.closest('[data-upg-season-id]');
+  if (!row) return;
+  const rect = row.getBoundingClientRect();
+  const clone = row.cloneNode(true);
+  Object.assign(clone.style, {position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',
+    opacity:'0.85',zIndex:'9999',pointerEvents:'none',outline:'2px dashed var(--blue)',
+    borderRadius:'14px',background:'var(--surface)',boxShadow:'0 4px 16px rgba(0,0,0,.18)',transition:'none'});
+  document.body.appendChild(clone);
+  row.style.opacity = '0.3';
+  _upgSeasonTouchState = {id, row, clone, offsetY: touch.clientY - rect.top, over: null};
+  document.addEventListener('touchmove', _upgSeasonTouchMove, {passive:false});
+  document.addEventListener('touchend', _upgSeasonTouchEnd);
+}
+function _upgSeasonTouchMove(e) {
+  e.preventDefault();
+  if (!_upgSeasonTouchState) return;
+  const touch = e.touches[0];
+  const {clone, offsetY} = _upgSeasonTouchState;
+  clone.style.top = (touch.clientY - offsetY) + 'px';
+  clone.style.display = 'none';
+  const under = document.elementFromPoint(touch.clientX, touch.clientY);
+  clone.style.display = '';
+  const targetRow = under?.closest('[data-upg-season-id]');
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  if (targetRow && targetRow !== _upgSeasonTouchState.row) {
+    targetRow.classList.add('prov-drag-over');
+    _upgSeasonTouchState.over = targetRow;
+  } else { _upgSeasonTouchState.over = null; }
+}
+function _upgSeasonTouchEnd() {
+  document.removeEventListener('touchmove', _upgSeasonTouchMove);
+  document.removeEventListener('touchend', _upgSeasonTouchEnd);
+  if (!_upgSeasonTouchState) return;
+  const {id, row, clone, over} = _upgSeasonTouchState;
+  _upgSeasonTouchState = null;
+  clone.remove(); row.style.opacity = '';
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  if (over) _upgSeasonDoReorder(id, over.dataset.upgSeasonId);
+}
+function _upgSeasonDoReorder(fromId, toId) {
+  if (!fromId || !toId || fromId === toId) return;
+  const wd = getUpgradesData();
+  const vis = wd.seasons.slice().reverse();
+  const fromIdx = vis.findIndex(s => s.id === fromId);
+  if (fromIdx === -1) return;
+  const [moved] = vis.splice(fromIdx, 1);
+  const newToIdx = vis.findIndex(s => s.id === toId);
+  if (newToIdx === -1) return;
+  vis.splice(newToIdx, 0, moved);
+  wd.seasons = vis.slice().reverse();
+  save();
+  upgRerender();
 }
 
 function prefillUpgradesData() {
