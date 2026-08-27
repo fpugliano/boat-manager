@@ -6064,7 +6064,9 @@ function upgSeasonDrop(e, targetId) {
   e.preventDefault();
   document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
   const fromId = _upgSeasonDragId; _upgSeasonDragId = null;
-  _upgSeasonDoReorder(fromId, targetId);
+  const rect = e.currentTarget.getBoundingClientRect();
+  const insertAfter = e.clientY > rect.top + rect.height / 2;
+  _upgSeasonDoReorder(fromId, targetId, insertAfter);
 }
 function upgSeasonDragEnd() {
   document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
@@ -6091,6 +6093,7 @@ function _upgSeasonTouchMove(e) {
   if (!_upgSeasonTouchState) return;
   const touch = e.touches[0];
   const {clone, offsetY} = _upgSeasonTouchState;
+  _upgSeasonTouchState.lastY = touch.clientY;
   clone.style.top = (touch.clientY - offsetY) + 'px';
   clone.style.display = 'none';
   const under = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -6106,13 +6109,17 @@ function _upgSeasonTouchEnd() {
   document.removeEventListener('touchmove', _upgSeasonTouchMove);
   document.removeEventListener('touchend', _upgSeasonTouchEnd);
   if (!_upgSeasonTouchState) return;
-  const {id, row, clone, over} = _upgSeasonTouchState;
+  const {id, row, clone, over, lastY} = _upgSeasonTouchState;
   _upgSeasonTouchState = null;
   clone.remove(); row.style.opacity = '';
   document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
-  if (over) _upgSeasonDoReorder(id, over.dataset.upgSeasonId);
+  if (over) {
+    const rect = over.getBoundingClientRect();
+    const insertAfter = (lastY ?? 0) > rect.top + rect.height / 2;
+    _upgSeasonDoReorder(id, over.dataset.upgSeasonId, insertAfter);
+  }
 }
-function _upgSeasonDoReorder(fromId, toId) {
+function _upgSeasonDoReorder(fromId, toId, insertAfter = false) {
   if (!fromId || !toId || fromId === toId) return;
   const wd = getUpgradesData();
   const vis = wd.seasons.slice().reverse();
@@ -6121,7 +6128,7 @@ function _upgSeasonDoReorder(fromId, toId) {
   const [moved] = vis.splice(fromIdx, 1);
   const newToIdx = vis.findIndex(s => s.id === toId);
   if (newToIdx === -1) return;
-  vis.splice(newToIdx, 0, moved);
+  vis.splice(insertAfter ? newToIdx + 1 : newToIdx, 0, moved);
   wd.seasons = vis.slice().reverse();
   save();
   upgRerender();
