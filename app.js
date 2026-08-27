@@ -5877,7 +5877,9 @@ function renderUpgrades() {
     ondragover="upgEndDragOver(event)"
     ondragleave="upgEndDragLeave(event)"
     ondrop="upgEndDrop(event)"
-    style="height:36px;margin:0 12px 4px;border-radius:10px;border:2px dashed transparent;transition:border-color .15s,background .15s;box-sizing:border-box"></div>`;
+    style="height:52px;margin:0 12px 8px;border-radius:10px;border:2px dashed var(--sep);transition:border-color .15s,background .15s;box-sizing:border-box;display:flex;align-items:center;justify-content:center">
+    <span style="font-size:12px;color:var(--label3)">Drop here to move to bottom</span>
+  </div>`;
 
   return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 12px 8px">
     <div style="font-size:17px;font-weight:700">🔧 Upgrades &amp; Repairs</div>
@@ -6123,7 +6125,7 @@ function _upgSeasonTouchEnd() {
     const dz = document.getElementById('upg-season-drop-end');
     if (dz && lastY != null) {
       const dzRect = dz.getBoundingClientRect();
-      if (lastY >= dzRect.top) { upgEndDrop({preventDefault:()=>{},currentTarget:dz}); return; }
+      if (lastY >= dzRect.top) { _upgMoveToEnd(id); return; }
     }
   } else {
     const rect = over.getBoundingClientRect();
@@ -6139,15 +6141,18 @@ function upgEndDragOver(e) {
   e.currentTarget.style.background = 'rgba(0,122,255,.07)';
 }
 function upgEndDragLeave(e) {
-  e.currentTarget.style.borderColor = 'transparent';
+  e.currentTarget.style.borderColor = 'var(--sep)';
   e.currentTarget.style.background = '';
 }
 function upgEndDrop(e) {
   e.preventDefault();
-  e.currentTarget.style.borderColor = 'transparent';
+  e.currentTarget.style.borderColor = 'var(--sep)';
   e.currentTarget.style.background = '';
   document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
   const fromId = _upgSeasonDragId; _upgSeasonDragId = null;
+  _upgMoveToEnd(fromId);
+}
+function _upgMoveToEnd(fromId) {
   if (!fromId) return;
   const wd = getUpgradesData();
   const vis = wd.seasons.slice().reverse();
