@@ -10438,7 +10438,7 @@ async function attemptUnlock() {
 function resetActivity() { lastActivity = Date.now(); }
 
 async function silentPull() {
-  if (!cryptoKey) return;
+  if (!cryptoKey || _pushTimer) return; // skip if local has unsaved changes
   const pulled = await pullFromCloud();
   if (pulled) { migrateData(); renderApp(); }
 }
