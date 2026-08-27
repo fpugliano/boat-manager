@@ -6919,6 +6919,21 @@ function getWinterData() {
       delete season.checked;
     }
   });
+  // Migrate: add categories if missing
+  if (!data.winterization.categories) {
+    data.winterization.categories = [
+      { id:'winterize',   label:'Winterization',  icon:'❄️', groups:['General','Engine','Dinghy','Others','Right before leaving'] },
+      { id:'needs',       label:'Needs',           icon:'🛒', groups:[] },
+      { id:'backOnBoard', label:'Back on board',   icon:'⛵', groups:[] }
+    ];
+  }
+  // Ensure every season has sections for all categories
+  const _cats = data.winterization.categories;
+  Object.values(data.winterization.seasons).forEach(season => {
+    _cats.forEach(cat => {
+      if (!season.sections[cat.id]) season.sections[cat.id] = {items:[]};
+    });
+  });
   return data.winterization;
 }
 
@@ -7000,8 +7015,42 @@ function _winDoReorder(fromId, toId, sid) {
   save(); winterRerender();
 }
 
-function renderWinterSection(sid, season, archived) {
-  const def  = WINTER_DEFS[sid];
+function renderWinterItem(item, i, sid, archived) {
+  const isEdit = ui.winterEditItem?.sid === sid && ui.winterEditItem?.idx === i;
+  if (isEdit) {
+    const isImp = item.text.endsWith(' ⚠️') || !!item.asterisk;
+    const editTxt = item.text.replace(/ ⚠️$/, '');
+    return `<div class="wrow" style="flex-wrap:wrap;gap:4px">
+      <input id="wedit-inp" class="mi" style="flex:1;min-width:120px;margin:0;font-size:14px" value="${esc(editTxt)}"
+        onkeydown="if(event.key==='Enter')saveWinterItemEdit(${JSON.stringify(sid)},${i})" onkeyup="if(event.key==='Escape'){ui.winterEditItem=null;winterRerender()}">
+      <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;white-space:nowrap;color:var(--label2)">
+        <input type="checkbox" id="wedit-star" ${isImp?'checked':''}> Mark as important ⚠️
+      </label>
+      <button class="btn btn-p btn-xs" onclick="saveWinterItemEdit(${JSON.stringify(sid)},${i})">Save</button>
+      <button class="wact" onclick="ui.winterEditItem=null;winterRerender()">Cancel</button>
+      <button onclick="if(confirm('Remove this item?')){ui.winterEditItem=null;deleteWinterItem(${JSON.stringify(sid)},${i})}" style="background:#FCEBEB;border:0.5px solid #F09595;color:#A32D2D;border-radius:8px;padding:4px 10px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">🗑</button>
+    </div>`;
+  }
+  const isImp = !!item.asterisk || item.text?.endsWith(' ⚠️');
+  const star = (item.asterisk && !item.text?.endsWith(' ⚠️')) ? ` <span style="font-size:11px;opacity:.7">⚠️</span>` : '';
+  const ts = item.checked ? 'opacity:0.4' : isImp ? 'color:var(--label2)' : '';
+  const acts = archived ? '' : `<div style="display:flex;gap:1px;flex-shrink:0">
+    <button style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:14px;color:var(--label3);line-height:1;flex-shrink:0" onclick="startWinterEdit(${JSON.stringify(sid)},${i})" title="Edit">✏️</button>
+  </div>`;
+  const winDragAttrs = archived ? '' : ` data-win-id="${item.id}" data-win-sid="${sid}" draggable="true" ondragstart="winDragStart(event,${JSON.stringify(item.id)},${JSON.stringify(sid)})" ondragover="winDragOver(event,${JSON.stringify(item.id)},${JSON.stringify(sid)})" ondragleave="winDragLeave(event)" ondrop="winDrop(event,${JSON.stringify(item.id)},${JSON.stringify(sid)})" ondragend="winDragEnd()"`;
+  const winGrip = archived ? '' : `<span class="prov-grip" ontouchstart="winTouchStart(event,${JSON.stringify(item.id)},${JSON.stringify(sid)})">⠿</span>`;
+  return `<div class="wrow"${winDragAttrs}>
+    ${winGrip}
+    <div class="wbox${item.checked?' on':''}" onclick="toggleWinterItem(${JSON.stringify(sid)},${i})">
+      ${item.checked?'<svg width="11" height="9" viewBox="0 0 11 9"><polyline points="1,4.5 4,7.5 10,1" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
+    </div>
+    <div style="flex:1;font-size:14px;line-height:1.4;${ts};cursor:pointer" onclick="toggleWinterItem(${JSON.stringify(sid)},${i})">${esc(item.text)}${star}</div>
+    ${acts}
+  </div>`;
+}
+
+function renderWinterSection(cat, season, archived) {
+  const sid  = cat.id;
   const sec  = season.sections?.[sid] || {items:[]};
   const items = sec.items;
   const done  = items.filter(x => x.checked).length;
@@ -7011,10 +7060,12 @@ function renderWinterSection(sid, season, archived) {
   const open = complete ? !!(ui.winterOpen?.[sid]) : (ui.winterOpen?.[sid] !== false);
   const badge = complete
     ? `<span style="background:var(--green);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px">✓ Complete</span>` : '';
-  const hdr = `<div class="whdr" onclick="if(!ui.winterOpen)ui.winterOpen={};ui.winterOpen['${sid}']=!${open};winterRerender()">
+  const editCatBtn = archived ? '' : `<button onclick="showWinterCategoryEdit(${JSON.stringify(sid)})" style="background:none;border:none;padding:2px 6px;cursor:pointer;font-size:14px;color:var(--label3)" title="Edit category">✏️</button>`;
+  const hdr = `<div class="whdr" onclick="if(!ui.winterOpen)ui.winterOpen={};ui.winterOpen[${JSON.stringify(sid)}]=!${open};winterRerender()">
     <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:17px">${def.icon}</span>
-      <span style="font-size:15px;font-weight:700;color:var(--label)">${esc(def.label)}</span>${badge}
+      <span style="font-size:17px">${cat.icon}</span>
+      <span style="font-size:15px;font-weight:700;color:var(--label)">${esc(cat.label)}</span>${badge}
+      ${editCatBtn}
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <span style="font-size:12px;color:var(--label3);font-weight:500">${done}/${total}</span>
@@ -7025,72 +7076,79 @@ function renderWinterSection(sid, season, archived) {
     <div style="height:3px;background:${complete?'var(--green)':'var(--blue)'};width:${pct}%;transition:width .4s"></div>
   </div>`;
   if (!open) return `<div class="wcard">${hdr}</div>`;
-  let lastGrp = '\x00';
-  const rows = items.map((item, i) => {
-    const grpHdr = item.group !== lastGrp ? (lastGrp = item.group, item.group ? `<div class="wgrp">${esc(item.group)}</div>` : '') : '';
-    const isEdit = ui.winterEditItem?.sid === sid && ui.winterEditItem?.idx === i;
-    if (isEdit) {
-      const isImp = item.text.endsWith(' ⚠️') || !!item.asterisk;
-      const editTxt = item.text.replace(/ ⚠️$/, '');
-      return grpHdr + `<div class="wrow" style="flex-wrap:wrap;gap:4px">
-        <input id="wedit-inp" class="mi" style="flex:1;min-width:120px;margin:0;font-size:14px" value="${esc(editTxt)}"
-          onkeydown="if(event.key==='Enter')saveWinterItemEdit('${sid}',${i})" onkeyup="if(event.key==='Escape'){ui.winterEditItem=null;winterRerender()}">
-        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;white-space:nowrap;color:var(--label2)">
-          <input type="checkbox" id="wedit-star" ${isImp?'checked':''}> Mark as important ⚠️
-        </label>
-        <button class="btn btn-p btn-xs" onclick="saveWinterItemEdit('${sid}',${i})">Save</button>
-        <button class="wact" onclick="ui.winterEditItem=null;winterRerender()">Cancel</button>
-        <button onclick="if(confirm('Remove this item?')){ui.winterEditItem=null;deleteWinterItem('${sid}',${i})}" style="background:#FCEBEB;border:0.5px solid #F09595;color:#A32D2D;border-radius:8px;padding:4px 10px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">🗑</button>
-      </div>`;
-    }
-    const isImp = !!item.asterisk || item.text?.endsWith(' ⚠️');
-    const star = (item.asterisk && !item.text?.endsWith(' ⚠️')) ? ` <span style="font-size:11px;opacity:.7">⚠️</span>` : '';
-    const ts = item.checked ? 'opacity:0.4' : isImp ? 'color:var(--label2)' : '';
-    const acts = archived ? '' : `<div style="display:flex;gap:1px;flex-shrink:0">
-      <button style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:14px;color:var(--label3);line-height:1;flex-shrink:0" onclick="startWinterEdit('${sid}',${i})" title="Edit">✏️</button>
+
+  // Build a map: groupName → items (in their array order)
+  const groupedItems = {};
+  const ungrouped = [];
+  items.forEach((item, i) => {
+    const g = item.group || null;
+    if (g) { if (!groupedItems[g]) groupedItems[g] = []; groupedItems[g].push({item, i}); }
+    else ungrouped.push({item, i});
+  });
+
+  const smBtn = 'background:none;border:none;padding:2px 6px;cursor:pointer;font-size:13px;color:var(--label3);font-family:var(--font)';
+  let rows = '';
+
+  // Render named groups in category order
+  cat.groups.forEach((grpName, gi) => {
+    const grpItems = groupedItems[grpName] || [];
+    const grpEditBtns = archived ? '' : `<div style="display:flex;gap:2px">
+      <button onclick="renameWinterGroup(${JSON.stringify(sid)},${gi})" style="${smBtn}" title="Rename group">✏️</button>
+      <button onclick="deleteWinterGroup(${JSON.stringify(sid)},${gi})" style="${smBtn};color:#A32D2D" title="Delete group">🗑</button>
     </div>`;
-    const winDragAttrs = archived ? '' : ` data-win-id="${item.id}" data-win-sid="${sid}" draggable="true" ondragstart="winDragStart(event,'${item.id}','${sid}')" ondragover="winDragOver(event,'${item.id}','${sid}')" ondragleave="winDragLeave(event)" ondrop="winDrop(event,'${item.id}','${sid}')" ondragend="winDragEnd()"`;
-    const winGrip = archived ? '' : `<span class="prov-grip" ontouchstart="winTouchStart(event,'${item.id}','${sid}')">⠿</span>`;
-    return grpHdr + `<div class="wrow"${winDragAttrs}>
-      ${winGrip}
-      <div class="wbox${item.checked?' on':''}" onclick="toggleWinterItem('${sid}',${i})">
-        ${item.checked?'<svg width="11" height="9" viewBox="0 0 11 9"><polyline points="1,4.5 4,7.5 10,1" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
-      </div>
-      <div style="flex:1;font-size:14px;line-height:1.4;${ts};cursor:pointer" onclick="toggleWinterItem('${sid}',${i})">${esc(item.text)}${star}</div>
-      ${acts}
+    rows += `<div class="wgrp" style="display:flex;align-items:center;justify-content:space-between">
+      <span>${esc(grpName)}</span>
+      ${grpEditBtns}
     </div>`;
-  }).join('');
-  const addRow = archived ? '' : `<div style="padding:10px 16px;border-top:1px solid var(--sep)">
-    <button onclick="showAddWinterItem('${sid}')" style="background:none;border:none;padding:0;cursor:pointer;font-size:13px;font-weight:500;color:var(--blue);font-family:var(--font)">+ Add item</button>
+    grpItems.forEach(({item, i}) => { rows += renderWinterItem(item, i, sid, archived); });
+    if (!archived) rows += `<div style="padding:4px 16px 8px">
+      <button onclick="showAddWinterItem(${JSON.stringify(sid)},${JSON.stringify(grpName)})" style="background:none;border:none;padding:0;cursor:pointer;font-size:12px;color:var(--blue);font-family:var(--font)">+ Add item</button>
+    </div>`;
+  });
+
+  // Render ungrouped items
+  ungrouped.forEach(({item, i}) => { rows += renderWinterItem(item, i, sid, archived); });
+
+  // Add group button + add ungrouped item button
+  const addGroupBtn = archived ? '' : `<div style="padding:8px 16px;border-top:1px solid var(--sep)">
+    <button onclick="addWinterGroup(${JSON.stringify(sid)})" style="background:none;border:none;padding:0;cursor:pointer;font-size:13px;font-weight:500;color:var(--label3);font-family:var(--font)">+ Add group</button>
   </div>`;
-  return `<div class="wcard">${hdr}<div style="border-top:1px solid var(--sep)">${rows}${addRow}</div></div>`;
+  const addItemBtn = archived ? '' : `<div style="padding:4px 16px 10px">
+    <button onclick="showAddWinterItem(${JSON.stringify(sid)},null)" style="background:none;border:none;padding:0;cursor:pointer;font-size:13px;font-weight:500;color:var(--blue);font-family:var(--font)">+ Add item</button>
+  </div>`;
+  return `<div class="wcard">${hdr}<div style="border-top:1px solid var(--sep)">${rows}${addGroupBtn}${addItemBtn}</div></div>`;
 }
 
 function renderWinterization() {
   const wd = getWinterData();
   if (!ui.winterSeasonId) ui.winterSeasonId = wd.currentSeason;
-  if (!ui.winterOpen) ui.winterOpen = {winterize:true, needs:true, backOnBoard:true};
+  if (!ui.winterOpen) { ui.winterOpen = {}; wd.categories.forEach(c => { ui.winterOpen[c.id] = true; }); }
   const season = wd.seasons[ui.winterSeasonId];
   if (!season) return '';
   const archived = season.archived;
   const isCurrent = ui.winterSeasonId === wd.currentSeason;
-  const sids = ['winterize','needs','backOnBoard'];
+  const cats = wd.categories;
+  const sids = cats.map(c => c.id);
   const allComplete = sids.every(sid => { const items=(season.sections?.[sid]?.items||[]); return items.length>0&&items.every(x=>x.checked); });
   const seasonOpts = Object.keys(wd.seasons).reverse().map(id =>
     `<option value="${id}" ${id===ui.winterSeasonId?'selected':''}>${esc(wd.seasons[id].name)}${wd.seasons[id].archived?' (archived)':''}</option>`
   ).join('');
+  const manageCatsBtn = archived ? '' : `<button onclick="showWinterManageCategories()" style="background:none;border:0.5px solid var(--sep);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:500;color:var(--label2);cursor:pointer;font-family:var(--font)">⚙ Categories</button>`;
   const hdr = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:8px;flex-wrap:wrap">
     <select onchange="ui.winterSeasonId=this.value;ui.winterOpen=null;ui.winterEditItem=null;winterRerender()"
       style="background:var(--surface);border:0.5px solid var(--sep);border-radius:20px;padding:7px 14px;font-size:14px;font-weight:600;font-family:var(--font);color:var(--label);cursor:pointer;max-width:220px">${seasonOpts}</select>
-    ${isCurrent&&!archived?`<button class="btn btn-d btn-sm" onclick="resetWinterSeason()">Reset season</button>`:''}
-    ${archived?`<span style="font-size:12px;color:var(--label3);font-weight:500;padding:6px 12px;background:var(--surface2);border-radius:12px">Archived</span>`:''}
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      ${manageCatsBtn}
+      ${isCurrent&&!archived?`<button class="btn btn-d btn-sm" onclick="resetWinterSeason()">Reset season</button>`:''}
+      ${archived?`<span style="font-size:12px;color:var(--label3);font-weight:500;padding:6px 12px;background:var(--surface2);border-radius:12px">Archived</span>`:''}
+    </div>
   </div>`;
   const congr = allComplete&&!archived ? `<div style="background:rgba(52,199,89,.12);border:2px solid var(--green);border-radius:14px;padding:18px 20px;margin-bottom:16px;text-align:center">
     <div style="font-size:20px;font-weight:700;color:var(--green)">${esc(season.name)} complete! ⚓</div>
     <div style="font-size:13px;color:var(--label3);margin:6px 0 14px">All sections done. Ready to archive.</div>
     <button class="btn btn-p btn-sm" onclick="startNewWinterSeason()">Start Winter ${nextWinterName(season.name)} →</button>
   </div>` : '';
-  return hdr + congr + sids.map(sid => renderWinterSection(sid, season, archived)).join('');
+  return hdr + congr + cats.map(cat => renderWinterSection(cat, season, archived)).join('');
 }
 
 function toggleWinterItem(sid, idx) {
@@ -7128,8 +7186,10 @@ function deleteWinterItem(sid, idx) {
   save(); winterRerender();
 }
 
-function showAddWinterItem(sid) {
-  showModal('Add Item', `
+function showAddWinterItem(sid, group) {
+  const grp = group || null;
+  const title = 'Add Item' + (grp ? ' to ' + grp : '');
+  showModal(title, `
     <div class="mi-label">Item text</div>
     <input class="mi" id="m-wadd" placeholder="e.g. Check anchor chain" autofocus>
     <label style="display:flex;align-items:center;gap:8px;font-size:14px;margin:12px 0">
@@ -7137,11 +7197,11 @@ function showAddWinterItem(sid) {
     </label>
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
-      <button class="btn btn-p" onclick="addWinterItem('${sid}')">Add</button>
+      <button class="btn btn-p" onclick="addWinterItem(${JSON.stringify(sid)},${JSON.stringify(grp)})">Add</button>
     </div>`);
 }
 
-function addWinterItem(sid) {
+function addWinterItem(sid, group) {
   let text = document.getElementById('m-wadd')?.value.trim();
   if (!text) { showToast('Enter item text', true); return; }
   const important = !!document.getElementById('m-wstar')?.checked;
@@ -7151,17 +7211,18 @@ function addWinterItem(sid) {
   const season = wd.seasons[wd.currentSeason];
   if (!season||season.archived) return;
   if (!season.sections[sid]) season.sections[sid] = {items:[]};
-  season.sections[sid].items.push({id:uid(), text, asterisk: important, checked:false, group:null});
+  season.sections[sid].items.push({id:uid(), text, asterisk: important, checked:false, group: group || null});
   save(); hideModal(); winterRerender();
 }
 
 function resetWinterSeason() {
   if (!confirm('Reset all checkboxes for this season?')) return;
-  const wd = getWinterData();
-  const season = wd.seasons[wd.currentSeason];
+  const wd2 = getWinterData();
+  const season = wd2.seasons[wd2.currentSeason];
   if (!season||season.archived) return;
-  ['winterize','needs','backOnBoard'].forEach(sid => { (season.sections?.[sid]?.items||[]).forEach(item => item.checked=false); });
-  ui.winterOpen = {winterize:true, needs:true, backOnBoard:true};
+  wd2.categories.forEach(cat => { (season.sections?.[cat.id]?.items||[]).forEach(item => item.checked=false); });
+  ui.winterOpen = {};
+  wd2.categories.forEach(c => { ui.winterOpen[c.id] = true; });
   ui.winterEditItem = null;
   save(); winterRerender();
 }
@@ -7172,16 +7233,146 @@ function startNewWinterSeason() {
   cur.archived = true;
   const newName = 'Winter ' + nextWinterName(cur.name);
   const newId = 'w' + newName.replace(/[^0-9]/g,'');
-  wd.seasons[newId] = { name:newName, archived:false, sections:{
-    winterize:  {items: buildWinterSectionItems('winterize',  [])},
-    needs:      {items: buildWinterSectionItems('needs',      [])},
-    backOnBoard:{items: buildWinterSectionItems('backOnBoard', [])}
-  }};
+  const sections = {};
+  wd.categories.forEach(cat => {
+    const prevItems = cur.sections?.[cat.id]?.items || [];
+    sections[cat.id] = { items: prevItems.map(item => ({
+      id: uid(), text: item.text, asterisk: item.asterisk, checked: false, group: item.group
+    }))};
+  });
+  wd.seasons[newId] = { name:newName, archived:false, sections };
   wd.currentSeason = newId;
   ui.winterSeasonId = newId;
-  ui.winterOpen = {winterize:true, needs:true, backOnBoard:true};
+  ui.winterOpen = {};
+  wd.categories.forEach(c => { ui.winterOpen[c.id] = true; });
   ui.winterEditItem = null;
   save(); winterRerender();
+}
+
+function showWinterManageCategories() {
+  const wd = getWinterData();
+  const smBtn = 'background:none;border:none;padding:2px 6px;cursor:pointer;font-size:13px;color:var(--label3);font-family:var(--font)';
+  const rows = wd.categories.map((cat, idx) => {
+    const isFirst = idx === 0, isLast = idx === wd.categories.length - 1;
+    const hasItems = Object.values(wd.seasons).some(s => (s.sections?.[cat.id]?.items||[]).length > 0);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:0.5px solid var(--sep)">
+      <span style="font-size:18px">${cat.icon}</span>
+      <span style="flex:1;font-size:14px;font-weight:500">${esc(cat.label)}</span>
+      <div style="display:flex;gap:4px">
+        ${isFirst ? '' : `<button onclick="winterMoveCat(${JSON.stringify(cat.id)},-1)" style="${smBtn}" title="Move up">▲</button>`}
+        ${isLast  ? '' : `<button onclick="winterMoveCat(${JSON.stringify(cat.id)},1)"  style="${smBtn}" title="Move down">▼</button>`}
+        <button onclick="hideModal();showWinterCategoryEdit(${JSON.stringify(cat.id)})" style="${smBtn}">✏️</button>
+        ${hasItems ? '' : `<button onclick="deleteWinterCategory(${JSON.stringify(cat.id)})" style="${smBtn};color:#A32D2D">🗑</button>`}
+      </div>
+    </div>`;
+  }).join('');
+  showModal('Categories', `
+    ${rows}
+    <div style="margin-top:12px">
+      <button class="btn btn-s btn-sm" onclick="addWinterCategory()">+ Add category</button>
+    </div>
+    <div class="modal-btns"><button class="btn btn-s" onclick="hideModal()">Done</button></div>
+  `);
+}
+
+function winterMoveCat(id, dir) {
+  const wd = getWinterData();
+  const idx = wd.categories.findIndex(c => c.id === id); if (idx === -1) return;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= wd.categories.length) return;
+  [wd.categories[idx], wd.categories[newIdx]] = [wd.categories[newIdx], wd.categories[idx]];
+  save(); showWinterManageCategories();
+}
+
+function showWinterCategoryEdit(sid) {
+  const wd = getWinterData();
+  const cat = wd.categories.find(c => c.id === sid); if (!cat) return;
+  const smBtn = 'background:none;border:none;padding:2px 6px;cursor:pointer;font-size:13px;color:var(--label3);font-family:var(--font)';
+  const grpRows = cat.groups.map((g, gi) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--sep)">
+      <span style="flex:1;font-size:13px">${esc(g)}</span>
+      <button onclick="renameWinterGroup(${JSON.stringify(sid)},${gi})" style="${smBtn}">✏️</button>
+      <button onclick="deleteWinterGroup(${JSON.stringify(sid)},${gi})" style="${smBtn};color:#A32D2D">🗑</button>
+    </div>`).join('');
+  showModal(`Edit: ${cat.icon} ${cat.label}`, `
+    <div class="mi-label">Label</div>
+    <input class="mi" id="wcat-label" value="${esc(cat.label)}">
+    <div class="mi-label" style="margin-top:10px">Icon (emoji)</div>
+    <input class="mi" id="wcat-icon" value="${esc(cat.icon)}" style="max-width:80px">
+    <div style="font-size:13px;font-weight:600;color:var(--label);margin:14px 0 6px">Groups</div>
+    ${grpRows || '<div style="font-size:13px;color:var(--label3);padding:6px 0">No groups yet</div>'}
+    <button onclick="addWinterGroup(${JSON.stringify(sid)})" style="background:none;border:none;padding:4px 0;cursor:pointer;font-size:13px;color:var(--blue);font-family:var(--font)">+ Add group</button>
+    <div class="modal-btns">
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveWinterCategoryEdit(${JSON.stringify(sid)})">Save</button>
+    </div>`);
+}
+
+function saveWinterCategoryEdit(sid) {
+  const wd = getWinterData();
+  const cat = wd.categories.find(c => c.id === sid); if (!cat) return;
+  const label = document.getElementById('wcat-label')?.value.trim();
+  const icon  = document.getElementById('wcat-icon')?.value.trim();
+  if (!label) { showToast('Enter a label', true); return; }
+  cat.label = label;
+  if (icon) cat.icon = icon;
+  hideModal(); save(); winterRerender();
+}
+
+function addWinterGroup(sid) {
+  const name = prompt('Group name:');
+  if (!name?.trim()) return;
+  const wd = getWinterData();
+  const cat = wd.categories.find(c => c.id === sid); if (!cat) return;
+  if (cat.groups.includes(name.trim())) { showToast('Group already exists', true); return; }
+  cat.groups.push(name.trim());
+  save(); winterRerender();
+}
+
+function renameWinterGroup(sid, groupIdx) {
+  const wd = getWinterData();
+  const cat = wd.categories.find(c => c.id === sid); if (!cat) return;
+  const oldName = cat.groups[groupIdx];
+  const newName = prompt('Rename group:', oldName);
+  if (!newName?.trim() || newName.trim() === oldName) return;
+  cat.groups[groupIdx] = newName.trim();
+  // Update all items in all seasons
+  Object.values(wd.seasons).forEach(s => {
+    (s.sections?.[sid]?.items||[]).forEach(item => { if (item.group === oldName) item.group = newName.trim(); });
+  });
+  save(); hideModal(); winterRerender();
+}
+
+function deleteWinterGroup(sid, groupIdx) {
+  const wd = getWinterData();
+  const cat = wd.categories.find(c => c.id === sid); if (!cat) return;
+  const name = cat.groups[groupIdx];
+  if (!confirm(`Delete group "${name}"? Items in this group will become ungrouped.`)) return;
+  cat.groups.splice(groupIdx, 1);
+  Object.values(wd.seasons).forEach(s => {
+    (s.sections?.[sid]?.items||[]).forEach(item => { if (item.group === name) item.group = null; });
+  });
+  save(); hideModal(); winterRerender();
+}
+
+function addWinterCategory() {
+  const label = prompt('Category name:');
+  if (!label?.trim()) return;
+  const icon  = prompt('Icon (emoji):', '📋') || '📋';
+  const wd = getWinterData();
+  const id = 'cat_' + uid();
+  wd.categories.push({ id, label: label.trim(), icon: (icon.trim()||'📋'), groups: [] });
+  Object.values(wd.seasons).forEach(s => { if (!s.sections[id]) s.sections[id] = {items:[]}; });
+  save(); hideModal(); winterRerender();
+}
+
+function deleteWinterCategory(sid) {
+  const wd = getWinterData();
+  const hasItems = Object.values(wd.seasons).some(s => (s.sections?.[sid]?.items||[]).length > 0);
+  if (hasItems) { showToast('Remove all items first', true); return; }
+  if (!confirm('Delete this category?')) return;
+  wd.categories = wd.categories.filter(c => c.id !== sid);
+  save(); hideModal(); winterRerender();
 }
 
 // ═══════════════════════════════════════════════════════════
