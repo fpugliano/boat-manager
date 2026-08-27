@@ -5904,7 +5904,7 @@ function renderUpgradeSeason(s, isFirst = false) {
       <span style="font-size:12px;color:var(--label3)">${done}/${total}</span>
       <span style="font-size:11px;color:var(--label3)">${open?'▲':'▼'}</span>
     </div>
-  </div>`;
+  </div>
   <div style="height:3px;background:var(--surface2)">
     <div style="height:3px;background:${complete?'var(--green)':'var(--orange)'};width:${pct}%;transition:width .4s"></div>
   </div>`;
