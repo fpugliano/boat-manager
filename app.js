@@ -5873,11 +5873,17 @@ function renderUpgrades() {
   const summary = grandTotal > 0 ? `<div style="margin:4px 12px 16px;padding:12px 16px;background:var(--surface);border:0.5px solid var(--sep);border-radius:12px;font-size:13px;color:var(--label3)">All seasons total: <b style="color:var(--label)">€${grandTotal.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2})}</b></div>` : '';
   const exMsg = !isOwner ? `<div style="margin:0 12px 12px;font-size:12px;color:var(--label3);font-style:italic">Replace these examples with your own upgrades and repairs</div>` : '';
 
+  const dropEnd = `<div id="upg-season-drop-end"
+    ondragover="upgEndDragOver(event)"
+    ondragleave="upgEndDragLeave(event)"
+    ondrop="upgEndDrop(event)"
+    style="height:36px;margin:0 12px 4px;border-radius:10px;border:2px dashed transparent;transition:border-color .15s,background .15s;box-sizing:border-box"></div>`;
+
   return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 12px 8px">
     <div style="font-size:17px;font-weight:700">🔧 Upgrades &amp; Repairs</div>
     <button onclick="showAddUpgradeSeason()" style="background:var(--surface);border:0.5px solid var(--sep);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;font-family:var(--font);color:var(--label);cursor:pointer">+ Add season</button>
   </div>
-  ${exMsg}${cards}${summary}`;
+  ${exMsg}${cards}${dropEnd}${summary}`;
 }
 
 function renderUpgradeSeason(s, isFirst = false) {
@@ -6113,11 +6119,44 @@ function _upgSeasonTouchEnd() {
   _upgSeasonTouchState = null;
   clone.remove(); row.style.opacity = '';
   document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
-  if (over) {
+  if (!over) {
+    const dz = document.getElementById('upg-season-drop-end');
+    if (dz && lastY != null) {
+      const dzRect = dz.getBoundingClientRect();
+      if (lastY >= dzRect.top) { upgEndDrop({preventDefault:()=>{},currentTarget:dz}); return; }
+    }
+  } else {
     const rect = over.getBoundingClientRect();
     const insertAfter = (lastY ?? 0) > rect.top + rect.height / 2;
     _upgSeasonDoReorder(id, over.dataset.upgSeasonId, insertAfter);
   }
+}
+function upgEndDragOver(e) {
+  if (!_upgSeasonDragId) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.style.borderColor = 'var(--blue)';
+  e.currentTarget.style.background = 'rgba(0,122,255,.07)';
+}
+function upgEndDragLeave(e) {
+  e.currentTarget.style.borderColor = 'transparent';
+  e.currentTarget.style.background = '';
+}
+function upgEndDrop(e) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = 'transparent';
+  e.currentTarget.style.background = '';
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  const fromId = _upgSeasonDragId; _upgSeasonDragId = null;
+  if (!fromId) return;
+  const wd = getUpgradesData();
+  const vis = wd.seasons.slice().reverse();
+  const fromIdx = vis.findIndex(s => s.id === fromId);
+  if (fromIdx === -1) return;
+  const [moved] = vis.splice(fromIdx, 1);
+  vis.push(moved);
+  wd.seasons = vis.slice().reverse();
+  save(); upgRerender();
 }
 function _upgSeasonDoReorder(fromId, toId, insertAfter = false) {
   if (!fromId || !toId || fromId === toId) return;
