@@ -248,7 +248,8 @@ async function aesDecrypt(key, storedJson) {
 let _pushTimer = null;
 function schedulePush() {
   clearTimeout(_pushTimer);
-  _pushTimer = setTimeout(() => pushToCloud(), 10000);
+  setSyncStatus('pending');
+  _pushTimer = setTimeout(() => pushToCloud(), 2000);
 }
 
 async function save() {
@@ -10443,7 +10444,11 @@ async function silentPull() {
 }
 
 async function onVisibilityChange() {
-  if (document.visibilityState !== 'visible' || !cryptoKey) return;
+  if (document.visibilityState === 'hidden') {
+    if (_pushTimer) { clearTimeout(_pushTimer); _pushTimer = null; pushToCloud(); }
+    return;
+  }
+  if (!cryptoKey) return;
   const rawTs = localStorage.getItem(LAST_SYNC_KEY);
   if (rawTs && Date.now() - new Date(rawTs).getTime() < 60000) return;
   await silentPull();
@@ -10891,8 +10896,8 @@ function setSyncStatus(status) {
   syncStatus = status;
   const dot = document.getElementById('sync-dot');
   if (dot) {
-    const colors = {synced:'var(--green)',syncing:'var(--orange)',offline:'var(--red)',idle:'#666'};
-    const titles = {synced:'Synced to cloud',syncing:'Syncing…',offline:'Offline — tap to retry',idle:'Not synced'};
+    const colors = {synced:'var(--green)',syncing:'var(--orange)',pending:'var(--orange)',offline:'var(--red)',idle:'#666'};
+    const titles = {synced:'Synced to cloud',syncing:'Syncing…',pending:'Saving…',offline:'Offline — tap to retry',idle:'Not synced'};
     dot.style.color = colors[status] || '#666';
     dot.title = titles[status] || 'Sync';
   }
@@ -11923,8 +11928,8 @@ function renderSettings() {
   const email    = localStorage.getItem(EMAIL_KEY) || '—';
   const rawTs    = localStorage.getItem(LAST_SYNC_KEY);
   const lastSync = timeAgo(rawTs);
-  const dotColor = {synced:'#22C55E',syncing:'#F59E0B',offline:'#EF4444',idle:'#9ca3af'}[syncStatus]||'#9ca3af';
-  const dotLabel = {synced:'Synced',syncing:'Syncing…',offline:'Error',idle:'Not synced'}[syncStatus]||'—';
+  const dotColor = {synced:'#22C55E',syncing:'#F59E0B',pending:'#F59E0B',offline:'#EF4444',idle:'#9ca3af'}[syncStatus]||'#9ca3af';
+  const dotLabel = {synced:'Synced',syncing:'Syncing…',pending:'Saving…',offline:'Error',idle:'Not synced'}[syncStatus]||'—';
 
   function settingsRow(id, label, rightHtml, expandedHtml) {
     const open = !!ui.settingsOpen[id];
