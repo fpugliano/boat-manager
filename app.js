@@ -2187,7 +2187,14 @@ function renderMaintenance() {
         <div style="width:26px;flex-shrink:0"></div>
       </div>
       ${logRows}
-    </div>`;
+    </div>
+    ${display.length > 0 ? `<div id="maint-drop-end"
+      ondragover="maintLogEndDragOver(event)"
+      ondragleave="maintLogEndDragLeave(event)"
+      ondrop="maintLogEndDrop(event)"
+      style="height:52px;margin:8px 12px;border-radius:10px;border:2px dashed var(--sep);transition:border-color .15s,background .15s;box-sizing:border-box;display:flex;align-items:center;justify-content:center">
+      <span style="font-size:12px;color:var(--label3)">Drop here to move to bottom</span>
+    </div>` : ''}`;
   const activeCats      = getActiveCategories();
   const activeCatLabels = MAINT_CATEGORIES.filter(c => activeCats.includes(c.id)).map(c => c.label).join(', ');
   const intervalsCardHtml = `
@@ -2423,6 +2430,34 @@ function maintLogDragEnd() {
   document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
   _maintLogDragId = null;
 }
+function maintLogEndDragOver(e) {
+  if (!_maintLogDragId) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.style.borderColor = 'var(--blue)';
+  e.currentTarget.style.background = 'rgba(0,122,255,.07)';
+}
+function maintLogEndDragLeave(e) {
+  e.currentTarget.style.borderColor = 'var(--sep)';
+  e.currentTarget.style.background = '';
+}
+function maintLogEndDrop(e) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = 'var(--sep)';
+  e.currentTarget.style.background = '';
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  const fromId = _maintLogDragId; _maintLogDragId = null;
+  _maintLogMoveToEnd(fromId);
+}
+function _maintLogMoveToEnd(fromId) {
+  if (!fromId) return;
+  const log = getMaintLog();
+  const fromIdx = log.findIndex(e => e.id === fromId);
+  if (fromIdx === -1) return;
+  const [moved] = log.splice(fromIdx, 1);
+  log.push(moved);
+  save();
+  document.getElementById('mainContent').innerHTML = renderMaintenance();
+}
 function maintLogTouchStart(e, id) {
   e.preventDefault();
   const touch = e.touches[0], row = e.currentTarget.closest('[data-maint-id]'); if (!row) return;
@@ -2436,6 +2471,7 @@ function maintLogTouchStart(e, id) {
 function _maintLogTouchMove(e) {
   e.preventDefault(); if (!_maintLogTouchState) return;
   const touch = e.touches[0], {clone, offsetY} = _maintLogTouchState;
+  _maintLogTouchState.lastY = touch.clientY;
   clone.style.top = (touch.clientY - offsetY) + 'px';
   clone.style.display = 'none';
   const under = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -2448,10 +2484,18 @@ function _maintLogTouchMove(e) {
 function _maintLogTouchEnd() {
   document.removeEventListener('touchmove', _maintLogTouchMove); document.removeEventListener('touchend', _maintLogTouchEnd);
   if (!_maintLogTouchState) return;
-  const {id, row, clone, over} = _maintLogTouchState; _maintLogTouchState = null;
+  const {id, row, clone, over, lastY} = _maintLogTouchState; _maintLogTouchState = null;
   clone.remove(); row.style.opacity = '';
   document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
-  if (over) _maintLogDoReorder(id, over.dataset.maintId);
+  if (!over) {
+    const dz = document.getElementById('maint-drop-end');
+    if (dz && lastY != null) {
+      const dzRect = dz.getBoundingClientRect();
+      if (lastY >= dzRect.top) { _maintLogMoveToEnd(id); return; }
+    }
+  } else {
+    _maintLogDoReorder(id, over.dataset.maintId);
+  }
 }
 function _maintLogDoReorder(fromId, toId) {
   if (!fromId || !toId || fromId === toId) return;
@@ -5527,6 +5571,14 @@ function renderSafety() {
     </div>`;
   }).join('') : '<div style="padding:16px;color:var(--label3)">No life rafts — tap + Add to get started</div>';
 
+  const flareDropEnd = `<div id="safety-flare-drop-end"
+    ondragover="safetyFlareEndDragOver(event)"
+    ondragleave="safetyFlareEndDragLeave(event)"
+    ondrop="safetyFlareEndDrop(event)"
+    style="height:52px;margin:8px 12px;border-radius:10px;border:2px dashed var(--sep);transition:border-color .15s,background .15s;box-sizing:border-box;display:flex;align-items:center;justify-content:center">
+    <span style="font-size:12px;color:var(--label3)">Drop here to move to bottom</span>
+  </div>`;
+
   return `${alertHtml}
     <div class="card" style="margin-bottom:14px">
       <div class="card-hd" style="display:flex;align-items:center;justify-content:space-between">
@@ -5534,6 +5586,7 @@ function renderSafety() {
         <button class="btn btn-p btn-sm" onclick="showAddFlare()">+ Add</button>
       </div>
       <div style="padding:0">${flareRowsHtml}</div>
+      ${flares.length > 0 ? flareDropEnd : ''}
     </div>
     <div class="card">
       <div class="card-hd" style="display:flex;align-items:center;justify-content:space-between">
@@ -5541,6 +5594,13 @@ function renderSafety() {
         <button class="btn btn-p btn-sm" onclick="showAddRaft()">+ Add</button>
       </div>
       <div style="padding:0">${raftRowsHtml}</div>
+      ${rafts.length > 0 ? `<div id="safety-raft-drop-end"
+        ondragover="safetyRaftEndDragOver(event)"
+        ondragleave="safetyRaftEndDragLeave(event)"
+        ondrop="safetyRaftEndDrop(event)"
+        style="height:52px;margin:8px 12px;border-radius:10px;border:2px dashed var(--sep);transition:border-color .15s,background .15s;box-sizing:border-box;display:flex;align-items:center;justify-content:center">
+        <span style="font-size:12px;color:var(--label3)">Drop here to move to bottom</span>
+      </div>` : ''}
     </div>`;
 }
 
@@ -5706,6 +5766,33 @@ function safetyFlareDragEnd() {
   document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el=>el.classList.remove('prov-drag-over','prov-dragging'));
   _safetyFlareDragId=null;
 }
+function safetyFlareEndDragOver(e) {
+  if (!_safetyFlareDragId) return;
+  e.preventDefault(); e.dataTransfer.dropEffect='move';
+  e.currentTarget.style.borderColor='var(--blue)';
+  e.currentTarget.style.background='rgba(0,122,255,.07)';
+}
+function safetyFlareEndDragLeave(e) {
+  e.currentTarget.style.borderColor='var(--sep)';
+  e.currentTarget.style.background='';
+}
+function safetyFlareEndDrop(e) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor='var(--sep)';
+  e.currentTarget.style.background='';
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el=>el.classList.remove('prov-drag-over','prov-dragging'));
+  const fromId=_safetyFlareDragId; _safetyFlareDragId=null;
+  _safetyFlareMoveToEnd(fromId);
+}
+function _safetyFlareMoveToEnd(fromId) {
+  if (!fromId) return;
+  const arr=data.safety?.flares||[];
+  const fromIdx=arr.findIndex(f=>f.id===fromId);
+  if (fromIdx===-1) return;
+  const [moved]=arr.splice(fromIdx,1);
+  arr.push(moved);
+  save(); document.getElementById('mainContent').innerHTML=renderSafety();
+}
 function safetyFlareTouchStart(e, id) {
   e.preventDefault();
   const touch=e.touches[0], row=e.currentTarget.closest('[data-safety-flare-id]'); if (!row) return;
@@ -5719,6 +5806,7 @@ function safetyFlareTouchStart(e, id) {
 function _safetyFlareTouchMove(e) {
   e.preventDefault(); if (!_safetyFlareTouchState) return;
   const touch=e.touches[0],{clone,offsetY}=_safetyFlareTouchState;
+  _safetyFlareTouchState.lastY = touch.clientY;
   clone.style.top=(touch.clientY-offsetY)+'px'; clone.style.display='none';
   const under=document.elementFromPoint(touch.clientX,touch.clientY); clone.style.display='';
   const targetRow=under?.closest('[data-safety-flare-id]');
@@ -5729,10 +5817,18 @@ function _safetyFlareTouchMove(e) {
 function _safetyFlareTouchEnd() {
   document.removeEventListener('touchmove',_safetyFlareTouchMove); document.removeEventListener('touchend',_safetyFlareTouchEnd);
   if (!_safetyFlareTouchState) return;
-  const{id,row,clone,over}=_safetyFlareTouchState; _safetyFlareTouchState=null;
+  const{id,row,clone,over,lastY}=_safetyFlareTouchState; _safetyFlareTouchState=null;
   clone.remove(); row.style.opacity='';
   document.querySelectorAll('.prov-drag-over').forEach(el=>el.classList.remove('prov-drag-over'));
-  if (over) _safetyFlareDoReorder(id, over.dataset.safetyFlareId);
+  if (!over) {
+    const dz = document.getElementById('safety-flare-drop-end');
+    if (dz && lastY != null) {
+      const dzRect = dz.getBoundingClientRect();
+      if (lastY >= dzRect.top) { _safetyFlareMoveToEnd(id); return; }
+    }
+  } else {
+    _safetyFlareDoReorder(id, over.dataset.safetyFlareId);
+  }
 }
 function _safetyFlareDoReorder(fromId, toId) {
   if (!fromId||!toId||fromId===toId) return;
@@ -5765,6 +5861,33 @@ function safetyRaftDragEnd() {
   document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el=>el.classList.remove('prov-drag-over','prov-dragging'));
   _safetyRaftDragId=null;
 }
+function safetyRaftEndDragOver(e) {
+  if (!_safetyRaftDragId) return;
+  e.preventDefault(); e.dataTransfer.dropEffect='move';
+  e.currentTarget.style.borderColor='var(--blue)';
+  e.currentTarget.style.background='rgba(0,122,255,.07)';
+}
+function safetyRaftEndDragLeave(e) {
+  e.currentTarget.style.borderColor='var(--sep)';
+  e.currentTarget.style.background='';
+}
+function safetyRaftEndDrop(e) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor='var(--sep)';
+  e.currentTarget.style.background='';
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el=>el.classList.remove('prov-drag-over','prov-dragging'));
+  const fromId=_safetyRaftDragId; _safetyRaftDragId=null;
+  _safetyRaftMoveToEnd(fromId);
+}
+function _safetyRaftMoveToEnd(fromId) {
+  if (!fromId) return;
+  const arr=data.safety?.lifeRafts||[];
+  const fromIdx=arr.findIndex(r=>r.id===fromId);
+  if (fromIdx===-1) return;
+  const [moved]=arr.splice(fromIdx,1);
+  arr.push(moved);
+  save(); document.getElementById('mainContent').innerHTML=renderSafety();
+}
 function safetyRaftTouchStart(e, id) {
   e.preventDefault();
   const touch=e.touches[0], row=e.currentTarget.closest('[data-safety-raft-id]'); if (!row) return;
@@ -5778,6 +5901,7 @@ function safetyRaftTouchStart(e, id) {
 function _safetyRaftTouchMove(e) {
   e.preventDefault(); if (!_safetyRaftTouchState) return;
   const touch=e.touches[0],{clone,offsetY}=_safetyRaftTouchState;
+  _safetyRaftTouchState.lastY = touch.clientY;
   clone.style.top=(touch.clientY-offsetY)+'px'; clone.style.display='none';
   const under=document.elementFromPoint(touch.clientX,touch.clientY); clone.style.display='';
   const targetRow=under?.closest('[data-safety-raft-id]');
@@ -5788,10 +5912,18 @@ function _safetyRaftTouchMove(e) {
 function _safetyRaftTouchEnd() {
   document.removeEventListener('touchmove',_safetyRaftTouchMove); document.removeEventListener('touchend',_safetyRaftTouchEnd);
   if (!_safetyRaftTouchState) return;
-  const{id,row,clone,over}=_safetyRaftTouchState; _safetyRaftTouchState=null;
+  const{id,row,clone,over,lastY}=_safetyRaftTouchState; _safetyRaftTouchState=null;
   clone.remove(); row.style.opacity='';
   document.querySelectorAll('.prov-drag-over').forEach(el=>el.classList.remove('prov-drag-over'));
-  if (over) _safetyRaftDoReorder(id, over.dataset.safetyRaftId);
+  if (!over) {
+    const dz = document.getElementById('safety-raft-drop-end');
+    if (dz && lastY != null) {
+      const dzRect = dz.getBoundingClientRect();
+      if (lastY >= dzRect.top) { _safetyRaftMoveToEnd(id); return; }
+    }
+  } else {
+    _safetyRaftDoReorder(id, over.dataset.safetyRaftId);
+  }
 }
 function _safetyRaftDoReorder(fromId, toId) {
   if (!fromId||!toId||fromId===toId) return;
@@ -6235,6 +6367,33 @@ function sysDragEnd() {
   document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
   _sysDragId = null;
 }
+function sysEndDragOver(e) {
+  if (!_sysDragId) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.style.borderColor = 'var(--blue)';
+  e.currentTarget.style.background = 'rgba(0,122,255,.07)';
+}
+function sysEndDragLeave(e) {
+  e.currentTarget.style.borderColor = 'var(--sep)';
+  e.currentTarget.style.background = '';
+}
+function sysEndDrop(e) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = 'var(--sep)';
+  e.currentTarget.style.background = '';
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  const fromId = _sysDragId; _sysDragId = null;
+  _sysMoveToEnd(fromId);
+}
+function _sysMoveToEnd(fromId) {
+  if (!fromId) return;
+  const systems = data.systems || [];
+  const fromIdx = systems.findIndex(s => s.id === fromId);
+  if (fromIdx === -1) return;
+  const [moved] = systems.splice(fromIdx, 1);
+  systems.push(moved);
+  save(); document.getElementById('mainContent').innerHTML = renderSystems();
+}
 function sysTouchStart(e, id) {
   e.preventDefault(); e.stopPropagation();
   const touch = e.touches[0], row = e.currentTarget.closest('[data-sys-id]'); if (!row) return;
@@ -6248,6 +6407,7 @@ function sysTouchStart(e, id) {
 function _sysTouchMove(e) {
   e.preventDefault(); if (!_sysTouchState) return;
   const touch = e.touches[0], {clone, offsetY} = _sysTouchState;
+  _sysTouchState.lastY = touch.clientY;
   clone.style.top = (touch.clientY - offsetY) + 'px';
   clone.style.display = 'none';
   const under = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -6260,10 +6420,18 @@ function _sysTouchMove(e) {
 function _sysTouchEnd() {
   document.removeEventListener('touchmove', _sysTouchMove); document.removeEventListener('touchend', _sysTouchEnd);
   if (!_sysTouchState) return;
-  const {id, row, clone, over} = _sysTouchState; _sysTouchState = null;
+  const {id, row, clone, over, lastY} = _sysTouchState; _sysTouchState = null;
   clone.remove(); row.style.opacity = '';
   document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
-  if (over) _sysDoReorder(id, over.dataset.sysId);
+  if (!over) {
+    const dz = document.getElementById('sys-drop-end');
+    if (dz && lastY != null) {
+      const dzRect = dz.getBoundingClientRect();
+      if (lastY >= dzRect.top) { _sysMoveToEnd(id); return; }
+    }
+  } else {
+    _sysDoReorder(id, over.dataset.sysId);
+  }
 }
 function _sysDoReorder(fromId, toId) {
   if (!fromId || !toId || fromId === toId) return;
@@ -6508,13 +6676,21 @@ function renderSystems() {
         ${filtered.filter(s=>(s.cat||s.category)===cat).map(s=>renderSystemCard(s)).join('')}
       `).join('') + noCat.map(s=>renderSystemCard(s)).join('');
 
+  const sysDropEnd = `<div id="sys-drop-end"
+    ondragover="sysEndDragOver(event)"
+    ondragleave="sysEndDragLeave(event)"
+    ondrop="sysEndDrop(event)"
+    style="height:52px;margin:8px 12px;border-radius:10px;border:2px dashed var(--sep);transition:border-color .15s,background .15s;box-sizing:border-box;display:flex;align-items:center;justify-content:center">
+    <span style="font-size:12px;color:var(--label3)">Drop here to move to bottom</span>
+  </div>`;
+
   return `
     ${renderSystemsOverview()}
     <div class="subtab-bar" style="margin-bottom:10px">${pills}</div>
     <div class="btn-row">
       <button class="btn btn-p btn-sm" onclick="showAddSystem()">+ Add System</button>
     </div>
-    ${body}`;
+    ${body}${sysDropEnd}`;
 }
 
 function renderSystemCard(s) {
@@ -11945,9 +12121,17 @@ function _buildTabEditHtml() {
       </div>`;
     }).join('') : ''}`;
   }).join('');
+  const tabDropEnd = `<div id="tab-edit-drop-end"
+    ondragover="tabEditEndDragOver(event)"
+    ondragleave="tabEditEndDragLeave(event)"
+    ondrop="tabEditEndDrop(event)"
+    style="height:52px;margin:8px 12px;border-radius:10px;border:2px dashed var(--sep);transition:border-color .15s,background .15s;box-sizing:border-box;display:flex;align-items:center;justify-content:center">
+    <span style="font-size:12px;color:var(--label3)">Drop here to move to bottom</span>
+  </div>`;
+
   return `
     <div style="font-size:11px;color:var(--label3);margin-bottom:8px">Drag ⠿ to reorder · toggle to show/hide · tap Set home</div>
-    <div style="max-height:52vh;overflow-y:auto;border:1px solid var(--sep);border-radius:10px;overflow-x:hidden">${rows}</div>
+    <div style="max-height:52vh;overflow-y:auto;border:1px solid var(--sep);border-radius:10px;overflow-x:hidden">${rows}${tabDropEnd}</div>
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
       <button class="btn btn-p" onclick="saveTabSettings()">Save</button>
@@ -12020,6 +12204,37 @@ function tabEditDragEnd() {
   document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el=>el.classList.remove('prov-drag-over','prov-dragging'));
   _tabEditDragId=null;
 }
+function tabEditEndDragOver(e) {
+  if (!_tabEditDragId) return;
+  e.preventDefault(); e.dataTransfer.dropEffect='move';
+  e.currentTarget.style.borderColor='var(--blue)';
+  e.currentTarget.style.background='rgba(0,122,255,.07)';
+}
+function tabEditEndDragLeave(e) {
+  e.currentTarget.style.borderColor='var(--sep)';
+  e.currentTarget.style.background='';
+}
+function tabEditEndDrop(e) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor='var(--sep)';
+  e.currentTarget.style.background='';
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el=>el.classList.remove('prov-drag-over','prov-dragging'));
+  const fromId=_tabEditDragId; _tabEditDragId=null;
+  _tabEditMoveToEnd(fromId);
+}
+function _tabEditMoveToEnd(fromId) {
+  if (!fromId||!_tabEditState) return;
+  const tabs=_tabEditState.tabs;
+  const sorted=[...CUSTOMIZABLE_TABS]
+    .map(t=>tabs.find(s=>s.id===t.id)||{id:t.id,visible:true,order:999})
+    .sort((a,b)=>a.order-b.order);
+  const fi=sorted.findIndex(t=>t.id===fromId);
+  if (fi===-1) return;
+  const [moved]=sorted.splice(fi,1);
+  sorted.push(moved);
+  sorted.forEach((t,i)=>{ const ts=tabs.find(s=>s.id===t.id); if(ts) ts.order=i; });
+  _refreshTabEditModal();
+}
 function tabEditTouchStart(e, id) {
   e.preventDefault();
   const touch=e.touches[0], row=e.currentTarget.closest('[data-tab-edit-id]'); if (!row) return;
@@ -12033,6 +12248,7 @@ function tabEditTouchStart(e, id) {
 function _tabEditTouchMove(e) {
   e.preventDefault(); if (!_tabEditTouchState) return;
   const touch=e.touches[0],{clone,offsetY}=_tabEditTouchState;
+  _tabEditTouchState.lastY = touch.clientY;
   clone.style.top=(touch.clientY-offsetY)+'px'; clone.style.display='none';
   const under=document.elementFromPoint(touch.clientX,touch.clientY); clone.style.display='';
   const targetRow=under?.closest('[data-tab-edit-id]');
@@ -12043,10 +12259,18 @@ function _tabEditTouchMove(e) {
 function _tabEditTouchEnd() {
   document.removeEventListener('touchmove',_tabEditTouchMove); document.removeEventListener('touchend',_tabEditTouchEnd);
   if (!_tabEditTouchState) return;
-  const{id,row,clone,over}=_tabEditTouchState; _tabEditTouchState=null;
+  const{id,row,clone,over,lastY}=_tabEditTouchState; _tabEditTouchState=null;
   clone.remove(); row.style.opacity='';
   document.querySelectorAll('.prov-drag-over').forEach(el=>el.classList.remove('prov-drag-over'));
-  if (over) _tabEditDoReorder(id, over.dataset.tabEditId);
+  if (!over) {
+    const dz = document.getElementById('tab-edit-drop-end');
+    if (dz && lastY != null) {
+      const dzRect = dz.getBoundingClientRect();
+      if (lastY >= dzRect.top) { _tabEditMoveToEnd(id); return; }
+    }
+  } else {
+    _tabEditDoReorder(id, over.dataset.tabEditId);
+  }
 }
 function _tabEditDoReorder(fromId, toId) {
   if (!fromId||!toId||fromId===toId||!_tabEditState) return;
