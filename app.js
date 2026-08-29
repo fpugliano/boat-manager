@@ -7060,7 +7060,7 @@ function renderWinterSection(cat, season, archived) {
   const open = complete ? !!(ui.winterOpen?.[sid]) : (ui.winterOpen?.[sid] !== false);
   const badge = complete
     ? `<span style="background:var(--green);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px">✓ Complete</span>` : '';
-  const editCatBtn = archived ? '' : `<button onclick="showWinterCategoryEdit(${JSON.stringify(sid)})" style="background:none;border:none;padding:2px 6px;cursor:pointer;font-size:14px;color:var(--label3)" title="Edit category">✏️</button>`;
+  const editCatBtn = archived ? '' : `<button onclick="event.stopPropagation();showWinterCategoryEdit(${JSON.stringify(sid)})" style="background:none;border:none;padding:2px 6px;cursor:pointer;font-size:14px;color:var(--label3)" title="Edit category">✏️</button>`;
   const hdr = `<div class="whdr" onclick="if(!ui.winterOpen)ui.winterOpen={};ui.winterOpen[${JSON.stringify(sid)}]=!${open};winterRerender()">
     <div style="display:flex;align-items:center;gap:8px">
       <span style="font-size:17px">${cat.icon}</span>
