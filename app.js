@@ -6076,14 +6076,15 @@ function renderUpgradeItem(s, item, idx) {
   }
   // Inline edit
   if (ui.upgEdit?.iid === iid) {
-    return `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--sep);background:var(--surface2)">
-      <input id="ueit" class="fi" style="flex:1;font-size:14px" value="${esc(item.text)}"
+    return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--sep);background:var(--surface2)">
+      <input id="ueit" class="fi" style="flex:1 1 100%;min-width:0;font-size:14px" value="${esc(item.text)}"
         onkeydown="if(event.key==='Enter')saveUpgradeItemEdit('${sid}','${iid}')">
       <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
         <span style="font-size:13px;color:var(--label3)">€</span>
         <input id="uecost" class="fi" type="number" min="0" step="0.01" style="width:70px;font-size:14px" value="${esc(item.cost||'')}" placeholder="0"
           onkeydown="if(event.key==='Enter')saveUpgradeItemEdit('${sid}','${iid}')">
       </div>
+      <div style="flex:1"></div>
       <button class="btn btn-p btn-xs" onclick="saveUpgradeItemEdit('${sid}','${iid}')">Save</button>
       <button class="btn btn-s btn-xs" onclick="ui.upgEdit=null;upgRerender()">Cancel</button>
       <button onclick="if(confirm('Remove this item?')){ui.upgEdit=null;deleteUpgradeItem('${sid}','${iid}')}" style="background:#FCEBEB;border:0.5px solid #F09595;color:#A32D2D;border-radius:8px;padding:4px 10px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">🗑</button>
@@ -6113,14 +6114,15 @@ function renderUpgradeItem(s, item, idx) {
 
 function renderUpgradeAddRow(s) {
   if (ui.upgAddItem === s.id) {
-    return `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--sep);background:var(--surface2)">
-      <input id="uadd-t" class="fi" style="flex:1;font-size:14px" placeholder="Item description"
+    return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--sep);background:var(--surface2)">
+      <input id="uadd-t" class="fi" style="flex:1 1 100%;min-width:0;font-size:14px" placeholder="Item description"
         onkeydown="if(event.key==='Enter')saveUpgradeNewItem('${s.id}')">
       <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
         <span style="font-size:13px;color:var(--label3)">€</span>
         <input id="uadd-c" class="fi" type="number" min="0" step="0.01" style="width:70px;font-size:14px" placeholder="0"
           onkeydown="if(event.key==='Enter')saveUpgradeNewItem('${s.id}')">
       </div>
+      <div style="flex:1"></div>
       <button class="btn btn-p btn-xs" onclick="saveUpgradeNewItem('${s.id}')">Add</button>
       <button class="btn btn-s btn-xs" onclick="ui.upgAddItem=null;upgRerender()">✕</button>
     </div>`;
