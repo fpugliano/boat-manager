@@ -529,9 +529,11 @@ function getAlerts() {
       }
     }
   }
-  // Maintenance — only overdue tasks
+  // Maintenance — only overdue tasks, only for active equipment categories
+  const activeCats = getActiveCategories();
+  const activeCatTaskIds = new Set(MAINT_CATEGORIES.filter(c => activeCats.includes(c.id)).flatMap(c => c.tasks));
   getEngines().forEach(eid => {
-    MAINT_TASKS.forEach(task => {
+    MAINT_TASKS.filter(t => activeCatTaskIds.has(t.id)).forEach(task => {
       const s = calcMaintStatus(task, eid);
       if (s && s.color === 'red') {
         const intHrs = data.maintenance?.intervals?.[task.id]?.hrs ?? task.intHrs;
