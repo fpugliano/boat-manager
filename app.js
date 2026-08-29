@@ -7060,16 +7060,17 @@ function renderWinterSection(cat, season, archived) {
   const open = complete ? !!(ui.winterOpen?.[sid]) : (ui.winterOpen?.[sid] !== false);
   const badge = complete
     ? `<span style="background:var(--green);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px">✓ Complete</span>` : '';
-  const editCatBtn = archived ? '' : `<button onclick="event.stopPropagation();showWinterCategoryEdit(${JSON.stringify(sid)})" style="background:none;border:none;padding:2px 6px;cursor:pointer;font-size:14px;color:var(--label3)" title="Edit category">✏️</button>`;
-  const hdr = `<div class="whdr" onclick="if(!ui.winterOpen)ui.winterOpen={};ui.winterOpen[${JSON.stringify(sid)}]=!${open};winterRerender()">
-    <div style="display:flex;align-items:center;gap:8px">
+  const editCatBtn = archived ? '' : `<button onclick="showWinterCategoryEdit(${JSON.stringify(sid)})" style="background:none;border:none;padding:6px 8px;cursor:pointer;font-size:14px;color:var(--label3);flex-shrink:0" title="Edit category">✏️</button>`;
+  const toggle = `if(!ui.winterOpen)ui.winterOpen={};ui.winterOpen[${JSON.stringify(sid)}]=!${open};winterRerender()`;
+  const hdr = `<div class="whdr" style="cursor:default">
+    <div style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;padding:0" onclick="${toggle}">
       <span style="font-size:17px">${cat.icon}</span>
       <span style="font-size:15px;font-weight:700;color:var(--label)">${esc(cat.label)}</span>${badge}
-      ${editCatBtn}
     </div>
-    <div style="display:flex;align-items:center;gap:8px">
+    <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
       <span style="font-size:12px;color:var(--label3);font-weight:500">${done}/${total}</span>
-      <span style="font-size:11px;color:var(--label3)">${open?'▲':'▼'}</span>
+      ${editCatBtn}
+      <span style="font-size:11px;color:var(--label3);cursor:pointer" onclick="${toggle}">${open?'▲':'▼'}</span>
     </div>
   </div>
   <div style="height:3px;background:var(--surface2)">
