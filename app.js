@@ -6083,7 +6083,7 @@ function renderUpgradeItem(s, item, idx) {
         onkeydown="if(event.key==='Enter')saveUpgradeItemEdit('${sid}','${iid}')">
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:13px;color:var(--label3)">€</span>
-        <input id="uecost" class="fi" type="number" min="0" step="0.01" style="width:80px;font-size:13px" value="${esc(item.cost||'')}" placeholder="0"
+        <input id="uecost" class="mi" type="number" min="0" max="99999.99" step="0.01" style="width:110px;font-size:13px;padding:8px 10px" value="${esc(item.cost||'')}" placeholder="0.00"
           onkeydown="if(event.key==='Enter')saveUpgradeItemEdit('${sid}','${iid}')">
         <div style="flex:1"></div>
         <button class="btn btn-p btn-xs" onclick="saveUpgradeItemEdit('${sid}','${iid}')">Save</button>
@@ -6121,7 +6121,7 @@ function renderUpgradeAddRow(s) {
         onkeydown="if(event.key==='Enter')saveUpgradeNewItem('${s.id}')">
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:13px;color:var(--label3)">€</span>
-        <input id="uadd-c" class="fi" type="number" min="0" step="0.01" style="width:80px;font-size:13px" placeholder="0"
+        <input id="uadd-c" class="mi" type="number" min="0" max="99999.99" step="0.01" style="width:110px;font-size:13px;padding:8px 10px" placeholder="0.00"
           onkeydown="if(event.key==='Enter')saveUpgradeNewItem('${s.id}')">
         <div style="flex:1"></div>
         <button class="btn btn-p btn-xs" onclick="saveUpgradeNewItem('${s.id}')">Add</button>
