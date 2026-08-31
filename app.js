@@ -589,6 +589,10 @@ function renderSetup(setupEmail = '') {
       <input class="setup-inp" id="s-email" type="email" placeholder="your@email.com" value="${esc(setupEmail)}">
       <label class="setup-lbl">Flag / Nationality</label>
       <input class="setup-inp" id="s-flag" placeholder="e.g. USA" value="${esc(data.meta?.flag||'')}">
+      <label class="setup-lbl">Currency</label>
+      <select class="setup-inp" id="s-currency" style="appearance:none;-webkit-appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px">
+        ${CURRENCIES.map(c => `<option value="${c.code}" ${(data.meta?.currency||'EUR')===c.code?'selected':''}>${c.label}</option>`).join('')}
+      </select>
       <label class="setup-lbl" style="margin-bottom:10px">Hull Type</label>
       <div class="hull-row">
         <div class="hull-opt ${hull==='monohull'?'sel':''}" onclick="selHull('monohull')">
@@ -620,20 +624,50 @@ function selHull(t) {
 }
 
 function completeSetup() {
-  const name  = document.getElementById('s-boat').value.trim();
-  const owner = document.getElementById('s-owner').value.trim();
-  const email = document.getElementById('s-email').value.trim().toLowerCase();
-  const flag  = document.getElementById('s-flag').value.trim();
+  const name     = document.getElementById('s-boat').value.trim();
+  const owner    = document.getElementById('s-owner').value.trim();
+  const email    = document.getElementById('s-email').value.trim().toLowerCase();
+  const flag     = document.getElementById('s-flag').value.trim();
+  const currency = document.getElementById('s-currency')?.value || 'EUR';
   if (!name)  { showToast('Please enter a boat name', true); return; }
   if (!email || !email.includes('@')) { showToast('Please enter a valid email', true); return; }
   data.meta.boatName  = name;
   data.meta.ownerName = owner;
   data.meta.email     = email;
   data.meta.flag      = flag;
+  data.meta.currency  = currency;
   localStorage.setItem(EMAIL_KEY, email);
   data.meta.setupComplete = true;
   // Don't save yet — we have no crypto key. Show PIN setup next.
   renderPINSetup();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CURRENCY
+// ═══════════════════════════════════════════════════════════
+
+const CURRENCIES = [
+  { code:'USD', symbol:'$',    label:'USD — US Dollar ($)' },
+  { code:'EUR', symbol:'€',    label:'EUR — Euro (€)' },
+  { code:'GBP', symbol:'£',    label:'GBP — British Pound (£)' },
+  { code:'AUD', symbol:'A$',   label:'AUD — Australian Dollar (A$)' },
+  { code:'CAD', symbol:'C$',   label:'CAD — Canadian Dollar (C$)' },
+  { code:'CHF', symbol:'Fr',   label:'CHF — Swiss Franc (Fr)' },
+  { code:'NOK', symbol:'kr',   label:'NOK — Norwegian Krone (kr)' },
+  { code:'SEK', symbol:'kr',   label:'SEK — Swedish Krona (kr)' },
+  { code:'DKK', symbol:'kr',   label:'DKK — Danish Krone (kr)' },
+  { code:'NZD', symbol:'NZ$',  label:'NZD — New Zealand Dollar (NZ$)' },
+  { code:'ZAR', symbol:'R',    label:'ZAR — South African Rand (R)' },
+  { code:'BRL', symbol:'R$',   label:'BRL — Brazilian Real (R$)' },
+  { code:'MXN', symbol:'Mex$', label:'MXN — Mexican Peso (Mex$)' },
+  { code:'TRY', symbol:'₺',    label:'TRY — Turkish Lira (₺)' },
+  { code:'MAD', symbol:'DH',   label:'MAD — Moroccan Dirham (DH)' },
+  { code:'JPY', symbol:'¥',    label:'JPY — Japanese Yen (¥)' },
+];
+
+function currencySymbol() {
+  const code = data.meta?.currency || 'EUR';
+  return CURRENCIES.find(c => c.code === code)?.symbol || '€';
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -6082,7 +6116,7 @@ function renderUpgradeItem(s, item, idx) {
       <input id="ueit" class="mi" style="font-size:15px" value="${esc(item.text)}"
         onkeydown="if(event.key==='Enter')saveUpgradeItemEdit('${sid}','${iid}')">
       <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:13px;color:var(--label3)">€</span>
+        <span style="font-size:13px;color:var(--label3)">${currencySymbol()}</span>
         <input id="uecost" class="mi" type="number" min="0" max="99999.99" step="0.01" style="width:110px;font-size:13px;padding:8px 10px" value="${esc(item.cost||'')}" placeholder="0.00"
           onkeydown="if(event.key==='Enter')saveUpgradeItemEdit('${sid}','${iid}')">
         <div style="flex:1"></div>
@@ -6094,7 +6128,7 @@ function renderUpgradeItem(s, item, idx) {
   }
   // Normal row
   const complete = s.items.length > 0 && s.items.every(x => x.checked);
-  const costTxt = item.cost ? ` <span style="color:var(--label3);font-size:12px">· €${item.cost}</span>` : '';
+  const costTxt = item.cost ? ` <span style="color:var(--label3);font-size:12px">· ${currencySymbol()}${item.cost}</span>` : '';
   const chkStyle = item.checked
     ? 'background:var(--green);border-color:var(--green)'
     : 'background:var(--surface);border:2px solid var(--sep)';
@@ -6120,7 +6154,7 @@ function renderUpgradeAddRow(s) {
       <input id="uadd-t" class="mi" style="font-size:15px" placeholder="Item description"
         onkeydown="if(event.key==='Enter')saveUpgradeNewItem('${s.id}')">
       <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:13px;color:var(--label3)">€</span>
+        <span style="font-size:13px;color:var(--label3)">${currencySymbol()}</span>
         <input id="uadd-c" class="mi" type="number" min="0" max="99999.99" step="0.01" style="width:110px;font-size:13px;padding:8px 10px" placeholder="0.00"
           onkeydown="if(event.key==='Enter')saveUpgradeNewItem('${s.id}')">
         <div style="flex:1"></div>
