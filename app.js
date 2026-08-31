@@ -6079,7 +6079,7 @@ function renderUpgradeItem(s, item, idx) {
   // Inline edit
   if (ui.upgEdit?.iid === iid) {
     return `<div style="display:flex;flex-direction:column;gap:8px;padding:10px 14px;border-bottom:1px solid var(--sep);background:var(--surface2)">
-      <input id="ueit" class="fi" style="width:100%;box-sizing:border-box;font-size:15px" value="${esc(item.text)}"
+      <input id="ueit" class="mi" style="font-size:15px" value="${esc(item.text)}"
         onkeydown="if(event.key==='Enter')saveUpgradeItemEdit('${sid}','${iid}')">
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:13px;color:var(--label3)">€</span>
@@ -6117,7 +6117,7 @@ function renderUpgradeItem(s, item, idx) {
 function renderUpgradeAddRow(s) {
   if (ui.upgAddItem === s.id) {
     return `<div style="display:flex;flex-direction:column;gap:8px;padding:10px 14px;border-bottom:1px solid var(--sep);background:var(--surface2)">
-      <input id="uadd-t" class="fi" style="width:100%;box-sizing:border-box;font-size:15px" placeholder="Item description"
+      <input id="uadd-t" class="mi" style="font-size:15px" placeholder="Item description"
         onkeydown="if(event.key==='Enter')saveUpgradeNewItem('${s.id}')">
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:13px;color:var(--label3)">€</span>
