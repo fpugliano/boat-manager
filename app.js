@@ -666,8 +666,8 @@ const CURRENCIES = [
 ];
 
 function currencySymbol() {
-  const code = data.meta?.currency || 'EUR';
-  return CURRENCIES.find(c => c.code === code)?.symbol || '€';
+  const code = data.meta?.currency || 'USD';
+  return CURRENCIES.find(c => c.code === code)?.symbol || '$';
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -848,7 +848,7 @@ function renderInsurance() {
       ${fr('Certificate No.','documents.insurance.certNumber',I.certNumber)}
       ${fr('Issue Date','documents.insurance.issueDate',I.issueDate,'date')}
       ${frExpiry('documents.insurance.expiryDate',I.expiryDate,exp)}
-      ${fr('Annual Premium (€)','documents.insurance.premium',I.premium)}
+      ${fr('Annual Premium (${currencySymbol()})','documents.insurance.premium',I.premium)}
     </div></div>
     <div class="sec-hd">Maximum Cover</div>
     <div class="card"><div class="card-body">
@@ -1086,7 +1086,7 @@ function addInsuranceRenewal() {
   showModal('Add Insurance Renewal', `
     <div class="mi-label">Year</div><input class="mi" id="m-year" placeholder="2025">
     <div class="mi-label">Insurer</div><input class="mi" id="m-ins" placeholder="Insurer name">
-    <div class="mi-label">Annual Premium</div><input class="mi" id="m-prem" placeholder="€ 0.00">
+    <div class="mi-label">Annual Premium</div><input class="mi" id="m-prem" placeholder="${currencySymbol()} 0.00">
     <div class="mi-label">Expiry</div><input class="mi" id="m-exp" type="date">
     <div class="modal-btns">
       <button class="btn btn-p w-full" onclick="saveInsuranceRenewal()">Add</button>
@@ -1111,7 +1111,7 @@ function addCustomsRenewal() {
   showModal('Add Renewal Entry', `
     <div class="mi-label">Year</div><input class="mi" id="m-year" placeholder="2026">
     <div class="mi-label">Months Covered</div><input class="mi" id="m-months" placeholder="e.g. April,May,June">
-    <div class="mi-label">Amount Paid</div><input class="mi" id="m-amount" placeholder="€231.00">
+    <div class="mi-label">Amount Paid</div><input class="mi" id="m-amount" placeholder="${currencySymbol()}231.00">
     <div class="mi-label">Payment Code (RF)</div><input class="mi" id="m-pcode" placeholder="RF…">
     <div class="mi-label">Date Paid</div><input class="mi" id="m-dpaid" type="date">
     <div class="mi-label">Notes</div><input class="mi" id="m-notes" placeholder="Optional">
@@ -1331,7 +1331,7 @@ function shortDate(dateStr) {
 
 function fmtCost(v) {
   const n = parseFloat(String(v||'').replace(/[€$£,\s]/g,''));
-  return isNaN(n) ? '—' : '€' + n.toLocaleString('en', {minimumFractionDigits:0, maximumFractionDigits:0});
+  return isNaN(n) ? '—' : currencySymbol() + n.toLocaleString('en', {minimumFractionDigits:0, maximumFractionDigits:0});
 }
 
 function renderShipyard() {
@@ -1450,7 +1450,7 @@ function showAddQuote() {
   showModal('Add Quote', `
     <div class="mi-label">Shipyard Name</div><input class="mi" id="m-sn" placeholder="Name" autofocus>
     <div class="mi-label">Location</div><input class="mi" id="m-sl" placeholder="City, Country">
-    <div class="mi-label">Cost quoted</div><input class="mi" id="m-sp" placeholder="€ 0,000">
+    <div class="mi-label">Cost quoted</div><input class="mi" id="m-sp" placeholder="${currencySymbol()} 0,000">
     <div class="mi-label">Start date</div><input class="mi" id="m-qsd" type="date">
     <div class="mi-label">End date</div><input class="mi" id="m-qed" type="date">
     <div class="mi-label">Notes</div><input class="mi" id="m-snotes" placeholder="Optional">
@@ -1529,7 +1529,7 @@ function showAddShipyardHistory() {
     <div class="mi-label">Location</div><input class="mi" id="m-sloc" placeholder="City, Country">
     <div class="mi-label">Start Date</div><input class="mi" id="m-sd" type="date">
     <div class="mi-label">End Date</div><input class="mi" id="m-ed" type="date">
-    <div class="mi-label">Cost Paid</div><input class="mi" id="m-cp" placeholder="€ 0,000">
+    <div class="mi-label">Cost Paid</div><input class="mi" id="m-cp" placeholder="${currencySymbol()} 0,000">
     <div class="mi-label">Notes</div><input class="mi" id="m-hn" placeholder="Optional">
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
@@ -1935,7 +1935,7 @@ function buildEditSchedHTML(taskId) {
           <input class="mi" id="ea-d-${eid}" type="date" value="${today}"></div>
       </div>
       <div class="mi-label">Notes</div><input class="mi" id="ea-n-${eid}" placeholder="Optional">
-      <div class="mi-label">Cost (€)</div><input class="mi" id="ea-c-${eid}" type="number" min="0" placeholder="0">
+      <div class="mi-label">Cost (${currencySymbol()})</div><input class="mi" id="ea-c-${eid}" type="number" min="0" placeholder="0">
       <button class="btn btn-p btn-sm w-full" onclick="addSchedHistEntry('${taskId}','${eid}')" style="margin-bottom:4px">+ Add Entry${isCat?' ('+eLbl[eid]+')':''}</button>`;
   }).join('');
 
@@ -2572,7 +2572,7 @@ function showAddMaintEntry() {
       <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="m-ep" checked> Port</label>
       <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="m-es" checked> Stbd</label>
     </div>` : ''}
-    <div class="mi-label">Cost (€)</div><input class="mi" id="m-lc" placeholder="Optional">
+    <div class="mi-label">Cost (${currencySymbol()})</div><input class="mi" id="m-lc" placeholder="Optional">
     <div class="mi-label">Notes / Location</div><input class="mi" id="m-ln" placeholder="Optional">
     <div class="modal-btns">
       <button class="btn btn-s" onclick="hideModal()">Cancel</button>
@@ -2634,7 +2634,7 @@ function editMaintEntry(i) {
       <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="me-ep" ${portChk}> Port</label>
       <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="me-es" ${stbdChk}> Stbd</label>
     </div>` : ''}
-    <div class="mi-label">Cost (€)</div><input class="mi" id="me-lc" value="${esc(e.cost||'')}">
+    <div class="mi-label">Cost (${currencySymbol()})</div><input class="mi" id="me-lc" value="${esc(e.cost||'')}">
     <div class="mi-label">Notes / Location</div><input class="mi" id="me-ln" value="${esc(e.notes||'')}">
     <div class="modal-btns">
       <button onclick="if(confirm('Remove this entry?')){hideModal();removeMaintEntry(${i})}" style="background:#FCEBEB;border:0.5px solid #F09595;color:#A32D2D;border-radius:8px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">Delete</button>
@@ -3751,15 +3751,15 @@ function renderLpg() {
       <div class="card-hd">Price per kg — all time</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:12px 14px">
         <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
-          <div style="font-size:16px;font-weight:800;color:#22C55E">€${Math.min(...prices).toFixed(2)}</div>
+          <div style="font-size:16px;font-weight:800;color:#22C55E">${currencySymbol()}${Math.min(...prices).toFixed(2)}</div>
           <div style="font-size:9px;color:var(--label3)">Lowest</div>
         </div>
         <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
-          <div style="font-size:16px;font-weight:800">€${(prices.reduce((a,b)=>a+b,0)/prices.length).toFixed(2)}</div>
+          <div style="font-size:16px;font-weight:800">${currencySymbol()}${(prices.reduce((a,b)=>a+b,0)/prices.length).toFixed(2)}</div>
           <div style="font-size:9px;color:var(--label3)">Average</div>
         </div>
         <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
-          <div style="font-size:16px;font-weight:800;color:#EF4444">€${Math.max(...prices).toFixed(2)}</div>
+          <div style="font-size:16px;font-weight:800;color:#EF4444">${currencySymbol()}${Math.max(...prices).toFixed(2)}</div>
           <div style="font-size:9px;color:var(--label3)">Highest</div>
         </div>
       </div>
@@ -3781,7 +3781,7 @@ function renderLpg() {
       <span style="flex-shrink:0;color:var(--label3)">${ds}</span>
       ${h.location?`<span style="color:var(--label2);flex-shrink:0">${esc(h.location)}</span>`:''}
       <span style="color:var(--label3);flex-shrink:0">${h.bottles}×${h.kg||11}kg</span>
-      ${h.pricePerKg?`<span style="color:var(--label3);flex-shrink:0">€${Number(h.pricePerKg).toFixed(2)}/kg</span>${priceBadge}`:''}
+      ${h.pricePerKg?`<span style="color:var(--label3);flex-shrink:0">${currencySymbol()}${Number(h.pricePerKg).toFixed(2)}/kg</span>${priceBadge}`:''}
       <span style="flex:1"></span>
       <button onclick="lpgEditHistory(${origIdx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:14px;color:var(--label3);line-height:1;flex-shrink:0">✏️</button>
     </div>`;
@@ -3839,7 +3839,7 @@ function lpgFillModal(entry, idx) {
     <div class="mi-label">Location</div><input class="mi" id="lpg-loc" value="${esc(e.location||'')}">
     <div class="mi-label">Number of bottles</div><input class="mi" id="lpg-b" type="number" min="1" value="${e.bottles||1}" oninput="lpgUpdateTotal()">
     <div class="mi-label">kg per bottle</div><input class="mi" id="lpg-kg" type="number" min="1" value="${e.kg||11}" oninput="lpgUpdateTotal()">
-    <div class="mi-label">Price per kg (€)</div><input class="mi" id="lpg-ppkg" type="number" min="0" step="0.01" value="${e.pricePerKg||''}" oninput="lpgUpdateTotal()">
+    <div class="mi-label">Price per kg (${currencySymbol()})</div><input class="mi" id="lpg-ppkg" type="number" min="0" step="0.01" value="${e.pricePerKg||''}" oninput="lpgUpdateTotal()">
     <div id="lpg-total" style="font-size:12px;color:var(--label3);margin:6px 0 4px;text-align:right"></div>
     <div class="mi-label">Notes (optional)</div><input class="mi" id="lpg-notes" value="${esc(e.notes||'')}">
     <div class="modal-btns">
@@ -3854,7 +3854,7 @@ function lpgUpdateTotal() {
   const kg = parseFloat(document.getElementById('lpg-kg')?.value)||0;
   const p = parseFloat(document.getElementById('lpg-ppkg')?.value)||0;
   const el = document.getElementById('lpg-total');
-  if (el) el.textContent = (b&&kg&&p) ? `Total: €${(b*kg*p).toFixed(2)}` : '';
+  if (el) el.textContent = (b&&kg&&p) ? `Total: ${currencySymbol()}${(b*kg*p).toFixed(2)}` : '';
 }
 function lpgSaveFill(idx) {
   const lpg = getLpgData();
@@ -4129,7 +4129,7 @@ function renderDiesel() {
     '<div style="font-size:16px;font-weight:800">' + cons.totalLitres.toFixed(0) + ' L</div>' +
     '<div style="font-size:9px;color:var(--label3)">Total fuel burned</div></div>' +
     '<div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">' +
-    '<div style="font-size:16px;font-weight:800' + (cons.totalEur > 0 ? '' : ';color:var(--label3)') + '">' + (cons.totalEur > 0 ? '€' + cons.totalEur.toFixed(2) : '—') + '</div>' +
+    '<div style="font-size:16px;font-weight:800' + (cons.totalEur > 0 ? '' : ';color:var(--label3)') + '">' + (cons.totalEur > 0 ? currencySymbol() + cons.totalEur.toFixed(2) : '—') + '</div>' +
     '<div style="font-size:9px;color:var(--label3)">Fuel bill</div></div></div>' +
     '<div style="font-size:10px;color:var(--label3);font-style:italic">Engine hours are captured from the maintenance tab at each refill</div>' +
     '</div></div>';
@@ -4140,13 +4140,13 @@ function renderDiesel() {
     '<div class="card-hd">Price per litre — all time</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:12px 14px">' +
     '<div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">' +
-    '<div style="font-size:16px;font-weight:800;color:#22C55E">€' + Math.min(...prices).toFixed(3) + '</div>' +
+    '<div style="font-size:16px;font-weight:800;color:#22C55E">' + currencySymbol() + Math.min(...prices).toFixed(3) + '</div>' +
     '<div style="font-size:9px;color:var(--label3)">Lowest</div></div>' +
     '<div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">' +
-    '<div style="font-size:16px;font-weight:800">€' + (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(3) + '</div>' +
+    '<div style="font-size:16px;font-weight:800">' + currencySymbol() + (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(3) + '</div>' +
     '<div style="font-size:9px;color:var(--label3)">Average</div></div>' +
     '<div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">' +
-    '<div style="font-size:16px;font-weight:800;color:#EF4444">€' + Math.max(...prices).toFixed(3) + '</div>' +
+    '<div style="font-size:16px;font-weight:800;color:#EF4444">' + currencySymbol() + Math.max(...prices).toFixed(3) + '</div>' +
     '<div style="font-size:9px;color:var(--label3)">Highest</div></div>' +
     '</div></div>' : '';
 
@@ -4175,7 +4175,7 @@ function renderDiesel() {
       '<span style="flex-shrink:0;color:var(--label3)">' + ds + '</span>' +
       (h.location ? '<span style="color:var(--label2);flex-shrink:0">' + esc(h.location) + '</span>' : '') +
       '<span style="color:var(--label3);flex-shrink:0">' + (h.litres || 0).toFixed(0) + ' L → ' + esc(tankName) + '</span>' +
-      (h.pricePerLitre ? '<span style="color:var(--label3);flex-shrink:0">€' + Number(h.pricePerLitre).toFixed(3) + '/L</span>' + priceBadge : '') +
+      (h.pricePerLitre ? '<span style="color:var(--label3);flex-shrink:0">' + currencySymbol() + Number(h.pricePerLitre).toFixed(3) + '/L</span>' + priceBadge : '') +
       '<span style="flex:1"></span>' +
       '<button onclick="dieselEditHistory(' + origIdx + ')" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:14px;color:var(--label3);line-height:1;flex-shrink:0">✏️</button>' +
       '</div>' + hrsLine + '</div>';
@@ -4216,7 +4216,7 @@ function dieselFillModal(entry, idx) {
     <div class="mi-label">Location</div><input class="mi" id="ds-loc" value="${esc(e.location||'')}">
     <div class="mi-label">Tank</div><select class="mi" id="ds-tank">${tankOpts}</select>
     <div class="mi-label">Litres</div><input class="mi" id="ds-lit" type="number" min="0" step="0.1" value="${e.litres||''}" oninput="dieselUpdateTotal()">
-    <div class="mi-label">Price per litre (€)</div><input class="mi" id="ds-ppl" type="number" min="0" step="0.001" value="${e.pricePerLitre||''}" oninput="dieselUpdateTotal()">
+    <div class="mi-label">Price per litre (${currencySymbol()})</div><input class="mi" id="ds-ppl" type="number" min="0" step="0.001" value="${e.pricePerLitre||''}" oninput="dieselUpdateTotal()">
     <div id="ds-total" style="font-size:12px;color:var(--label3);margin:6px 0 4px;text-align:right"></div>
     <div class="mi-label">Port engine hours</div><input class="mi" id="ds-hp" type="number" min="0" value="${esc(String(portHrs))}">
     <div class="mi-label">Starboard engine hours</div><input class="mi" id="ds-hs" type="number" min="0" value="${esc(String(stbdHrs))}">
@@ -4232,7 +4232,7 @@ function dieselUpdateTotal() {
   const lit = parseFloat(document.getElementById('ds-lit')?.value) || 0;
   const ppl = parseFloat(document.getElementById('ds-ppl')?.value) || 0;
   const el  = document.getElementById('ds-total');
-  if (el) el.textContent = (lit && ppl) ? 'Total: €' + (lit * ppl).toFixed(2) : '';
+  if (el) el.textContent = (lit && ppl) ? 'Total: ' + currencySymbol() + (lit * ppl).toFixed(2) : '';
 }
 function dieselSaveFill(idx) {
   const d = getDieselData();
@@ -4429,7 +4429,7 @@ function renderProvisionsHistory() {
     try { const dt = new Date(d); return dt.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
     catch(e) { return d || '—'; }
   };
-  const fmt = n => n != null ? `€${Number(n).toFixed(2)}` : '';
+  const fmt = n => n != null ? `${currencySymbol()}${Number(n).toFixed(2)}` : '';
 
   // Drill-down: show a single receipt group's items
   if (ui.provHistGroup) {
@@ -4592,7 +4592,7 @@ function renderProvisionsInsights() {
   const thisYM = now.getFullYear() * 100 + (now.getMonth() + 1);
   const lastDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const lastYM = lastDate.getFullYear() * 100 + (lastDate.getMonth() + 1);
-  const fmt = n => `€${Number(n).toFixed(2)}`;
+  const fmt = n => `${currencySymbol()}${Number(n).toFixed(2)}`;
 
   const hasData = items.some(it => (it.priceHistory || []).some(h => h.price != null));
 
@@ -4946,9 +4946,9 @@ function prefillNewUserSampleData() {
       insurer:'Example Insurance Co (Example)', policyNumber:'EX-POLICY-001',
       certNumber:'EX-CERT-001', issueDate:'2025-01-01', expiryDate:'2026-01-01',
       premium:'1,200',
-      maxPersonalInjury:'€500,000 per person (Example)',
-      maxMaterial:'€300,000 per accident (Example)',
-      maxPollution:'€150,000 per accident (Example)',
+      maxPersonalInjury:`${currencySymbol()}500,000 per person (Example)`,
+      maxMaterial:`${currencySymbol()}300,000 per accident (Example)`,
+      maxPollution:`${currencySymbol()}150,000 per accident (Example)`,
       renewalHistory:[]
     };
     dirty = true;
@@ -4964,7 +4964,7 @@ function prefillNewUserSampleData() {
       paymentRef:'EX-PAY-0001', validUntil:'2026-11-01',
       applicationNumber:'EX-APP-0001', applicationDate:'01/04/2025', entryDate:'01/04/2025',
       year:'2025', monthsCovered:'April,May,June,July,August,September,October',
-      amountPaid:'€0 (Example)', paymentCode:'EX-RF-00000000001',
+      amountPaid:`${currencySymbol()}0 (Example)`, paymentCode:'EX-RF-00000000001',
       adminFeeCode:'EX-FEE-00000000001', status:'New',
       ownerPassportNumber:'EX-PASS-001', ownerPhone:'+1 555 0100',
       ownerAddress:'123 Example Street, Example City (Example)',
@@ -5068,9 +5068,9 @@ function prefillNewUserSampleData() {
       data.maintenance.engines[eid].hours = 450;
     });
     const entries = [
-      {id:uid(), date:dAgo(90),  hours:'300', task:'Engine oil', cost:'€85',  notes:'Example entry', engines:['port','starboard']},
-      {id:uid(), date:dAgo(180), hours:'250', task:'Impeller',   cost:'€120', notes:'Example entry', engines:['port','starboard']},
-      {id:uid(), date:dAgo(90),  hours:'300', task:'Gear oil',   cost:'€60',  notes:'Example entry', engines:['port','starboard']},
+      {id:uid(), date:dAgo(90),  hours:'300', task:'Engine oil', cost:`${currencySymbol()}85`,  notes:'Example entry', engines:['port','starboard']},
+      {id:uid(), date:dAgo(180), hours:'250', task:'Impeller',   cost:`${currencySymbol()}120`, notes:'Example entry', engines:['port','starboard']},
+      {id:uid(), date:dAgo(90),  hours:'300', task:'Gear oil',   cost:`${currencySymbol()}60`,  notes:'Example entry', engines:['port','starboard']},
     ];
     entries.forEach(e => data.maintenance.log.unshift(e));
     if (!data.maintenance.sched) data.maintenance.sched = {};
@@ -5107,8 +5107,8 @@ function prefillNewUserSampleData() {
     if (!data.shipyard) data.shipyard = {};
     if (!data.shipyard.current) data.shipyard.current = {};
     data.shipyard.history = [
-      {id:uid(), year:'2024/2025', name:'Example Boatyard',        location:'Example Marina', start:'2024-10-01', end:'2025-04-01', cost:'€2,800', notes:'Antifouling and hull inspection (Example)'},
-      {id:uid(), year:'2023/2024', name:'Another Example Boatyard', location:'Example Port',   start:'2023-10-15', end:'2024-03-15', cost:'€3,500', notes:'Full haul out and engine service (Example)'},
+      {id:uid(), year:'2024/2025', name:'Example Boatyard',        location:'Example Marina', start:'2024-10-01', end:'2025-04-01', cost:`${currencySymbol()}2,800`, notes:'Antifouling and hull inspection (Example)'},
+      {id:uid(), year:'2023/2024', name:'Another Example Boatyard', location:'Example Port',   start:'2023-10-15', end:'2024-03-15', cost:`${currencySymbol()}3,500`, notes:'Full haul out and engine service (Example)'},
     ];
     dirty = true;
   }
@@ -5213,9 +5213,9 @@ function prefillShipyardData() {
       location:     'Palma de Mallorca, Spain',
       startDate:    dAbs(-25),
       endDate:      dAbs(5),
-      actualCost:   '€3,500',
-      depositPaid:  '€1,200',
-      balanceDue:   '€2,300',
+      actualCost:   `${currencySymbol()}3,500`,
+      depositPaid:  `${currencySymbol()}1,200`,
+      balanceDue:   `${currencySymbol()}2,300`,
       notes:        'Annual haul-out. Antifouling bottom paint, hull inspection, anode replacement, propeller polish (Example)',
     };
   }
@@ -5226,7 +5226,7 @@ function prefillShipyardData() {
         id: uid(),
         name:     'Palma Boat Yard (Example)',
         location: 'Palma de Mallorca, Spain',
-        price:    '€3,500',
+        price:    `${currencySymbol()}3,500`,
         notes:    'Antifouling + hull inspection + anodes (Example)',
         selected: true,
       },
@@ -5234,7 +5234,7 @@ function prefillShipyardData() {
         id: uid(),
         name:     'Port Adriano Marina (Example)',
         location: 'Calvià, Mallorca',
-        price:    '€4,100',
+        price:    `${currencySymbol()}4,100`,
         notes:    'Full antifouling + osmosis treatment + anodes (Example)',
         selected: false,
       },
@@ -5242,7 +5242,7 @@ function prefillShipyardData() {
         id: uid(),
         name:     'Club de Mar (Example)',
         location: 'Palma de Mallorca, Spain',
-        price:    '€2,950',
+        price:    `${currencySymbol()}2,950`,
         notes:    'Basic antifouling only, no extras (Example)',
         selected: false,
       },
@@ -5258,7 +5258,7 @@ function prefillShipyardData() {
         location: 'Corfu, Greece',
         start:    dRel(2),
         end:      dRel(2, 18),
-        cost:     '€2,800',
+        cost:     `${currencySymbol()}2,800`,
         notes:    'Antifouling, hull inspection, saildrive service, cutlass bearing replacement (Example)',
       },
       {
@@ -5268,7 +5268,7 @@ function prefillShipyardData() {
         location: 'Lagos, Portugal',
         start:    dRel(1),
         end:      dRel(1, 14),
-        cost:     '€3,100',
+        cost:     `${currencySymbol()}3,100`,
         notes:    'Antifouling, waterline repaint, propeller polish, engine raw-water impeller (Example)',
       },
     ];
@@ -5417,7 +5417,7 @@ function renderParts() {
           const storeDisplay = p.storeUrl
             ? `<a href="${esc(p.storeUrl)}" target="_blank" rel="noopener" style="color:var(--blue)">${esc(p.location||'Shop')}</a>`
             : esc(p.location||'');
-          const meta = [p.pn?esc(p.pn):null, esc(normCat(p.category)), storeDisplay||null, `€${p.unitPrice||0}`].filter(Boolean).join(' · ');
+          const meta = [p.pn?esc(p.pn):null, esc(normCat(p.category)), storeDisplay||null, `${currencySymbol()}${p.unitPrice||0}`].filter(Boolean).join(' · ');
           return `<div class="part-row" data-parts-id="${p.id}" draggable="true" ondragstart="partsDragStart(event,'${p.id}')" ondragover="partsDragOver(event,'${p.id}')" ondragleave="partsDragLeave(event)" ondrop="partsDrop(event,'${p.id}')" ondragend="partsDragEnd()">
             <span class="prov-grip" ontouchstart="partsTouchStart(event,'${p.id}')">⠿</span>
             <div class="qty-wrap">
@@ -5433,7 +5433,7 @@ function renderParts() {
           </div>`;
         }).join('') || '<div style="padding:16px;color:var(--label3)">No parts — tap + Add Part to get started</div>'}
       </div>
-      <div class="parts-footer">Total inventory value: €${totalValue}</div>
+      <div class="parts-footer">Total inventory value: ${currencySymbol()}${totalValue}</div>
     </div>`;
 }
 
@@ -5478,7 +5478,7 @@ function _partModalFields(p) {
     </div>
     <div class="mi-label">Quantity</div><input class="mi" id="m-pq" type="number" value="${p.qty??1}" min="0">
     <div class="mi-label">Min Quantity</div><input class="mi" id="m-pmq" type="number" value="${p.minQuantity??1}" min="0">
-    <div class="mi-label">Unit Price (€)</div><input class="mi" id="m-pp2" type="number" value="${p.unitPrice??0}" min="0" step="0.01">
+    <div class="mi-label">Unit Price (${currencySymbol()})</div><input class="mi" id="m-pp2" type="number" value="${p.unitPrice??0}" min="0" step="0.01">
     <div class="mi-label">From Store</div><input class="mi" id="m-pl" placeholder="e.g. Yanmar dealer" value="${esc(p.location||'')}">
     <div class="mi-label">Store URL</div><input class="mi" id="m-purl" type="url" placeholder="https://…" value="${esc(p.storeUrl||'')}">`;
 }
@@ -6038,7 +6038,7 @@ function renderUpgrades() {
   const reversedSeasons = wd.seasons.slice().reverse();
   const firstId = reversedSeasons[0]?.id;
   const cards = reversedSeasons.map(s => renderUpgradeSeason(s, s.id === firstId)).join('');
-  const summary = grandTotal > 0 ? `<div style="margin:4px 12px 16px;padding:12px 16px;background:var(--surface);border:0.5px solid var(--sep);border-radius:12px;font-size:13px;color:var(--label3)">All seasons total: <b style="color:var(--label)">€${grandTotal.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2})}</b></div>` : '';
+  const summary = grandTotal > 0 ? `<div style="margin:4px 12px 16px;padding:12px 16px;background:var(--surface);border:0.5px solid var(--sep);border-radius:12px;font-size:13px;color:var(--label3)">All seasons total: <b style="color:var(--label)">${currencySymbol()}${grandTotal.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2})}</b></div>` : '';
   const exMsg = !isOwner ? `<div style="margin:0 12px 12px;font-size:12px;color:var(--label3);font-style:italic">Replace these examples with your own upgrades and repairs</div>` : '';
 
   const dropEnd = `<div id="upg-season-drop-end"
@@ -6087,7 +6087,7 @@ function renderUpgradeSeason(s, isFirst = false) {
     const rows = s.items.map((item, idx) => renderUpgradeItem(s, item, idx)).join('');
     const addRow = renderUpgradeAddRow(s);
     const seasonTotal = s.items.reduce((sum,it)=>sum+(parseFloat(it.cost)||0),0);
-    const totLine = seasonTotal > 0 ? `<div style="padding:8px 16px 10px;font-size:12px;color:var(--label3);border-top:1px solid var(--sep)">Season total: <b style="color:var(--label)">€${seasonTotal.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2})}</b></div>` : '';
+    const totLine = seasonTotal > 0 ? `<div style="padding:8px 16px 10px;font-size:12px;color:var(--label3);border-top:1px solid var(--sep)">Season total: <b style="color:var(--label)">${currencySymbol()}${seasonTotal.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2})}</b></div>` : '';
     body = `<div style="border-top:1px solid var(--sep)">${rows}${addRow}${totLine}</div>`;
   }
 
@@ -11893,7 +11893,7 @@ function _aiStep3Html(parsed) {
       const catOpts = dest === 'provisions'
         ? PROV_CAT_ORDER.map(c => `<option value="${c}" ${st.category===c?'selected':''}>${PROV_CAT_LABELS[c]}</option>`).join('')
         : PART_CATEGORIES.map(c => `<option value="${c}" ${st.category===c?'selected':''}>${esc(c)}</option>`).join('');
-      const priceStr = e.price != null ? ` · €${e.price}` : '';
+      const priceStr = e.price != null ? ` · ${currencySymbol()}${e.price}` : '';
       return `<div id="ai-row-provisions-${idx}" style="display:flex;align-items:center;gap:6px;padding:3px 0;${!st.include?'opacity:0.4;':''}">
         <input id="ai-cb-provisions-${idx}" type="checkbox" ${st.include?'checked':''} onchange="aiToggleItem('provisions',${idx})" style="width:15px;height:15px;cursor:pointer;accent-color:var(--blue);flex-shrink:0">
         <span style="flex:1;font-size:11px;color:var(--label2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.name||'?')}">${esc(e.name||'?')}${e.qty&&e.qty!==1?` ×${e.qty}`:''}${priceStr}</span>
@@ -12588,6 +12588,13 @@ function renderSettings() {
       </div>
     </div>
     <div class="card" style="margin-bottom:16px;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:0.5px solid var(--sep)">
+        <span style="font-size:13px;font-weight:500;color:var(--label)">Currency</span>
+        <select onchange="data.meta.currency=this.value;save();document.getElementById('mainContent').innerHTML=renderSettings()"
+          style="border:0.5px solid var(--sep);border-radius:8px;padding:5px 10px;font-size:13px;font-family:var(--font);color:var(--label);background:var(--surface);cursor:pointer">
+          ${CURRENCIES.map(c=>`<option value="${c.code}" ${(data.meta?.currency||'USD')===c.code?'selected':''}>${c.label}</option>`).join('')}
+        </select>
+      </div>
       ${settingsRow('sync',    'Cloud sync',          syncRight,  syncExpanded)}
       ${settingsRow('backup',  'Backup &amp; restore', '',         backupExpanded)}
       <div onclick="document.getElementById('jsonImportFile').click()" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:0.5px solid var(--sep);cursor:pointer;user-select:none;-webkit-user-select:none">
