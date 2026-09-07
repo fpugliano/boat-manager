@@ -282,6 +282,15 @@ input[type=file]{display:none}
 .sync-dot{position:absolute;right:48px;top:50%;transform:translateY(-50%);
   font-size:16px;line-height:1;cursor:pointer;transition:color .3s;color:#666}
 
+/* ── Schengen log ── */
+.schengen-log-grid{display:grid;grid-template-columns:1fr 1fr;min-width:0;width:100%}
+.schengen-log-grid > div{min-width:0;overflow:hidden}
+.schengen-log-grid > div:first-child{border-right:1px solid var(--sep)}
+@media(max-width:600px){
+  .schengen-log-grid{grid-template-columns:1fr}
+  .schengen-log-grid > div:first-child{border-right:none;border-bottom:1px solid var(--sep)}
+}
+
 /* ── Maintenance v2 ── */
 .maint-hours-grid{display:grid;gap:10px;margin-bottom:14px}
 .maint-hours-grid.cat{grid-template-columns:1fr 1fr}

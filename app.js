@@ -2850,7 +2850,6 @@ function renderSchengenPersonStatus(p, idx) {
 
 function renderSchengenPersonLog(p, idx) {
   const sorted = [...(p?.log||[])].sort((a,b)=>b.date.localeCompare(a.date));
-  const borderRight = idx === 0 ? 'border-right:1px solid var(--sep);' : '';
   // Build trip-duration map: check-in id → days count or 'ongoing'
   const todayMs = new Date().setHours(23,59,59,999);
   const chrono = [...(p?.log||[])].sort((a,b)=>a.date.localeCompare(b.date));
@@ -2890,7 +2889,7 @@ function renderSchengenPersonLog(p, idx) {
       <button onclick="showSchengenEditEntry(${idx},'${e.id}')" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:14px;color:var(--label3);line-height:1;flex-shrink:0">✏️</button>
     </div>`;
   }).join('') || `<div style="padding:14px 10px;text-align:center;color:var(--label3);font-size:12px">No entries</div>`;
-  return `<div style="min-width:0;overflow:hidden;${borderRight}">
+  return `<div>
     <div style="padding:10px 10px 6px;font-size:12px;font-weight:700;color:var(--label);border-bottom:1px solid var(--sep)">${esc(p.name||'Person '+(idx+1))}</div>
     ${rows}
     <div style="padding:8px 10px">
@@ -2902,7 +2901,7 @@ function renderSchengenPersonLog(p, idx) {
 function renderSchengenLog(sd) {
   const cols = sd.persons.map((p,i) => renderSchengenPersonLog(p,i)).join('');
   return `<div style="margin:0 12px 16px;background:var(--surface);border:0.5px solid var(--sep);border-radius:14px;overflow:hidden">
-    <div style="display:grid;grid-template-columns:1fr 1fr;min-width:0;width:100%">${cols}</div>
+    <div class="schengen-log-grid">${cols}</div>
   </div>`;
 }
 
