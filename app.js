@@ -2701,6 +2701,47 @@ function calcSchengenDays(log) {
   return { days, inSchengen: inDate !== null };
 }
 
+// Rolling-window forward simulation: how many more days can you stay from today,
+// and the last legal day (exit-by). Unlike (90 - daysUsed), this accounts for old
+// days ageing out of the trailing 180-day window and being returned to you.
+function calcSchengenExitBy(log) {
+  // Work in integer day-indices (DST-proof) rather than millisecond arithmetic.
+  const idx = d => Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())/86400000);
+  const todayMid = new Date(); todayMid.setHours(0,0,0,0);
+  const todayIdx = idx(todayMid);
+  // Set of past day-indices (before today) that count toward Schengen — passport stays only.
+  const past = new Set();
+  const sorted = [...(log||[])].sort((a,b)=>a.date.localeCompare(b.date));
+  const addRange = (startD, endIdx, seaman) => {
+    if (seaman || !startD) return;
+    for (let d = idx(startD); d <= endIdx; d++) if (d < todayIdx) past.add(d);
+  };
+  let inDate = null, inSeaman = false;
+  for (const e of sorted) {
+    if (e.type==='in') { inDate = parseISODate(e.date); inSeaman = e.seamanBook === true; }
+    else if (e.type==='out' && inDate) {
+      const out = parseISODate(e.date);
+      const endIdx = (!out || idx(out) > todayIdx) ? todayIdx : idx(out);
+      addRange(inDate, endIdx, inSeaman);
+      inDate = null; inSeaman = false;
+    }
+  }
+  if (inDate) addRange(inDate, todayIdx, inSeaman);
+  // Walk forward assuming continuous presence from today; stop at the last day where
+  // the trailing 180-day window [D-179, D] holds no more than 90 counted days.
+  let maxStay = 0;
+  for (let k = 1; k <= 90; k++) {
+    const D = todayIdx + (k-1);                   // candidate last present day
+    const winStart = D - 179;
+    const futureCount = D - Math.max(todayIdx, winStart) + 1;
+    let pastCount = 0;
+    for (const d of past) if (d >= winStart && d < todayIdx) pastCount++;
+    if (futureCount + pastCount <= 90) maxStay = k; else break;
+  }
+  const exitBy = new Date(todayMid); exitBy.setDate(exitBy.getDate() + Math.max(0, maxStay-1));
+  return { maxStay, exitBy };
+}
+
 function isSeamanBookActive(log) {
   const sorted = [...(log||[])].sort((a,b)=>a.date.localeCompare(b.date));
   for (let i = sorted.length-1; i >= 0; i--) {
@@ -2749,9 +2790,9 @@ function renderSchengen() {
     const eu = p.passports?.[p.activePassport||0]?.eu;
     if (eu) return;
     const {days} = calcSchengenDays(p.log);
-    const rem = 90-days;
-    if (rem < 0) warnings.push(`⚠ ${p.name}: OVERSTAYED by ${Math.abs(rem)} days`);
-    else if (rem < 20) warnings.push(`${p.name}: ${rem} days remaining`);
+    const {maxStay} = calcSchengenExitBy(p.log);
+    if (days > 90) warnings.push(`⚠ ${p.name}: OVERSTAYED by ${days-90} days`);
+    else if (maxStay < 20) warnings.push(`${p.name}: ${maxStay} days remaining`);
   });
   const warningBanner = warnings.length ? `
     <div style="margin:0 12px 10px;padding:10px 14px;background:rgba(255,59,48,.1);border:0.5px solid var(--red);border-radius:10px;font-size:13px;color:var(--red);font-weight:600">
@@ -2782,14 +2823,15 @@ function renderSchengenPersonStatus(p, idx) {
   const activePass = p.passports?.[activePassIdx];
   const isEU = activePass?.eu === true;
   const {days} = calcSchengenDays(p.log);
-  const remaining = 90 - days;
-  const overstayed = remaining < 0;
+  const {maxStay, exitBy} = calcSchengenExitBy(p.log);
+  const overstayBy = days - 90;
+  const overstayed = overstayBy > 0;
+  const remaining = maxStay;   // rolling-correct days you can still stay from today
   const inStatus = isCurrentlyInSchengen(p.log);
   const seamanActive = isSeamanBookActive(p.log);
   const circleColor = remaining > 30 ? 'var(--green)' : remaining > 10 ? 'var(--orange)' : 'var(--red)';
-  const exitBy = new Date(); exitBy.setDate(exitBy.getDate() + Math.max(0, remaining));
   const exitByStr = overstayed
-    ? `⚠ Overstayed by ${Math.abs(remaining)} day${Math.abs(remaining)===1?'':'s'}`
+    ? `⚠ Overstayed by ${overstayBy} day${overstayBy===1?'':'s'}`
     : exitBy.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
   const exitByColor = overstayed || remaining < 30 ? 'var(--red)' : 'var(--green)';
   const lastLogEntry = [...(p.log||[])].sort((a,b)=>a.date.localeCompare(b.date)).pop();
@@ -2830,7 +2872,7 @@ function renderSchengenPersonStatus(p, idx) {
           <div style="font-size:9px;color:var(--label3)">Used</div>
         </div>
         <div style="background:var(--surface2);border-radius:8px;padding:5px;text-align:center">
-          <div style="font-size:14px;font-weight:700;color:${circleColor}">${overstayed?'-':''}${Math.abs(remaining)}</div>
+          <div style="font-size:14px;font-weight:700;color:${circleColor}">${overstayed?'-'+overstayBy:remaining}</div>
           <div style="font-size:9px;color:var(--label3)">${overstayed?'Over':'Left'}</div>
         </div>
       </div>
