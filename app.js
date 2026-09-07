@@ -6776,8 +6776,57 @@ function renderSystems() {
     <div class="subtab-bar" style="margin-bottom:10px">${pills}</div>
     <div class="btn-row">
       <button class="btn btn-p btn-sm" onclick="showAddSystem()">+ Add System</button>
+      <button class="btn btn-s btn-sm" onclick="exportSystems()">⬇ Export XLS</button>
     </div>
     ${body}${sysDropEnd}`;
+}
+
+function exportSystems() {
+  const systems = data.systems || [];
+  if (!systems.length) { showToast('No systems to export', true); return; }
+
+  const cols = [
+    ['Category',        s => s.cat || s.category || ''],
+    ['Make',            s => s.make || ''],
+    ['Model',           s => s.model || ''],
+    ['Serial No.',      s => s.serialNumber || ''],
+    ['Location',        s => s.location || ''],
+    ['Install Date',    s => s.installDate || ''],
+    ['Last Service',    s => s.lastService || ''],
+    ['Warranty Expiry', s => s.warrantyExpiry || ''],
+    ['Price (USD)',     s => s.purchasePriceUsd ? Number(s.purchasePriceUsd) : ''],
+    ['Price at Purchase', s => s.purchasePriceOriginal || ''],
+    ['Supplier',        s => s.supplier || ''],
+    ['Invoice Ref',     s => s.invoiceRef || ''],
+    ['Part Code',       s => s.partCode || ''],
+    ['Manual URL',      s => s.manualUrl || ''],
+    ['Notes',           s => s.notes || ''],
+  ];
+
+  const cell = v => (typeof v === 'number')
+    ? `<td>${v}</td>`
+    : `<td>${esc(String(v)).replace(/\n/g,'<br>')}</td>`;
+
+  const head = cols.map(c => `<th>${esc(c[0])}</th>`).join('');
+  const rows = systems.map(s => `<tr>${cols.map(c => cell(c[1](s))).join('')}</tr>`).join('');
+
+  const html =
+    `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">` +
+    `<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>` +
+    `<x:Name>Systems</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>` +
+    `</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->` +
+    `<style>th{background:#eee;font-weight:bold;text-align:left}th,td{border:1px solid #ccc;padding:4px 8px}</style>` +
+    `</head><body><table>` +
+    `<thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></body></html>`;
+
+  const blob = new Blob(['﻿', html], { type: 'application/vnd.ms-excel' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.download = `oroboro-systems-${stamp}.xls`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast(`Exported ${systems.length} systems`);
 }
 
 function renderSystemCard(s) {
