@@ -2701,44 +2701,52 @@ function calcSchengenDays(log) {
   return { days, inSchengen: inDate !== null };
 }
 
-// Rolling-window forward simulation: how many more days can you stay from today,
-// and the last legal day (exit-by). Unlike (90 - daysUsed), this accounts for old
-// days ageing out of the trailing 180-day window and being returned to you.
+// Rolling-window forward simulation for the exit-by date and remaining stay.
+// Unlike (90 - daysUsed), this accounts for old days ageing out of the trailing
+// 180-day window and being returned to you. Presence is projected forward from the
+// currently-open passport entry — which may be ongoing (past) or planned (future) —
+// so a re-entry dated ahead of today is measured from that entry, not from today.
 function calcSchengenExitBy(log) {
   // Work in integer day-indices (DST-proof) rather than millisecond arithmetic.
   const idx = d => Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())/86400000);
   const todayMid = new Date(); todayMid.setHours(0,0,0,0);
   const todayIdx = idx(todayMid);
-  // Set of past day-indices (before today) that count toward Schengen — passport stays only.
-  const past = new Set();
   const sorted = [...(log||[])].sort((a,b)=>a.date.localeCompare(b.date));
-  const addRange = (startD, endIdx, seaman) => {
-    if (seaman || !startD) return;
-    for (let d = idx(startD); d <= endIdx; d++) if (d < todayIdx) past.add(d);
-  };
-  let inDate = null, inSeaman = false;
+  // Pair up In/Out: collect closed passport stays, and note any trailing open stay.
+  const closed = [];                      // [startIdx, endIdx] for counted passport stays
+  let inIdx = null, inSeaman = false, openIdx = null, openSeaman = false;
   for (const e of sorted) {
-    if (e.type==='in') { inDate = parseISODate(e.date); inSeaman = e.seamanBook === true; }
-    else if (e.type==='out' && inDate) {
+    if (e.type==='in') {
+      const d = parseISODate(e.date);
+      inIdx = d ? idx(d) : null; inSeaman = e.seamanBook === true;
+    } else if (e.type==='out' && inIdx != null) {
       const out = parseISODate(e.date);
-      const endIdx = (!out || idx(out) > todayIdx) ? todayIdx : idx(out);
-      addRange(inDate, endIdx, inSeaman);
-      inDate = null; inSeaman = false;
+      if (!inSeaman) closed.push([inIdx, out ? idx(out) : inIdx]);
+      inIdx = null; inSeaman = false;
     }
   }
-  if (inDate) addRange(inDate, todayIdx, inSeaman);
-  // Walk forward assuming continuous presence from today; stop at the last day where
-  // the trailing 180-day window [D-179, D] holds no more than 90 counted days.
-  let maxStay = 0;
+  if (inIdx != null) { openIdx = inIdx; openSeaman = inSeaman; }
+  // Continuous passport presence begins at the open passport entry (past or future);
+  // otherwise (outside, or currently on a Seaman's Book) assume a hypothetical entry today.
+  const projStart = (openIdx != null && !openSeaman) ? openIdx : todayIdx;
+  // Counted (passport) days strictly before projStart — the open stay's own days are
+  // covered by the forward projection below, so they must not be double-counted.
+  const past = new Set();
+  for (const [s, e] of closed) for (let d = s; d <= e; d++) if (d < projStart) past.add(d);
+  // Walk forward from projStart; stop at the last day where the trailing 180-day
+  // window [D-179, D] holds no more than 90 counted days.
+  let stayLen = 0;
   for (let k = 1; k <= 90; k++) {
-    const D = todayIdx + (k-1);                   // candidate last present day
+    const D = projStart + (k-1);
     const winStart = D - 179;
-    const futureCount = D - Math.max(todayIdx, winStart) + 1;
-    let pastCount = 0;
-    for (const d of past) if (d >= winStart && d < todayIdx) pastCount++;
-    if (futureCount + pastCount <= 90) maxStay = k; else break;
+    let count = k;                                // days present projStart..D
+    for (const d of past) if (d >= winStart && d < projStart) count++;
+    if (count <= 90) stayLen = k; else break;
   }
-  const exitBy = new Date(todayMid); exitBy.setDate(exitBy.getDate() + Math.max(0, maxStay-1));
+  const exitByIdx = projStart + Math.max(0, stayLen-1);
+  const exitBy = new Date(todayMid); exitBy.setDate(exitBy.getDate() + (exitByIdx - todayIdx));
+  // Days still stayable from today (past/ongoing) vs the full planned stay (future entry).
+  const maxStay = projStart <= todayIdx ? Math.max(0, exitByIdx - todayIdx + 1) : stayLen;
   return { maxStay, exitBy };
 }
 
