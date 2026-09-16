@@ -591,7 +591,7 @@ function renderSetup(setupEmail = '') {
       <input class="setup-inp" id="s-flag" placeholder="e.g. USA" value="${esc(data.meta?.flag||'')}">
       <label class="setup-lbl">Currency</label>
       <select class="setup-inp" id="s-currency" style="appearance:none;-webkit-appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px">
-        ${CURRENCIES.map(c => `<option value="${c.code}" ${(data.meta?.currency||'EUR')===c.code?'selected':''}>${c.label}</option>`).join('')}
+        ${CURRENCIES.map(c => `<option value="${c.code}" ${(data.meta?.currency||'USD')===c.code?'selected':''}>${c.label}</option>`).join('')}
       </select>
       <label class="setup-lbl" style="margin-bottom:10px">Hull Type</label>
       <div class="hull-row">
@@ -628,7 +628,7 @@ function completeSetup() {
   const owner    = document.getElementById('s-owner').value.trim();
   const email    = document.getElementById('s-email').value.trim().toLowerCase();
   const flag     = document.getElementById('s-flag').value.trim();
-  const currency = document.getElementById('s-currency')?.value || 'EUR';
+  const currency = document.getElementById('s-currency')?.value || 'USD';
   if (!name)  { showToast('Please enter a boat name', true); return; }
   if (!email || !email.includes('@')) { showToast('Please enter a valid email', true); return; }
   data.meta.boatName  = name;
