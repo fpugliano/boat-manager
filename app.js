@@ -5434,22 +5434,13 @@ function _partsDoReorder(fromId, toId) {
 
 function renderParts() {
   const parts = data.spareParts || [];
-  const q = ui.partsSearch.toLowerCase();
-  const cat = ui.partsFilter;
   const customCats = parts.map(p => normCat(p.category)).filter(c => c && !PART_CATEGORIES.includes(c));
   const cats = ['All', ...PART_CATEGORIES, ...new Set(customCats)];
-  const filtered = parts.filter(p => {
-    const matchQ = !q || p.desc?.toLowerCase().includes(q) || p.pn?.toLowerCase().includes(q)
-      || normCat(p.category)?.toLowerCase().includes(q) || p.location?.toLowerCase().includes(q);
-    const matchC = cat === 'All' || normCat(p.category) === cat;
-    return matchQ && matchC;
-  });
-  const totalValue = parts.reduce((s,p) => s + (p.qty||0)*(p.unitPrice||0), 0).toFixed(2);
 
   return `
     <div class="parts-top">
       <input class="search-box" placeholder="🔍 Search parts…" value="${esc(ui.partsSearch)}"
-        oninput="ui.partsSearch=this.value;document.getElementById('mainContent').innerHTML=renderParts()">
+        oninput="ui.partsSearch=this.value;document.getElementById('partsListWrap').innerHTML=renderPartsList()">
     </div>
     <div class="subtab-bar" style="margin-bottom:10px">
       ${cats.map(c => `<div class="pill ${ui.partsFilter===c?'active':''}"
@@ -5459,6 +5450,22 @@ function renderParts() {
       <button class="btn btn-p btn-sm" onclick="showAddPart()">+ Add Part</button>
       <button class="btn btn-s btn-sm" onclick="exportParts()">⬇ Export CSV</button>
     </div>
+    <div id="partsListWrap">${renderPartsList()}</div>`;
+}
+
+function renderPartsList() {
+  const parts = data.spareParts || [];
+  const q = ui.partsSearch.toLowerCase();
+  const cat = ui.partsFilter;
+  const filtered = parts.filter(p => {
+    const matchQ = !q || p.desc?.toLowerCase().includes(q) || p.pn?.toLowerCase().includes(q)
+      || normCat(p.category)?.toLowerCase().includes(q) || p.location?.toLowerCase().includes(q);
+    const matchC = cat === 'All' || normCat(p.category) === cat;
+    return matchQ && matchC;
+  });
+  const totalValue = parts.reduce((s,p) => s + (p.qty||0)*(p.unitPrice||0), 0).toFixed(2);
+
+  return `
     <div class="card">
       <div class="card-hd">${filtered.length} items${cat!=='All'?' ('+cat+')':''}</div>
       <div class="card-body">
