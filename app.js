@@ -5439,7 +5439,8 @@ function renderParts() {
   const customCats = parts.map(p => normCat(p.category)).filter(c => c && !PART_CATEGORIES.includes(c));
   const cats = ['All', ...PART_CATEGORIES, ...new Set(customCats)];
   const filtered = parts.filter(p => {
-    const matchQ = !q || p.desc?.toLowerCase().includes(q) || p.pn?.toLowerCase().includes(q);
+    const matchQ = !q || p.desc?.toLowerCase().includes(q) || p.pn?.toLowerCase().includes(q)
+      || normCat(p.category)?.toLowerCase().includes(q) || p.location?.toLowerCase().includes(q);
     const matchC = cat === 'All' || normCat(p.category) === cat;
     return matchQ && matchC;
   });
