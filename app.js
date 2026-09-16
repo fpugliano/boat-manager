@@ -5456,6 +5456,7 @@ function renderParts() {
     </div>
     <div class="btn-row" style="padding:0 0 10px">
       <button class="btn btn-p btn-sm" onclick="showAddPart()">+ Add Part</button>
+      <button class="btn btn-s btn-sm" onclick="exportParts()">⬇ Export CSV</button>
     </div>
     <div class="card">
       <div class="card-hd">${filtered.length} items${cat!=='All'?' ('+cat+')':''}</div>
@@ -5484,6 +5485,41 @@ function renderParts() {
       </div>
       <div class="parts-footer">Total inventory value: ${currencySymbol()}${totalValue}</div>
     </div>`;
+}
+
+function exportParts() {
+  const parts = data.spareParts || [];
+  if (!parts.length) { showToast('No parts to export', true); return; }
+
+  const cols = [
+    ['Description',   p => p.desc || ''],
+    ['Part Number',   p => p.pn || ''],
+    ['Category',      p => normCat(p.category) || ''],
+    ['Quantity',      p => p.qty || 0],
+    ['Min Quantity',  p => p.minQuantity || 0],
+    ['Unit Price',    p => p.unitPrice || 0],
+    ['Line Total',    p => (p.qty||0)*(p.unitPrice||0)],
+    ['From Store',    p => p.location || ''],
+    ['Store URL',     p => p.storeUrl || ''],
+  ];
+
+  const csvCell = v => {
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+  };
+  const lines = [
+    cols.map(c => csvCell(c[0])).join(','),
+    ...parts.map(p => cols.map(c => csvCell(c[1](p))).join(',')),
+  ];
+
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.download = `oroboro-spare-parts-${stamp}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast(`Exported ${parts.length} parts`);
 }
 
 function adjQty(i, delta) {
