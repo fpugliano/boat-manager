@@ -129,7 +129,7 @@ let data = {};
 let ui = {
   tab:'documents', docSub:'vessel', maintEngine:'port',
   photoSub:'vesselDoc', crewOpen:null, sysOpen:null, sysTab:'All', sysOverviewOpen:false,
-  partsSearch:'', partsFilter:'All', alertsOpen:false, maintShowAll:false, maintTaskFilter:'All',
+  partsSearch:'', partsFilter:'All', sysSearch:'', alertsOpen:false, maintShowAll:false, maintTaskFilter:'All',
   provisionsSub:'all', provisionsView:'list', provHistGroup:null, tlDetailId:null,
   dieselPeriod:'all'
 };
@@ -6784,8 +6784,28 @@ function savePowerSpec() {
 }
 
 function renderSystems() {
-  const systems = data.systems || [];
   if (!ui.sysTab) ui.sysTab = 'All';
+
+  const pills = SYS_GROUPS.map(g =>
+    `<div class="pill ${ui.sysTab===g.id?'active':''}" onclick="ui.sysTab='${g.id}';document.getElementById('mainContent').innerHTML=renderSystems()">${g.label}</div>`
+  ).join('');
+
+  return `
+    ${renderSystemsOverview()}
+    <div class="subtab-bar" style="margin-bottom:10px">${pills}</div>
+    <div class="parts-top">
+      <input class="search-box" placeholder="🔍 Search systems…" value="${esc(ui.sysSearch)}"
+        oninput="ui.sysSearch=this.value;document.getElementById('sysListWrap').innerHTML=renderSystemsList()">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-p btn-sm" onclick="showAddSystem()">+ Add System</button>
+      <button class="btn btn-s btn-sm" onclick="exportSystems()">⬇ Export XLS</button>
+    </div>
+    <div id="sysListWrap">${renderSystemsList()}</div>`;
+}
+
+function renderSystemsList() {
+  const systems = data.systems || [];
   const curGroup = SYS_GROUPS.find(g=>g.id===ui.sysTab) || SYS_GROUPS[0];
 
   let filtered;
@@ -6793,21 +6813,22 @@ function renderSystems() {
   else if (curGroup.id === 'Other') filtered = systems.filter(s => !SYS_ALL_CATS.includes(s.cat||s.category));
   else                              filtered = systems.filter(s => (curGroup.cats||[]).includes(s.cat||s.category));
 
+  const q = ui.sysSearch.trim().toLowerCase();
+  if (q) filtered = filtered.filter(s => [s.cat||s.category, s.make, s.model, s.serialNumber, s.location, s.notes, s.supplier, s.partCode]
+    .some(v => v && String(v).toLowerCase().includes(q)));
+
   const cats = [...new Set(filtered.map(s=>s.cat||s.category).filter(Boolean))];
   const noCat = filtered.filter(s=>!(s.cat||s.category));
 
-  const pills = SYS_GROUPS.map(g =>
-    `<div class="pill ${ui.sysTab===g.id?'active':''}" onclick="ui.sysTab='${g.id}';document.getElementById('mainContent').innerHTML=renderSystems()">${g.label}</div>`
-  ).join('');
-
   const body = (cats.length===0 && noCat.length===0)
-    ? `<div style="padding:30px 16px;text-align:center;color:var(--label3);font-size:14px">No systems in this category — tap + Add to add one</div>`
+    ? `<div style="padding:30px 16px;text-align:center;color:var(--label3);font-size:14px">${q ? 'No systems match your search' : 'No systems in this category — tap + Add to add one'}</div>`
     : cats.map(cat=>`
         <div class="sec-hd">${esc(cat)}</div>
         ${filtered.filter(s=>(s.cat||s.category)===cat).map(s=>renderSystemCard(s)).join('')}
       `).join('') + noCat.map(s=>renderSystemCard(s)).join('');
 
-  const sysDropEnd = `<div id="sys-drop-end"
+  // Drag-to-reorder only makes sense on the full, unsearched list
+  const sysDropEnd = q ? '' : `<div id="sys-drop-end"
     ondragover="sysEndDragOver(event)"
     ondragleave="sysEndDragLeave(event)"
     ondrop="sysEndDrop(event)"
@@ -6815,14 +6836,7 @@ function renderSystems() {
     <span style="font-size:12px;color:var(--label3)">Drop here to move to bottom</span>
   </div>`;
 
-  return `
-    ${renderSystemsOverview()}
-    <div class="subtab-bar" style="margin-bottom:10px">${pills}</div>
-    <div class="btn-row">
-      <button class="btn btn-p btn-sm" onclick="showAddSystem()">+ Add System</button>
-      <button class="btn btn-s btn-sm" onclick="exportSystems()">⬇ Export XLS</button>
-    </div>
-    ${body}${sysDropEnd}`;
+  return `${body}${sysDropEnd}`;
 }
 
 function exportSystems() {
