@@ -579,7 +579,7 @@ function setupCredit() {
         <b>100% free</b>, forever — no ads, no tracking.
       </div>
       <div style="font-size:12px;color:var(--label3);line-height:1.6;margin-top:6px">
-        Built for fellow sailors by Francesco Pugliano and Yuka Abe, S/V Oroboro<br>
+        Built for fellow sailors by Francesco Pugliano and Yuka Abe,<br>on S/V Oroboro<br>
         <a href="mailto:fpugliano@gmail.com" style="color:var(--blue);text-decoration:none">fpugliano@gmail.com</a><br>
         Check out our blog at <a href="https://www.sailingoroboro.com" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none">www.sailingoroboro.com</a>
       </div>
