@@ -11073,6 +11073,7 @@ function renderLockScreen() {
           font-size:14px;color:var(--label3);cursor:pointer;padding:8px;text-align:center">
         Use a different account
       </button>
+      ${setupCredit()}
     </div>`;
   if (locked) startLockCountdown(at);
   else setTimeout(() => document.getElementById('u0')?.focus(), 80);
