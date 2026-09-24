@@ -676,7 +676,6 @@ const CURRENCIES = [
   { code:'BRL', symbol:'R$',   label:'BRL — Brazilian Real (R$)' },
   { code:'MXN', symbol:'Mex$', label:'MXN — Mexican Peso (Mex$)' },
   { code:'TRY', symbol:'₺',    label:'TRY — Turkish Lira (₺)' },
-  { code:'MAD', symbol:'DH',   label:'MAD — Moroccan Dirham (DH)' },
   { code:'JPY', symbol:'¥',    label:'JPY — Japanese Yen (¥)' },
 ];
 
