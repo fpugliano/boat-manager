@@ -572,6 +572,19 @@ function renderAlertBar() {
 //  SETUP SCREEN
 // ═══════════════════════════════════════════════════════════
 
+function setupCredit() {
+  return `
+    <div style="margin-top:24px;padding-top:18px;border-top:0.5px solid var(--sep);text-align:center">
+      <div style="font-size:13px;color:var(--label2);line-height:1.5">
+        <b>100% free</b>, forever — no ads, no tracking.
+      </div>
+      <div style="font-size:12px;color:var(--label3);line-height:1.6;margin-top:6px">
+        Built for fellow sailors by Francesco Pugliano<br>
+        <a href="mailto:fpugliano@gmail.com" style="color:var(--blue);text-decoration:none">fpugliano@gmail.com</a>
+      </div>
+    </div>`;
+}
+
 function renderSetup(setupEmail = '') {
   const ov = document.getElementById('setupOv');
   ov.classList.remove('hidden');
@@ -613,6 +626,7 @@ function renderSetup(setupEmail = '') {
           font-size:15px;color:var(--label3);cursor:pointer;padding:10px">
         ← Back to login
       </button>
+      ${setupCredit()}
     </div>`;
 }
 
@@ -11232,6 +11246,7 @@ function renderLoginScreen() {
           New user? Set up your boat →
         </button>
       </div>
+      ${setupCredit()}
     </div>`;
   setTimeout(() => document.getElementById('login-email')?.focus(), 80);
 }
