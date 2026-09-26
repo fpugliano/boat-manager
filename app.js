@@ -6243,7 +6243,14 @@ function renderUpgradeItem(s, item, idx) {
   const chkMark = item.checked ? '<svg width="11" height="9" viewBox="0 0 11 9"><polyline points="1,4.5 4,7.5 10,1" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '';
   const chkClick = complete ? '' : `onclick="toggleUpgradeItem('${sid}','${iid}')"`;
   const chkCursor = complete ? 'cursor:default' : 'cursor:pointer';
-  return `<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--sep)">
+  return `<div data-upg-item-id="${iid}" draggable="true"
+    ondragstart="upgItemDragStart(event,'${sid}','${iid}')"
+    ondragover="upgItemDragOver(event,'${sid}','${iid}')"
+    ondragleave="upgItemDragLeave(event)"
+    ondrop="upgItemDrop(event,'${sid}','${iid}')"
+    ondragend="upgItemDragEnd()"
+    style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--sep)">
+    <span class="prov-grip" onclick="event.stopPropagation()" ontouchstart="upgItemTouchStart(event,'${sid}','${iid}')" style="font-size:15px;color:var(--label3);flex-shrink:0;cursor:grab">⠿</span>
     <div ${chkClick}
       style="width:22px;height:22px;border-radius:6px;${chkStyle};flex-shrink:0;display:flex;align-items:center;justify-content:center;${chkCursor};transition:all .15s">
       ${chkMark}
@@ -6487,6 +6494,77 @@ function _upgSeasonDoReorder(fromId, toId, insertAfter = false) {
   wd.seasons = vis.slice().reverse();
   save();
   upgRerender();
+}
+
+// ── Upgrade item reordering (within a season) ──
+let _upgItemDrag = null, _upgItemTouchState = null;
+
+function upgItemDragStart(e, sid, iid) {
+  if (e.target.closest('button,input,select')) { e.preventDefault(); return; }
+  _upgItemDrag = {sid, iid};
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', iid);
+  setTimeout(() => document.querySelector(`[data-upg-item-id="${iid}"]`)?.classList.add('prov-dragging'), 0);
+}
+function upgItemDragOver(e, sid, iid) {
+  if (!_upgItemDrag || _upgItemDrag.sid !== sid || _upgItemDrag.iid === iid) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  e.currentTarget.classList.add('prov-drag-over');
+}
+function upgItemDragLeave(e) { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('prov-drag-over'); }
+function upgItemDrop(e, sid, iid) {
+  e.preventDefault();
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  if (!_upgItemDrag || _upgItemDrag.sid !== sid) { _upgItemDrag = null; return; }
+  const fromIid = _upgItemDrag.iid; _upgItemDrag = null;
+  _upgItemDoReorder(sid, fromIid, iid);
+}
+function upgItemDragEnd() {
+  document.querySelectorAll('.prov-drag-over,.prov-dragging').forEach(el => el.classList.remove('prov-drag-over','prov-dragging'));
+  _upgItemDrag = null;
+}
+function upgItemTouchStart(e, sid, iid) {
+  e.preventDefault();
+  const touch = e.touches[0], row = e.currentTarget.closest('[data-upg-item-id]'); if (!row) return;
+  const rect = row.getBoundingClientRect(), clone = row.cloneNode(true);
+  Object.assign(clone.style, {position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',opacity:'0.85',zIndex:'9999',pointerEvents:'none',outline:'2px dashed var(--blue)',borderRadius:'4px',background:'var(--surface)',boxShadow:'0 4px 16px rgba(0,0,0,.18)',transition:'none'});
+  document.body.appendChild(clone); row.style.opacity = '0.3';
+  _upgItemTouchState = {sid, iid, row, clone, offsetY: touch.clientY - rect.top, over: null};
+  document.addEventListener('touchmove', _upgItemTouchMove, {passive:false});
+  document.addEventListener('touchend', _upgItemTouchEnd);
+}
+function _upgItemTouchMove(e) {
+  e.preventDefault(); if (!_upgItemTouchState) return;
+  const touch = e.touches[0], {clone, offsetY} = _upgItemTouchState;
+  clone.style.top = (touch.clientY - offsetY) + 'px';
+  clone.style.display = 'none';
+  const under = document.elementFromPoint(touch.clientX, touch.clientY);
+  clone.style.display = '';
+  const targetRow = under?.closest('[data-upg-item-id]');
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  if (targetRow && targetRow !== _upgItemTouchState.row) { targetRow.classList.add('prov-drag-over'); _upgItemTouchState.over = targetRow; }
+  else { _upgItemTouchState.over = null; }
+}
+function _upgItemTouchEnd() {
+  document.removeEventListener('touchmove', _upgItemTouchMove); document.removeEventListener('touchend', _upgItemTouchEnd);
+  if (!_upgItemTouchState) return;
+  const {sid, row, clone, over} = _upgItemTouchState; _upgItemTouchState = null;
+  clone.remove(); row.style.opacity = '';
+  document.querySelectorAll('.prov-drag-over').forEach(el => el.classList.remove('prov-drag-over'));
+  if (over) _upgItemDoReorder(sid, row.dataset.upgItemId, over.dataset.upgItemId);
+}
+function _upgItemDoReorder(sid, fromIid, toIid) {
+  if (!fromIid || !toIid || fromIid === toIid) return;
+  const wd = getUpgradesData();
+  const s = wd.seasons.find(x => x.id === sid);
+  if (!s) return;
+  const fromIdx = s.items.findIndex(it => it.id === fromIid);
+  if (fromIdx === -1 || s.items.findIndex(it => it.id === toIid) === -1) return;
+  const [moved] = s.items.splice(fromIdx, 1);
+  s.items.splice(s.items.findIndex(it => it.id === toIid), 0, moved);
+  save(); upgRerender();
 }
 
 function prefillUpgradesData() {
