@@ -6179,6 +6179,7 @@ function renderUpgradeSeason(s, isFirst = false) {
       <div style="font-size:12px;color:var(--label3);margin-top:1px">${esc(s.location||'')}</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <button onclick="event.stopPropagation();showEditUpgradeSeason('${s.id}')" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:14px;color:var(--label3);line-height:1;flex-shrink:0">✏️</button>
       <span style="font-size:12px;color:var(--label3)">${done}/${total}</span>
       <span style="font-size:11px;color:var(--label3)">${open?'▲':'▼'}</span>
     </div>
@@ -6325,6 +6326,39 @@ function saveUpgradeSeason() {
   if (!name) { showToast('Enter a season name', true); return; }
   const wd = getUpgradesData();
   wd.seasons.push({id:uid(), name, location:document.getElementById('uas-l')?.value.trim()||'', open:true, items:[]});
+  save(); hideModal(); upgRerender();
+}
+
+function showEditUpgradeSeason(id) {
+  const wd = getUpgradesData();
+  const s = wd.seasons.find(x => x.id === id);
+  if (!s) return;
+  showModal('Edit Season', `
+    <div class="mi-label">Season name</div><input class="mi" id="ues-n" placeholder="e.g. 2027/2028" value="${esc(s.name||'')}" autofocus>
+    <div class="mi-label">Location</div><input class="mi" id="ues-l" placeholder="e.g. Paros" value="${esc(s.location||'')}">
+    <div class="modal-btns">
+      <button onclick="if(confirm('Delete this season and all its items?')){deleteUpgradeSeason('${id}')}" style="background:#FCEBEB;border:0.5px solid #F09595;color:#A32D2D;border-radius:8px;padding:8px 14px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;margin-right:auto">Delete</button>
+      <button class="btn btn-s" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-p" onclick="saveUpgradeSeasonEdit('${id}')">Save</button>
+    </div>`);
+}
+
+function saveUpgradeSeasonEdit(id) {
+  const name = document.getElementById('ues-n')?.value.trim();
+  if (!name) { showToast('Enter a season name', true); return; }
+  const wd = getUpgradesData();
+  const s = wd.seasons.find(x => x.id === id);
+  if (!s) return;
+  s.name = name;
+  s.location = document.getElementById('ues-l')?.value.trim() || '';
+  save(); hideModal(); upgRerender();
+}
+
+function deleteUpgradeSeason(id) {
+  const wd = getUpgradesData();
+  const i = wd.seasons.findIndex(x => x.id === id);
+  if (i === -1) return;
+  wd.seasons.splice(i, 1);
   save(); hideModal(); upgRerender();
 }
 
