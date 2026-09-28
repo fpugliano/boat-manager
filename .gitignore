@@ -2,5 +2,19 @@
 # Never push this to GitHub.
 oroboro-data.js
 
+# NOTE: owner-config.js IS committed, but only with the CHANGE_ME placeholder.
+# The real ADMIN_PASSWORD must live only in the Cloudflare Worker secret,
+# never in this file. Do not commit a real password here.
+
+# Cloudflare Wrangler local state & cache (contains account id / email)
+.wrangler/
+
+# Claude Code local workspace
+.claude/
+
+# Editor / temp junk
+.gitignore.tmp
+*.tmp
+
 # macOS
 .DS_Store

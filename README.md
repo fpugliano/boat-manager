@@ -4,6 +4,12 @@
 
 **Live app → [boat.sailingoroboro.com](https://boat.sailingoroboro.com)**
 
+[![Live App](https://img.shields.io/badge/Live%20App-boat.sailingoroboro.com-1E90FF?logo=safari&logoColor=white)](https://boat.sailingoroboro.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+![PWA](https://img.shields.io/badge/PWA-installable-5A0FC8)
+![Built with Vanilla JS](https://img.shields.io/badge/Vanilla-JS-F7DF1E?logo=javascript&logoColor=black)
+![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)
+
 ---
 
 ## Screenshots
@@ -39,11 +45,21 @@ No installation. No App Store. No Google Play. Open it in any browser, save to y
 - Configurable service intervals with custom tasks
 - Full maintenance log with filtering by task type
 
+### ⛽ Diesel
+- Multi-tank fuel tracking with per-engine hours
+- Refill history with price-per-litre and consumption analysis
+- Filter by season
+
+### 📖 Log Book
+- Passage log and coastal log entries
+- Printable / exportable passage reports
+
 ### 📦 Spare Parts
 - Inventory with quantities and minimum stock levels
 - Low stock warnings
 - Part numbers, locations, store URLs
 - Category filtering (Yanmar Engine, Saildrive, Watermaker, Oils & Fluids, Outboard, etc.)
+- Live search and one-tap **CSV export**
 
 ### 📄 Documents
 - Vessel registration
@@ -78,6 +94,12 @@ No installation. No App Store. No Google Play. Open it in any browser, save to y
 ### ⛵ Systems
 - Installed equipment register (Victron, navigation, sails, rigging, etc.)
 - Serial numbers, install dates, warranty expiry, manual URLs
+- Purchase details (price, supplier, invoice ref)
+- Live search and **XLS export**
+
+### ❄️ Winterize
+- Season checklists: winterize, spring re-commission, and "needs" shopping list
+- Reusable task templates carried over each season
 
 ### 🚨 Safety
 - Flare inventory with expiry tracking
@@ -123,17 +145,16 @@ All data is **end-to-end encrypted in your browser** before it ever leaves your 
 
 ```
 index.html          App shell (PWA metadata, entry point)
-app.js              All frontend logic (~9500 lines)
+app.js              All frontend logic (~13,000 lines)
 boat-worker.js      Cloudflare Worker — API + AI proxy
 styles.css          All styles
-owner-config.js     Owner-specific config (see Deployment)
+owner-config.js     Owner-specific config, committed with placeholders (see Deployment)
 wrangler.toml       Cloudflare Worker deployment config
 logo.js             Oroboro logo as JS constant
 oroboro-icon.js     App icon as JS constant
 admin.html          Admin dashboard (usage analytics)
 clear.html          Utility page to clear local storage
 CLOUDFLARE-SETUP.md Cloudflare deployment instructions
-CLAUDE.md           AI assistant context file
 ```
 
 ---
@@ -154,8 +175,13 @@ Fork this repo, then edit `owner-config.js`:
 ```js
 const OWNER_EMAIL       = 'your@email.com';
 const OWNER_STORAGE_URL = 'https://your-worker-name.your-account.workers.dev';
-const ADMIN_PASSWORD    = 'CHANGE_ME'; // must match the Worker secret
+const ADMIN_PASSWORD    = 'CHANGE_ME'; // leave as placeholder — see note below
 ```
+
+> ⚠️ **Never commit a real password here.** `owner-config.js` is served publicly by
+> the browser. The admin dashboard prompts for the password and validates it against the
+> Cloudflare Worker secret, so the real value only ever needs to live in the Worker secret
+> (`wrangler secret put ADMIN_PASSWORD`) — keep the placeholder in this file.
 
 ### 2. Deploy the Cloudflare Worker
 
@@ -164,7 +190,7 @@ const ADMIN_PASSWORD    = 'CHANGE_ME'; // must match the Worker secret
 wrangler login
 
 # Create a KV namespace
-wrangler kv:namespace create "BOAT_DATA"
+wrangler kv namespace create "BOAT_DATA"
 # Copy the returned ID into wrangler.toml
 
 # Set secrets
@@ -187,9 +213,9 @@ See [CLOUDFLARE-SETUP.md](CLOUDFLARE-SETUP.md) for detailed instructions.
 
 ## License
 
-Copyright © 2024–2026 Francesco Pugliano. All rights reserved.
+Released under the [MIT License](LICENSE) — free to use, modify, and self-host, with attribution. Copyright © 2024–2026 Francesco Pugliano.
 
-This software may not be copied, modified, distributed, or used in any form without the express written permission of the copyright holder.
+The name "Oroboro", the logo, and the personal boat data in `oroboro-data.js` are not covered by the licence and remain the author's.
 
 ---
 
