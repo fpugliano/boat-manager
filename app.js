@@ -6202,6 +6202,8 @@ function exportUpgrades() {
 
 function renderUpgradeSeason(s, isFirst = false) {
   const done = s.items.filter(x=>x.checked).length, total = s.items.length;
+  const seasonTotal = s.items.reduce((sum,it)=>sum+(parseFloat(it.cost)||0),0);
+  const totStr = seasonTotal ? `${currencySymbol()}${seasonTotal.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2})}` : '';
   const complete = total > 0 && done === total;
   const pct = total ? Math.round(done/total*100) : 0;
   // most recent season always open by default; others: open if in-progress, closed if complete
@@ -6212,7 +6214,7 @@ function renderUpgradeSeason(s, isFirst = false) {
     <span class="prov-grip" onclick="event.stopPropagation()" ontouchstart="upgSeasonTouchStart(event,'${s.id}')" style="font-size:16px;color:var(--label3);padding:4px 2px;flex-shrink:0">⠿</span>
     <div style="flex:1;min-width:0">
       <div style="font-size:15px;font-weight:700;color:var(--label)">${esc(s.name)}${badge}</div>
-      <div style="font-size:12px;color:var(--label3);margin-top:1px">${esc(s.location||'')}</div>
+      <div style="font-size:12px;color:var(--label3);margin-top:1px">${esc(s.location||'')}${s.location&&totStr?' · ':''}${totStr?`<b style="color:var(--label)">${totStr}</b>`:''}</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
       <button onclick="event.stopPropagation();showEditUpgradeSeason('${s.id}')" style="background:none;border:none;padding:2px 4px;cursor:pointer;font-size:14px;color:var(--label3);line-height:1;flex-shrink:0">✏️</button>
@@ -6230,9 +6232,7 @@ function renderUpgradeSeason(s, isFirst = false) {
   } else {
     const rows = s.items.map((item, idx) => renderUpgradeItem(s, item, idx)).join('');
     const addRow = renderUpgradeAddRow(s);
-    const seasonTotal = s.items.reduce((sum,it)=>sum+(parseFloat(it.cost)||0),0);
-    const totLine = seasonTotal > 0 ? `<div style="padding:8px 16px 10px;font-size:12px;color:var(--label3);border-top:1px solid var(--sep)">Season total: <b style="color:var(--label)">${currencySymbol()}${seasonTotal.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2})}</b></div>` : '';
-    body = `<div style="border-top:1px solid var(--sep)">${rows}${addRow}${totLine}</div>`;
+    body = `<div style="border-top:1px solid var(--sep)">${rows}${addRow}</div>`;
   }
 
   return `<div data-upg-season-id="${s.id}" draggable="true"
