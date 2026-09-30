@@ -6158,9 +6158,44 @@ function renderUpgrades() {
 
   return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 12px 8px">
     <div style="font-size:17px;font-weight:700">🔧 Upgrades &amp; Repairs</div>
-    <button onclick="showAddUpgradeSeason()" style="background:var(--surface);border:0.5px solid var(--sep);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;font-family:var(--font);color:var(--label);cursor:pointer">+ Add season</button>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button onclick="exportUpgrades()" style="background:var(--surface);border:0.5px solid var(--sep);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;font-family:var(--font);color:var(--label);cursor:pointer">⬇ Export CSV</button>
+      <button onclick="showAddUpgradeSeason()" style="background:var(--surface);border:0.5px solid var(--sep);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;font-family:var(--font);color:var(--label);cursor:pointer">+ Add season</button>
+    </div>
   </div>
   ${exMsg}${cards}${dropEnd}${summary}`;
+}
+
+function exportUpgrades() {
+  const seasons = (data.upgrades && data.upgrades.seasons) || [];
+  if (!seasons.length) { showToast('No upgrades to export', true); return; }
+
+  const csvCell = v => {
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+  };
+  const cur = currencySymbol();
+  const lines = [['Season','Location','Item','Cost ('+cur+')','Done'].map(csvCell).join(',')];
+  let grand = 0;
+  seasons.forEach(s => {
+    let subtotal = 0;
+    (s.items || []).forEach(it => {
+      subtotal += parseFloat(it.cost) || 0;
+      lines.push([s.name||'', s.location||'', it.text||'', it.cost||'', it.checked?'Yes':'No'].map(csvCell).join(','));
+    });
+    lines.push([s.name||'', s.location||'', 'SEASON TOTAL', subtotal.toFixed(2), ''].map(csvCell).join(','));
+    grand += subtotal;
+  });
+  lines.push(['', '', 'GRAND TOTAL', grand.toFixed(2), ''].map(csvCell).join(','));
+
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.download = `oroboro-upgrades-${stamp}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast(`Exported ${seasons.length} seasons`);
 }
 
 function renderUpgradeSeason(s, isFirst = false) {
