@@ -6155,12 +6155,12 @@ function renderUpgrades() {
     <span style="font-size:12px;color:var(--label3)">Drop here to move to bottom</span>
   </div>`;
 
-  return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 12px 8px">
-    <div>
-      <div style="font-size:17px;font-weight:700">🔧 Upgrades &amp; Repairs</div>
-      ${grandTotal>0?`<div style="font-size:13px;color:var(--label3);margin-top:2px">TOTAL: <b style="color:var(--label)">${currencySymbol()}${grandTotal.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2})}</b></div>`:''}
+  return `<div style="padding:12px 12px 8px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <div style="font-size:17px;font-weight:700;white-space:nowrap">🔧 Upgrades &amp; Repairs</div>
+      ${grandTotal>0?`<div style="font-size:13px;color:var(--label3);white-space:nowrap">TOTAL: <b style="color:var(--label)">${currencySymbol()}${grandTotal.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2})}</b></div>`:''}
     </div>
-    <div style="display:flex;align-items:center;gap:8px">
+    <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
       <button onclick="exportUpgrades()" style="background:var(--surface);border:0.5px solid var(--sep);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;font-family:var(--font);color:var(--label);cursor:pointer">⬇ Export CSV</button>
       <button onclick="showAddUpgradeSeason()" style="background:var(--surface);border:0.5px solid var(--sep);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;font-family:var(--font);color:var(--label);cursor:pointer">+ Add season</button>
     </div>
