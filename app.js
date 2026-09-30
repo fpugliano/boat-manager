@@ -6206,11 +6206,10 @@ function renderUpgradeSeason(s, isFirst = false) {
   const pct = total ? Math.round(done/total*100) : 0;
   // most recent season always open by default; others: open if in-progress, closed if complete
   const open = ui.upgOpen[s.id] !== undefined ? ui.upgOpen[s.id] : (isFirst || !complete);
-  const badge = complete ? `<span style="background:var(--green);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:6px">✓ Complete</span>` : '';
+  const badge = complete ? `<span style="color:var(--green);font-weight:700;margin-left:6px" title="Complete">✓</span>` : '';
   const hdr = `<div onclick="ui.upgOpen['${s.id}']=!${open};upgRerender()"
     style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;user-select:none;-webkit-user-select:none">
     <span class="prov-grip" onclick="event.stopPropagation()" ontouchstart="upgSeasonTouchStart(event,'${s.id}')" style="font-size:16px;color:var(--label3);padding:4px 2px;flex-shrink:0">⠿</span>
-    <div style="width:34px;height:34px;border-radius:9px;background:rgba(0,122,255,.1);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">⚓</div>
     <div style="flex:1;min-width:0">
       <div style="font-size:15px;font-weight:700;color:var(--label)">${esc(s.name)}${badge}</div>
       <div style="font-size:12px;color:var(--label3);margin-top:1px">${esc(s.location||'')}</div>
