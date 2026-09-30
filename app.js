@@ -6145,7 +6145,6 @@ function renderUpgrades() {
   const reversedSeasons = wd.seasons.slice().reverse();
   const firstId = reversedSeasons[0]?.id;
   const cards = reversedSeasons.map(s => renderUpgradeSeason(s, s.id === firstId)).join('');
-  const summary = grandTotal > 0 ? `<div style="margin:4px 12px 16px;padding:12px 16px;background:var(--surface);border:0.5px solid var(--sep);border-radius:12px;font-size:13px;color:var(--label3)">All seasons total: <b style="color:var(--label)">${currencySymbol()}${grandTotal.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2})}</b></div>` : '';
   const exMsg = !isOwner ? `<div style="margin:0 12px 12px;font-size:12px;color:var(--label3);font-style:italic">Replace these examples with your own upgrades and repairs</div>` : '';
 
   const dropEnd = `<div id="upg-season-drop-end"
@@ -6157,13 +6156,16 @@ function renderUpgrades() {
   </div>`;
 
   return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 12px 8px">
-    <div style="font-size:17px;font-weight:700">🔧 Upgrades &amp; Repairs</div>
+    <div>
+      <div style="font-size:17px;font-weight:700">🔧 Upgrades &amp; Repairs</div>
+      ${grandTotal>0?`<div style="font-size:13px;color:var(--label3);margin-top:2px">TOTAL: <b style="color:var(--label)">${currencySymbol()}${grandTotal.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:2})}</b></div>`:''}
+    </div>
     <div style="display:flex;align-items:center;gap:8px">
       <button onclick="exportUpgrades()" style="background:var(--surface);border:0.5px solid var(--sep);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;font-family:var(--font);color:var(--label);cursor:pointer">⬇ Export CSV</button>
       <button onclick="showAddUpgradeSeason()" style="background:var(--surface);border:0.5px solid var(--sep);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;font-family:var(--font);color:var(--label);cursor:pointer">+ Add season</button>
     </div>
   </div>
-  ${exMsg}${cards}${dropEnd}${summary}`;
+  ${exMsg}${cards}${dropEnd}`;
 }
 
 function exportUpgrades() {
