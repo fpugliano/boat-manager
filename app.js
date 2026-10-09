@@ -151,11 +151,9 @@ function parseISODate(str) {
   if (!m) return null;
   return new Date(+m[1], +m[2]-1, +m[3]);
 }
-function fmtDateEU(isoStr) {
-  const d = parseISODate(isoStr);
-  if (!d || isNaN(d)) return isoStr || '';
-  return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
-}
+// Kept as a named alias so existing call sites keep working; now delegates to
+// fmtDate() for one unified, unambiguous format ("28 Feb 2026").
+function fmtDateEU(isoStr) { return fmtDate(isoStr); }
 function daysUntil(dateStr) {
   if (!dateStr) return 9999;
   const d = parseISODate(dateStr) || new Date(dateStr);
@@ -163,10 +161,14 @@ function daysUntil(dateStr) {
   return Math.round((d - now) / 86400000);
 }
 
+// Single unified, locale-independent date formatter → "28 Feb 2026".
+// Accepts ISO (yyyy-mm-dd / ISO timestamps) and EU (dd/mm/yyyy) strings.
 function fmtDate(dateStr) {
   if (!dateStr) return '';
-  const d = parseISODate(dateStr) || new Date(dateStr);
-  if (isNaN(d)) return dateStr;
+  let d = parseISODate(dateStr);
+  if (!d) { const eu = String(dateStr).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if (eu) d = new Date(+eu[3], +eu[2]-1, +eu[1]); }
+  if (!d || isNaN(d)) { const t = new Date(dateStr); d = isNaN(t) ? null : t; }
+  if (!d || isNaN(d)) return dateStr;
   return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
 }
 
@@ -9104,7 +9106,7 @@ function tlDaysUntil(str) {
 }
 function tlFmtDate(d) {
   if (!d || isNaN(d.getTime())) return '—';
-  return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
 }
 function tlFrozenDays(log) {
   const fl = (log.freezeLog||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
@@ -9146,7 +9148,7 @@ function renderTLGauges(cur) {
   const boatRaw = tlDaysUntil(cur.validUntil);
   const boatDays = boatRaw === null ? null : boatRaw - frozen;
   const boatColor = boatDays===null?'#9ca3af':boatDays>180?'#22C55E':boatDays>90?'#F59E0B':'#EF4444';
-  const boatSubs = [cur?.validUntil?`Valid until ${esc(cur.validUntil)}`:'', frozen>0?`${frozen}d frozen`:''];
+  const boatSubs = [cur?.validUntil?`Valid until ${esc(fmtDate(cur.validUntil))}`:'', frozen>0?`${frozen}d frozen`:''];
   const g1 = tlCard('TL — Boat', tlCircleGauge(boatDays,365,boatColor), boatSubs);
 
   // Gauge 2 — User validity (6 months from userStartDate or validUntil, whichever sooner)
@@ -11935,7 +11937,7 @@ function timeAgo(isoStr) {
   if (secs < 60)   return `${secs}s ago`;
   if (secs < 3600) return `${Math.floor(secs/60)} min ago`;
   if (secs < 86400) return `${Math.floor(secs/3600)} hr ago`;
-  return new Date(isoStr).toLocaleDateString();
+  return fmtDate(isoStr);
 }
 
 // ── AI Import Assistant ──────────────────────────────────────
