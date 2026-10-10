@@ -9173,39 +9173,8 @@ function renderTLGauges(cur) {
   const userColor = userDays===null?'#9ca3af':userDays>60?'#22C55E':userDays>30?'#F59E0B':'#EF4444';
   const g2 = tlCard('User', tlCircleGauge(userDays,180,userColor), [esc(cur.holderName||'—'), `Until ${esc(userExpStr)}`, '€30 to change']);
 
-  // Gauge 3 — Schengen (live from data.schengen)
-  const holderKey = (cur.holderName||'').trim().toLowerCase();
-  const schengenMatch = holderKey ? (data.schengen?.persons||[]).find(p=>(p.name||'').trim().toLowerCase()===holderKey) : null;
-  let g3;
-  if (!schengenMatch) {
-    g3 = `<div style="background:var(--surface);border:0.5px solid var(--sep);border-radius:14px;padding:12px 8px 10px;text-align:center">
-      <div style="font-size:10px;font-weight:700;color:var(--label2);line-height:1.3;margin-bottom:4px">Schengen</div>
-      <svg viewBox="0 0 80 44" style="width:100%;display:block">
-        <path d="M8,40 A32,32 0 0,1 72,40" fill="none" stroke="#e5e7eb" stroke-width="10" stroke-linecap="round"/>
-        <text x="40" y="28" text-anchor="middle" font-size="14" font-weight="800" fill="#9ca3af" font-family="var(--font)">—</text>
-      </svg>
-      <div style="font-size:10px;color:var(--blue);cursor:pointer;margin-top:3px" onclick="showTab('schengen')">Set up in Schengen tab</div>
-    </div>`;
-  } else {
-    const isEU = schengenMatch.passports?.[schengenMatch.activePassport||0]?.eu === true;
-    if (isEU) {
-      g3 = `<div style="background:var(--surface);border:0.5px solid var(--sep);border-radius:14px;padding:12px 8px 10px;text-align:center">
-        <div style="font-size:10px;font-weight:700;color:var(--label2);line-height:1.3;margin-bottom:4px">Schengen</div>
-        <svg viewBox="0 0 80 44" style="width:100%;display:block">
-          <path d="M8,40 A32,32 0 0,1 72,40" fill="none" stroke="#e5e7eb" stroke-width="10" stroke-linecap="round"/>
-          <path d="M8,40 A32,32 0 0,1 72,40" fill="none" stroke="#22C55E" stroke-width="10" stroke-linecap="round" stroke-dasharray="101" stroke-dashoffset="0"/>
-          <text x="40" y="28" text-anchor="middle" font-size="14" font-weight="800" fill="#22C55E" font-family="var(--font)">EU</text>
-        </svg>
-        <div style="font-size:10px;color:#22C55E;font-weight:600;margin-top:3px">No limit</div>
-      </div>`;
-    } else {
-      const {days:schUsed} = calcSchengenDays(schengenMatch.log);
-      const schRem = 90 - schUsed;
-      const schColor = schRem>45?'#22C55E':schRem>20?'#F59E0B':'#EF4444';
-      g3 = tlCard('Schengen', tlCircleGauge(schRem,90,schColor), [`${schUsed}/90 used`]);
-    }
-  }
-  return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">${g1}${g2}${g3}</div>`;
+  // Schengen lives in its own tab — not mirrored here.
+  return `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:10px">${g1}${g2}</div>`;
 }
 function renderTLAlertBar(cur) {
   const issues = [];
