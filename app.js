@@ -9221,7 +9221,7 @@ function renderTLCurrentUser(cur) {
       <div style="font-size:15px;font-weight:700;color:var(--label)">${esc(cur.holderName||'—')}</div>
       <div style="font-size:12px;color:var(--label3);margin-top:2px">Valid until ${esc(expiryStr)}</div>
     </div>
-    <button onclick="showTLChangeUser()" style="background:${bdr};color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;white-space:nowrap">Change user →</button>
+    <button onclick="showTLChangeUser()" style="background:${bdr};color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;white-space:nowrap">Change / Renew →</button>
   </div>`;
 }
 function renderTLFreezeLog(cur) {
@@ -9488,10 +9488,11 @@ function deleteFreezeEntry(id) {
   save(); document.getElementById('mainContent').innerHTML=renderDocuments();
 }
 function showTLChangeUser() {
-  showModal('Change User', `
-    <div class="mi-label">New Holder / User Name</div>
-    <input class="mi" id="cu-name" placeholder="Full name" autofocus>
-    <div class="mi-label">Date of Change</div>
+  const wd=getTLData(), cur=wd.logs[wd.currentLog]||{};
+  showModal('Change / Renew User', `
+    <div class="mi-label">Holder / User Name <span style="color:var(--label3);font-weight:400">(keep the same name to renew +6 months)</span></div>
+    <input class="mi" id="cu-name" placeholder="Full name" value="${esc(cur.holderName||'')}" autofocus>
+    <div class="mi-label">Date (renewal / change)</div>
     <input class="mi" id="cu-date" type="date" value="${new Date().toISOString().slice(0,10)}">
     <div class="mi-label">Fee Paid</div>
     <input class="mi" id="cu-fee" value="€30" placeholder="€30">
@@ -9505,13 +9506,15 @@ function showTLChangeUser() {
 function saveTLChangeUser() {
   const wd=getTLData(), log=wd.logs[wd.currentLog]; if (!log) return;
   const name=document.getElementById('cu-name').value.trim();
-  if (!name) { showToast('Enter the new user name', true); return; }
+  if (!name) { showToast('Enter the user name', true); return; }
   const date=document.getElementById('cu-date').value;
   const fee=document.getElementById('cu-fee').value||'€30';
   const notes=document.getElementById('cu-notes').value;
+  const prev=(log.holderName||'').trim();
+  const renewed = prev && prev.toLowerCase()===name.toLowerCase();
   if (!log.freezeLog) log.freezeLog=[];
   log.freezeLog.push({id:uid(), type:'userChanged', date, location:'',
-    notes:`Changed to ${name} · ${fee}${notes?' · '+notes:''}`});
+    notes:`${renewed?`Renewed ${name} (+6 months)`:`Changed to ${name}`} · ${fee}${notes?' · '+notes:''}`});
   log.holderName=name;
   log.userStartDate=date;
   save(); hideModal(); document.getElementById('mainContent').innerHTML=renderDocuments();
