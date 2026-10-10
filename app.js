@@ -9227,7 +9227,7 @@ function renderTLCurrentUser(cur) {
 function renderTLFreezeLog(cur) {
   const fl = (cur.freezeLog||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
   const dotColor = {issued:'#9ca3af',hauled:'#3B82F6',relaunched:'#22C55E',userChanged:'#F59E0B'};
-  const typeLabel = {issued:'Issued',hauled:'Hauled out',relaunched:'Relaunched',userChanged:'User changed'};
+  const typeLabel = {issued:'Issued',hauled:'Hauled out (freeze)',relaunched:'Relaunched (resume)',userChanged:'User changed'};
   const rows = fl.map((e,i) => {
     const dot = dotColor[e.type]||'#9ca3af';
     const isLast = i === fl.length-1;
@@ -9427,8 +9427,8 @@ function showAddFreezeEntry() {
     <div class="mi-label">Type</div>
     <select class="mi" id="fe-type">
       <option value="issued">Issued</option>
-      <option value="hauled">Hauled out</option>
-      <option value="relaunched">Relaunched</option>
+      <option value="hauled">Hauled out (freezes clock)</option>
+      <option value="relaunched">Relaunched (resumes clock)</option>
       <option value="userChanged">User changed</option>
     </select>
     <div class="mi-label">Date</div>
@@ -9457,8 +9457,8 @@ function showEditFreezeEntry(id) {
     <div class="mi-label">Type</div>
     <select class="mi" id="fe-type">
       <option value="issued" ${e.type==='issued'?'selected':''}>Issued</option>
-      <option value="hauled" ${e.type==='hauled'?'selected':''}>Hauled out</option>
-      <option value="relaunched" ${e.type==='relaunched'?'selected':''}>Relaunched</option>
+      <option value="hauled" ${e.type==='hauled'?'selected':''}>Hauled out (freezes clock)</option>
+      <option value="relaunched" ${e.type==='relaunched'?'selected':''}>Relaunched (resumes clock)</option>
       <option value="userChanged" ${e.type==='userChanged'?'selected':''}>User changed</option>
     </select>
     <div class="mi-label">Date</div>
