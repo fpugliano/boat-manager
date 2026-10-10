@@ -1262,6 +1262,22 @@ const PHOTO_LABELS = {'vesselDoc':'Vessel Doc','insurance':'Insurance','transitL
 function renderPhotos() {
   const sub = ui.photoSub;
   const photos = data.photos?.[sub] || [];
+  const items = photos.map((p,i)=>({p, i, isPdf: p.isPdf || /^data:application\/pdf/.test(p.data||'') || (p.name||'').toLowerCase().endsWith('.pdf')}));
+  const pdfs = items.filter(x=>x.isPdf);
+  const imgs = items.filter(x=>!x.isPdf);
+
+  const pdfList = pdfs.map(({p,i})=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--surface);border:0.5px solid var(--sep);border-radius:10px;margin-bottom:8px">
+      <div onclick="viewPhoto(${i},'${sub}')" style="width:42px;height:42px;border-radius:9px;background:rgba(239,68,68,.1);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;cursor:pointer">📄</div>
+      <div style="flex:1;min-width:0">
+        <div onclick="viewPhoto(${i},'${sub}')" style="font-size:14px;font-weight:600;color:var(--label);cursor:pointer;word-break:break-word">${esc(p.name||'Document.pdf')}</div>
+        <input value="${esc(p.caption||'')}" placeholder="Caption…" onblur="savePhotoCaption('${sub}',${i},this.value)"
+          style="width:100%;border:0.5px solid var(--sep);border-radius:6px;padding:4px 8px;font-size:12px;font-family:var(--font);color:var(--label);background:var(--surface2);margin-top:4px;box-sizing:border-box">
+        <div style="font-size:11px;color:var(--label3);margin-top:3px">${p.sizeKb?p.sizeKb+' KB · ':''}PDF · tap to open ↗</div>
+      </div>
+      <button onclick="deletePhoto(${i},'${sub}')" style="background:none;border:none;color:var(--label3);font-size:16px;cursor:pointer;flex-shrink:0;padding:6px">✕</button>
+    </div>`).join('');
+
   return `
     <div class="subtab-bar">
       ${PHOTO_SUBS.map(s=>`<div class="pill ${sub===s?'active':''}" onclick="ui.photoSub='${s}';document.getElementById('mainContent').innerHTML=renderDocuments()">
@@ -1272,23 +1288,16 @@ function renderPhotos() {
       <div class="upload-zone" onclick="_photoCtx={section:'${sub}'};document.getElementById('photoFile').click()">
         📎 Tap to add photo or PDF
       </div>
+      ${pdfs.length ? `<div style="margin-top:10px">${pdfList}</div>` : ''}
       <div class="photo-grid">
-        ${photos.map((p,i)=>{
-          const isPdf = p.isPdf || /^data:application\/pdf/.test(p.data||'') || (p.name||'').toLowerCase().endsWith('.pdf');
-          const thumb = isPdf
-            ? `<div onclick="viewPhoto(${i},'${sub}')" style="aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:var(--surface2);border-radius:8px;cursor:pointer;padding:8px;box-sizing:border-box">
-                 <div style="font-size:34px;line-height:1">📄</div>
-                 <div style="font-size:10px;color:var(--label3);text-align:center;word-break:break-word;max-height:28px;overflow:hidden">${esc(p.name||'PDF')}</div>
-               </div>`
-            : `<img src="${p.data}" onclick="viewPhoto(${i},'${sub}')" alt="${esc(p.caption||'')}">`;
-          return `<div class="photo-item">
-            ${thumb}
+        ${imgs.map(({p,i})=>`
+          <div class="photo-item">
+            <img src="${p.data}" onclick="viewPhoto(${i},'${sub}')" alt="${esc(p.caption||'')}">
             <button class="photo-del" onclick="deletePhoto(${i},'${sub}')">✕</button>
             <input class="photo-cap" value="${esc(p.caption||'')}" placeholder="Caption…"
               onblur="savePhotoCaption('${sub}',${i},this.value)">
             ${p.sizeKb ? `<div style="font-size:10px;color:var(--label3);text-align:center;padding:2px 0">Saved as ${p.sizeKb} KB</div>` : ''}
-          </div>`;
-        }).join('')}
+          </div>`).join('')}
       </div>
     </div>`;
 }
