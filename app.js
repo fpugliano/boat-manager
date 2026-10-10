@@ -1270,17 +1270,25 @@ function renderPhotos() {
     </div>
     <div style="margin-top:12px">
       <div class="upload-zone" onclick="_photoCtx={section:'${sub}'};document.getElementById('photoFile').click()">
-        📷 Tap to add photo
+        📎 Tap to add photo or PDF
       </div>
       <div class="photo-grid">
-        ${photos.map((p,i)=>`
-          <div class="photo-item">
-            <img src="${p.data}" onclick="viewPhoto(${i},'${sub}')" alt="${esc(p.caption||'')}">
+        ${photos.map((p,i)=>{
+          const isPdf = p.isPdf || /^data:application\/pdf/.test(p.data||'') || (p.name||'').toLowerCase().endsWith('.pdf');
+          const thumb = isPdf
+            ? `<div onclick="viewPhoto(${i},'${sub}')" style="aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:var(--surface2);border-radius:8px;cursor:pointer;padding:8px;box-sizing:border-box">
+                 <div style="font-size:34px;line-height:1">📄</div>
+                 <div style="font-size:10px;color:var(--label3);text-align:center;word-break:break-word;max-height:28px;overflow:hidden">${esc(p.name||'PDF')}</div>
+               </div>`
+            : `<img src="${p.data}" onclick="viewPhoto(${i},'${sub}')" alt="${esc(p.caption||'')}">`;
+          return `<div class="photo-item">
+            ${thumb}
             <button class="photo-del" onclick="deletePhoto(${i},'${sub}')">✕</button>
             <input class="photo-cap" value="${esc(p.caption||'')}" placeholder="Caption…"
               onblur="savePhotoCaption('${sub}',${i},this.value)">
             ${p.sizeKb ? `<div style="font-size:10px;color:var(--label3);text-align:center;padding:2px 0">Saved as ${p.sizeKb} KB</div>` : ''}
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>
     </div>`;
 }
@@ -1308,10 +1316,29 @@ function compressImage(file, maxSize, quality, callback) {
 
 function handlePhotoUpload(input) {
   const file = input.files[0]; if (!file) return;
+  const section = _photoCtx?.section || ui.photoSub;
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  if (isPdf) {
+    // PDFs can't be canvas-compressed; store as-is. They're base64 inside your
+    // encrypted data, so keep them reasonable to avoid bloating storage/sync.
+    if (file.size > 5 * 1024 * 1024) { showToast('PDF too large — max 5 MB', true); input.value = ''; return; }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const dataUrl = String(e.target.result);
+      const base64 = dataUrl.split(',')[1] || '';
+      const sizeKb = Math.round(base64.length * 0.75 / 1024);
+      if (!data.photos) data.photos = {};
+      if (!data.photos[section]) data.photos[section] = [];
+      data.photos[section].push({id:uid(), data:dataUrl, caption:'', sizeKb, isPdf:true, name:file.name});
+      save(); document.getElementById('mainContent').innerHTML = renderPhotos();
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+    return;
+  }
   compressImage(file, 1200, 0.7, function(compressed) {
     const base64 = compressed.split(',')[1] || '';
     const sizeKb = Math.round(base64.length * 0.75 / 1024);
-    const section = _photoCtx?.section || ui.photoSub;
     if (!data.photos) data.photos = {};
     if (!data.photos[section]) data.photos[section] = [];
     data.photos[section].push({id:uid(), data:compressed, caption:'', sizeKb});
@@ -1332,7 +1359,25 @@ function savePhotoCaption(section, i, val) {
 
 function viewPhoto(i, section) {
   const p = data.photos?.[section]?.[i]; if (!p) return;
+  const isPdf = p.isPdf || /^data:application\/pdf/.test(p.data||'') || (p.name||'').toLowerCase().endsWith('.pdf');
+  if (isPdf) { openDataFile(p.data, p.name || 'document.pdf'); return; }
   showModal(p.caption||'Photo', `<img src="${p.data}" style="width:100%;border-radius:8px">`);
+}
+
+// Open a base64 data: URL (e.g. a stored PDF) in a new tab. Converting to a Blob
+// URL first because browsers block top-level navigation to data: URLs.
+function openDataFile(dataUrl, name) {
+  try {
+    const [meta, b64] = String(dataUrl).split(',');
+    const mime = (meta.match(/data:([^;]+)/) || [])[1] || 'application/octet-stream';
+    const bin = atob(b64 || '');
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([arr], {type: mime}));
+    const w = window.open(url, '_blank');
+    if (!w) showToast('Allow pop-ups to view the PDF', true);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) { showToast('Could not open file', true); }
 }
 
 // ═══════════════════════════════════════════════════════════
