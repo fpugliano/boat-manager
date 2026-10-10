@@ -9119,6 +9119,13 @@ function tlFrozenDays(log) {
       haulDate = null;
     }
   }
+  // Open (ongoing) haul-out — not yet relaunched: the clock is paused right now,
+  // so count the freeze from the haul-out date up to today.
+  if (haulDate) {
+    const h = parseISODate(haulDate);
+    const now = new Date(); now.setHours(0,0,0,0);
+    if (h && now > h) frozen += Math.round((now - h) / 86400000);
+  }
   return frozen;
 }
 function tlCircleGauge(days, maxDays, color) {
@@ -9146,9 +9153,10 @@ function renderTLGauges(cur) {
   // Gauge 1 — Boat validity
   const frozen = tlFrozenDays(cur);
   const boatRaw = tlDaysUntil(cur.validUntil);
-  const boatDays = boatRaw === null ? null : boatRaw - frozen;
+  const boatDays = boatRaw === null ? null : boatRaw + frozen; // frozen days extend the deadline
   const boatColor = boatDays===null?'#9ca3af':boatDays>180?'#22C55E':boatDays>90?'#F59E0B':'#EF4444';
-  const boatSubs = [cur?.validUntil?`Valid until ${esc(fmtDate(cur.validUntil))}`:'', frozen>0?`${frozen}d frozen`:''];
+  const effExpiry = (()=>{ const d = parseTLDate(cur?.validUntil); if (!d) return ''; d.setDate(d.getDate()+frozen); return tlFmtDate(d); })();
+  const boatSubs = [cur?.validUntil?`Valid until ${esc(effExpiry)}`:'', frozen>0?`${frozen}d frozen`:''];
   const g1 = tlCard('TL — Boat', tlCircleGauge(boatDays,365,boatColor), boatSubs);
 
   // Gauge 2 — User validity (6 months from userStartDate or validUntil, whichever sooner)
@@ -9202,7 +9210,7 @@ function renderTLGauges(cur) {
 function renderTLAlertBar(cur) {
   const issues = [];
   const frozen = tlFrozenDays(cur);
-  const boatDays = tlDaysUntil(cur.validUntil) !== null ? tlDaysUntil(cur.validUntil) - frozen : null;
+  const boatDays = tlDaysUntil(cur.validUntil) !== null ? tlDaysUntil(cur.validUntil) + frozen : null;
   if (boatDays !== null && boatDays <= 180) issues.push(boatDays<=90?`🔴 Boat TL expires in ${boatDays}d`:`🟡 Boat TL expires in ${boatDays}d`);
   const startDate = parseTLDate(cur.userStartDate||cur.issueDate||cur.validFrom||'');
   if (startDate) {
@@ -9552,7 +9560,7 @@ function renderClearance() {
   // ── Gauge 1: TL Boat ──
   const frozen   = cur ? tlFrozenDays(cur) : 0;
   const boatRaw  = cur ? tlDaysUntil(cur.validUntil) : null;
-  const boatDays = boatRaw !== null ? boatRaw - frozen : null;
+  const boatDays = boatRaw !== null ? boatRaw + frozen : null; // frozen days extend the deadline
   const boatColor= boatDays===null?'#9ca3af':boatDays>180?'#22C55E':boatDays>90?'#F59E0B':'#EF4444';
 
   // ── Gauge 2: User ──
@@ -9643,7 +9651,11 @@ function renderClearance() {
   }
 
   const g1subs = [];
-  if (cur?.validUntil) g1subs.push(`Valid until ${esc(cur.validUntil)}`);
+  if (cur?.validUntil) {
+    const d = parseTLDate(cur.validUntil);
+    if (d) d.setDate(d.getDate()+frozen);
+    g1subs.push(`Valid until ${esc(d ? tlFmtDate(d) : fmtDate(cur.validUntil))}`);
+  }
   if (frozen>0) g1subs.push(`${frozen}d frozen`);
 
   const g2subs = [esc(cur?.holderName||'—'), `Until ${esc(userExpStr)}`, '€30 to change'];
